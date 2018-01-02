@@ -1717,6 +1717,24 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		setImmersiveMode(false);
 		camera_in_background = true;
     }
+
+	/** Use this is place of simply alert.show(), if the orientation has just been set to allow
+	 *  rotation via setWindowFlagsForSettings(). On some devices (e.g., OnePlus 3T with Android 8),
+	 *  the dialog doesn't show properly if the phone is held in portrait. A workaround seems to be
+	 *  to use postDelayed. Note that postOnAnimation() doesn't work.
+	 */
+	public void showAlert(final AlertDialog alert) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "showAlert");
+		Handler handler = new Handler();
+		handler.postDelayed(new Runnable() {
+			public void run() {
+				alert.show();
+			}
+		}, 20);
+		// note that 1ms usually fixes the problem, but not always; 10ms seems fine, have set 20ms
+		// just in case
+	}
     
     public void showPreview(boolean show) {
 		if( MyDebug.LOG )
@@ -1938,7 +1956,14 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				// from http://stackoverflow.com/questions/11073832/no-activity-found-to-handle-intent - needed to fix crash if no gallery app installed
 				//Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("blah")); // test
 				if( intent.resolveActivity(getPackageManager()) != null ) {
-					this.startActivity(intent);
+					try {
+						this.startActivity(intent);
+					}
+					catch(SecurityException e2) {
+						// have received this crash from Google Play - don't display a toast, simply do nothing
+						Log.e(TAG, "SecurityException from ACTION_VIEW startActivity");
+						e2.printStackTrace();
+					}
 				}
 				else{
 					preview.showToast(null, R.string.no_gallery_app);
@@ -2093,7 +2118,10 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		showPreview(false);
 		setWindowFlagsForSettings();
 		FolderChooserDialog fragment = new MyFolderChooserDialog();
-		fragment.show(getFragmentManager(), "FOLDER_FRAGMENT");
+		// use commitAllowingStateLoss() instead of fragment.show(), does to "java.lang.IllegalStateException: Can not perform this action after onSaveInstanceState" crash seen on Google Play
+		// see https://stackoverflow.com/questions/14262312/java-lang-illegalstateexception-can-not-perform-this-action-after-onsaveinstanc
+		//fragment.show(getFragmentManager(), "FOLDER_FRAGMENT");
+		getFragmentManager().beginTransaction().add(fragment, "FOLDER_FRAGMENT").commitAllowingStateLoss();
     }
 
     /** User can long-click on gallery to select a recent save location from the history, of if not available,
@@ -2231,9 +2259,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				showPreview(true);
 			}
 		});
-        alertDialog.show();
 		//getWindow().setLayout(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT);
 		setWindowFlagsForSettings();
+		showAlert(alertDialog.create());
     }
 
     /** Clears the non-SAF folder history.

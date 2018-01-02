@@ -289,7 +289,7 @@ public class CameraController1 extends CameraController {
 		return "Camera";
 	}
 	
-	public CameraFeatures getCameraFeatures() {
+	public CameraFeatures getCameraFeatures() throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "getCameraFeatures()");
 	    Camera.Parameters parameters = this.getParameters();
@@ -316,6 +316,12 @@ public class CameraController1 extends CameraController {
 
 		// get available sizes
 		List<Camera.Size> camera_picture_sizes = parameters.getSupportedPictureSizes();
+		if( camera_picture_sizes == null ) {
+			// Google Play crashes suggest that getSupportedPictureSizes() can be null?! Better to fail gracefully
+			// instead of crashing
+			Log.e(TAG, "getSupportedPictureSizes() returned null!");
+			throw new CameraControllerException();
+		}
 		camera_features.picture_sizes = new ArrayList<>();
 		//camera_features.picture_sizes.add(new CameraController.Size(1920, 1080)); // test
 		for(Camera.Size camera_size : camera_picture_sizes) {

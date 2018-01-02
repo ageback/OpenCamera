@@ -1631,7 +1631,15 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		// we'll switch to the user-requested focus by calling setFocusPref() from setupCameraParameters() below
 		this.updateFocusForVideo();
 
-		setupCameraParameters();
+		try {
+			setupCameraParameters();
+		}
+		catch(CameraControllerException e) {
+			e.printStackTrace();
+			applicationInterface.onCameraError();
+			closeCamera(false, null);
+			return;
+		}
 
 		// now switch to video if saved
 		boolean saved_is_video = applicationInterface.isVideoPref();
@@ -1775,7 +1783,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 	}
 
-	private void setupCameraParameters() {
+	private void setupCameraParameters() throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setupCameraParameters()");
 		long debug_time = 0;
@@ -1905,15 +1913,6 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 							return;
 						}
 						// don't assign to faces_detected yet, as that has to be done on the UI thread
-				    	// convert rects to preview screen space
-						final Matrix matrix = getCameraToPreviewMatrix();
-						for(CameraController.Face face : faces) {
-							face_rect.set(face.rect);
-							matrix.mapRect(face_rect);
-							face_rect.round(face.rect);
-						}
-
-						reportFaces(faces);
 
 						// We don't synchronize on faces_detected, as the array may be passed to other
 						// classes via getFacesDetected(). Although that function could copy instead,
@@ -1922,6 +1921,17 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 						Activity activity = (Activity)Preview.this.getContext();
 						activity.runOnUiThread(new Runnable() {
 							public void run() {
+								// convert rects to preview screen space - also needs to be done on UI thread
+								// (otherwise can have crashes if camera_controller becomes null in the meantime)
+								final Matrix matrix = getCameraToPreviewMatrix();
+								for(CameraController.Face face : faces) {
+									face_rect.set(face.rect);
+									matrix.mapRect(face_rect);
+									face_rect.round(face.rect);
+								}
+
+								reportFaces(faces);
+
 								if( faces_detected == null || faces_detected.length != faces.length ) {
 									// avoid unnecessary reallocations
 									if( MyDebug.LOG )
@@ -1934,7 +1944,6 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				    }
 
 					/** Accessibility: report number of faces for talkback etc.
-					 *  Note, at least for Camera2 API, reportFaces() isn't called on UI thread.
 					 */
 				    private void reportFaces(CameraController.Face[] local_faces) {
 						if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && accessibility_manager.isEnabled() && accessibility_manager.isTouchExplorationEnabled() ) {
@@ -6156,7 +6165,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					toast.setView(text);
 				}
 				toast.setDuration(Toast.LENGTH_SHORT);
-				toast.show();
+				if( !((Activity)getContext()).isFinishing() ) {
+					// Workaround for crash due to bug in Android 7.1 when activity is closing whilst toast shows.
+					// This was fixed in Android 8, but still good to fix the crash on Android 7.1! See
+					// https://stackoverflow.com/questions/47548317/what-belong-is-badtokenexception-at-classes-of-project and
+					// https://github.com/drakeet/ToastCompat#why .
+					toast.show();
+				}
 				last_toast = toast;
 			}
 		});
@@ -6222,7 +6237,20 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	/** Returns the frame rate that the preview's surface or canvas view should be updated.
 	 */
 	public long getFrameRate() {
-		// avoid overloading ui thread when taking photo
+    	/* See https://stackoverflow.com/questions/44594711/slow-rendering-when-updating-textview ,
+    	   https://stackoverflow.com/questions/44233870/how-to-fix-slow-rendering-android-vitals -
+    	   there is evidence that using an infrequent update actually results in poorer performance,
+    	   due to devices running in a lower power state, but Google Play analytics do not take this
+    	   into consideration. Thus we are forced to request updates at 60fps whether we need them
+    	   or not. I can reproducing this giving improved performance on OnePlus 3T for old and
+    	   Camera2 API. Testing suggests this does not seem to adversely affect battery life.
+    	   This is limited to Android 7+, to avoid causing problems on older devices (which don't
+    	   contribute to Google Analytics anyway).
+    	 */
+		//
+    	if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.N )
+    		return 16;
+		// old behaviour: avoid overloading ui thread when taking photo
     	return this.isTakingPhoto() ? 500 : 100;
 	}
 
