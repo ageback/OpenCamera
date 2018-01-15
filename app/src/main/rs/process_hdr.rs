@@ -102,13 +102,13 @@ static uchar4 tonemap(float3 hdr) {
             float scale = 255.0f / ( tonemap_scale + value );
             scale *= linear_scale;
             // shouldn't need to clamp - linear_scale should be such that values don't map to more than 255
-            /*out.r = (uchar)(scale * hdr.r + 0.5f);
+            out.r = (uchar)(scale * hdr.r + 0.5f);
             out.g = (uchar)(scale * hdr.g + 0.5f);
-            out.b = (uchar)(scale * hdr.b + 0.5f);*/
-        	float3 out_f = scale * hdr;
+            out.b = (uchar)(scale * hdr.b + 0.5f);
+        	/*float3 out_f = scale * hdr;
             out.r = (uchar)clamp(out_f.r+0.5f, 0.0f, 255.0f);
             out.g = (uchar)clamp(out_f.g+0.5f, 0.0f, 255.0f);
-            out.b = (uchar)clamp(out_f.b+0.5f, 0.0f, 255.0f);
+            out.b = (uchar)clamp(out_f.b+0.5f, 0.0f, 255.0f);*/
             out.a = 255;
             /*int test_r = (int)(scale * hdr.r + 0.5f);
             int test_g = (int)(scale * hdr.g + 0.5f);
@@ -481,6 +481,8 @@ uchar4 __attribute__((kernel)) hdr_n(uchar4 in, uint32_t x, uint32_t y) {
     		float3 base_rgb = rgb;
 			int adj_indx = mid_indx;
 
+            for(int k=0;k<mid_indx;k++) {
+
 			// now look at a neighbour image
 			weight = 1.0f - weight;
 			if( avg <= 127.5f ) {
@@ -490,14 +492,16 @@ uchar4 __attribute__((kernel)) hdr_n(uchar4 in, uint32_t x, uint32_t y) {
     			adj_indx--;
 			}
             rgb = convert_float3(pixels[adj_indx].rgb);
-            /*if( n_bitmaps_g > 3 ) {
+            //if( n_bitmaps_g > 3 ) {
+            if( k+1 < mid_indx ) {
+                // there will be at least one more adjacent image to look at
                 avg = (rgb.r+rgb.g+rgb.b) / 3.0f;
                 diff = fabs( avg - 127.5f );
                 if( diff > safe_range_c ) {
                     // scaling chosen so that 0 and 255 map to a non-zero weight of 0.01
                     weight *= 1.0f - 0.99f * (diff - safe_range_c) / (127.5f - safe_range_c);
                 }
-            }*/
+            }
             rgb = parameter_A[adj_indx] * rgb + parameter_B[adj_indx];
 
             float value = fmax(rgb.r, rgb.g);
@@ -529,6 +533,10 @@ uchar4 __attribute__((kernel)) hdr_n(uchar4 in, uint32_t x, uint32_t y) {
 			hdr += weight * rgb;
 			sum_weight += weight;
 
+			if( diff <= safe_range_c ) {
+			    break;
+            }
+
 			/*if( n_bitmaps_g > 3 && diff > safe_range_c ) {
                 // now look at a neighbour image
                 weight = 1.0f - weight;
@@ -540,7 +548,7 @@ uchar4 __attribute__((kernel)) hdr_n(uchar4 in, uint32_t x, uint32_t y) {
                     adj_indx--;
                 }
                 rgb = convert_float3(pixels[adj_indx].rgb);
-                if( n_bitmaps_g > 5 ) {
+                if( false && n_bitmaps_g > 5 ) {
                     avg = (rgb.r+rgb.g+rgb.b) / 3.0f;
                     diff = fabs( avg - 127.5f );
                     if( diff > safe_range_c ) {
@@ -550,21 +558,47 @@ uchar4 __attribute__((kernel)) hdr_n(uchar4 in, uint32_t x, uint32_t y) {
                 }
                 rgb = parameter_A[adj_indx] * rgb + parameter_B[adj_indx];
 
-                // todo: deghosting
+                float value = fmax(rgb.r, rgb.g);
+                value = fmax(value, rgb.b);
+                if( value <= 250.0f )
+                {
+                    // deghosting
+                    // for overexposed pixels, we don't have a reliable value for that pixel, so we can't distinguish between
+                    // pixels that are overexposed, and those that need deghosting, so we limit to value <= 250.0f
+                    // tests that benefit from deghosting for dark pixels: testHDR2, testHDR9, testHDR19, testHDR21, testHDR30,
+                    // testHDR35, testHDR37, testHDR40, testHDR41, testHDR42, testHDR44
+                    // tests that benefit from deghosting for bright pixels: testHDR2, testHDR41, testHDR42
+                    // for 127.5-avg = 96.0, we want wiener_C = wiener_C_lo
+                    // for 127.5-avg = 127.5f, we want wiener_C = wiener_C_hi
+                    const float wiener_C_lo = 2000.0f;
+                    const float wiener_C_hi = 8000.0f;
+                    float wiener_C = wiener_C_lo; // higher value means more HDR but less ghosting
+                    float x = fabs( value - 127.5f ) - 96.0f;
+                    if( x > 0.0f ) {
+                        const float scale = (wiener_C_hi-wiener_C_lo)/(127.5f-96.0f);
+                        wiener_C = wiener_C_lo + x*scale;
+                    }
+                    float3 diff = base_rgb - rgb;
+                    float L = dot(diff, diff);
+                    float ghost_weight = L/(L+wiener_C);
+                    rgb = ghost_weight * base_rgb + (1.0-ghost_weight) * rgb;
+                }
 
                 hdr += weight * rgb;
                 sum_weight += weight;
 
                 // testing: make all non-safe images purple:
-                hdr.r = 255;
-                hdr.g = 0;
-                hdr.b = 255;
+                //hdr.r = 255;
+                //hdr.g = 0;
+                //hdr.b = 255;
 			}*/
 
 			// testing: make all non-safe images purple:
 			//hdr.r = 255;
 			//hdr.g = 0;
 			//hdr.b = 255;
+		}
+
 		}
 	}
 
