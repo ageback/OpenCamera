@@ -216,9 +216,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 
 	private boolean has_capture_rate_factor; // whether we have a capture rate for faster or slow motion
 	private float capture_rate_factor = 1.0f; // should be 1.0f if has_capture_rate_factor is false
-	private boolean video_high_speed;
+	private boolean video_high_speed; // whether the current video mode requires high speed frame rate (note this may still be true even if is_video==false, so potentially we could switch photo/video modes without setting up the flag)
 	private boolean supports_video_high_speed;
-	private CameraController.Size video_high_speed_size;
 	private final VideoQualityHandler video_quality_handler = new VideoQualityHandler();
 
 	private Toast last_toast;
@@ -1281,7 +1280,6 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		capture_rate_factor = 1.0f;
 		video_high_speed = false;
 		supports_video_high_speed = false;
-		video_high_speed_size = null;
 		video_quality_handler.resetCurrentQuality();
 		supported_flash_values = null;
 		current_flash_index = -1;
@@ -1661,23 +1659,20 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			}
 		}
 
-		// Setup for high speed - must be done after setupCameraParameters() and switching to video mode, but before setPreviewSize()
-		/*if( this.is_video && this.supports_video_high_speed
-				&& false
+		// in theory it shouldn't matter if we call setVideoHighSpeed(true) if is_video==false, as it should only have an effect
+		// in video mode; but don't set high speed mode in photo mode just to be safe
+		// Setup for high speed - must be done after setupCameraParameters() and switching to video mode, but before setPreviewSize() and startCameraPreview()
+		camera_controller.setVideoHighSpeed(is_video && video_high_speed);
+	    // test slow motion
+		/*if( this.is_video && video_high_speed
+				//&& false
 				// && applicationInterface.isVideoSlowMotionPref()
 			) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "set capture rate for slow motion");
 	    	has_capture_rate_factor = true;
 	    	capture_rate_factor = 0.25f;
-			video_high_speed = true;
-			camera_controller.setVideoHighSpeed(true);
-		}
-		else {
-			video_high_speed = false;
-			camera_controller.setVideoHighSpeed(false);
-		}
-		has_capture_rate_factor = true;
-		capture_rate_factor = 0.25f;
-		*/
+		}*/
 
 		if( do_startup_focus && using_android_l && camera_controller.supportsAutoFocus() ) {
 			// need to switch flash off for autofocus - and for Android L, need to do this before starting preview (otherwise it won't work in time); for old camera API, need to do this after starting preview!
@@ -1857,18 +1852,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			this.view_angle_x = camera_features.view_angle_x;
 			this.view_angle_y = camera_features.view_angle_y;
 			this.supports_video_high_speed = camera_features.video_sizes_high_speed != null && camera_features.video_sizes_high_speed.size() > 0;
-			if( supports_video_high_speed ) {
-				// only use highest high speed resolution for now
-				for(int i=0;i<camera_features.video_sizes_high_speed.size();i++) {
-					CameraController.Size size = camera_features.video_sizes_high_speed.get(i);
-		        	if( video_high_speed_size == null || size.width*size.height > video_high_speed_size.width*video_high_speed_size.height ) {
-		        		video_high_speed_size = size;
-		        	}
-		        }
-				if( MyDebug.LOG )
-					Log.d(TAG, "supports_video_high_speed, size: " + video_high_speed_size.width + " x " + video_high_speed_size.height);
-			}
 			this.video_quality_handler.setVideoSizes(camera_features.video_sizes);
+			this.video_quality_handler.setVideoSizesHighSpeed(camera_features.video_sizes_high_speed);
 	        this.supported_preview_sizes = camera_features.preview_sizes;
 		}
 		if( MyDebug.LOG ) {
@@ -2375,6 +2360,35 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 
 		{
+			// set up high speed frame rates
+			// should be done after checking the requested video size is available
+			video_high_speed = false;
+			if( this.supports_video_high_speed ) {
+				VideoProfile profile = getVideoProfile();
+				if( MyDebug.LOG )
+					Log.d(TAG, "check if we need high speed video for " + profile.videoFrameWidth + " x " + profile.videoFrameHeight + " at fps " + profile.videoCaptureRate);
+				CameraController.Size requested_size = new CameraController.Size(profile.videoFrameWidth, profile.videoFrameHeight);
+				CameraController.Size best_video_size = CameraController.CameraFeatures.findSize(video_quality_handler.getSupportedVideoSizes(), requested_size, profile.videoCaptureRate, false);
+				if( best_video_size == null && video_quality_handler.getSupportedVideoSizesHighSpeed() != null ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "need to check high speed sizes");
+					// check high speed
+					best_video_size = CameraController.CameraFeatures.findSize(video_quality_handler.getSupportedVideoSizesHighSpeed(), requested_size, profile.videoCaptureRate, false);
+				}
+
+				if( best_video_size == null ) {
+					Log.e(TAG, "fps not supported for this video size: " + profile.videoFrameWidth + " x " + profile.videoFrameHeight + " at fps " + profile.videoCaptureRate);
+					// TODO handle this
+				}
+				else if( best_video_size.high_speed ) {
+					video_high_speed = true;
+				}
+			}
+			if( MyDebug.LOG )
+				Log.d(TAG, "video_high_speed?: " + video_high_speed);
+		}
+
+		{
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "set up flash");
 				Log.d(TAG, "flash values: " + supported_flash_values);
@@ -2495,14 +2509,16 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		CameraController.Size new_size = null;
     	if( this.is_video ) {
 			// see comments for getOptimalVideoPictureSize()
+			VideoProfile profile = getVideoProfile();
+			if( MyDebug.LOG )
+				Log.d(TAG, "video size: " + profile.videoFrameWidth + " x " + profile.videoFrameHeight);
         	if( video_high_speed ) {
-        		// picture size must match video resolution for high speed, see doc for CameraDevice.createConstrainedHighSpeedCaptureSession()
-				new_size = new CameraController.Size(video_high_speed_size.width, video_high_speed_size.height);
+				// It's unclear it matters what size we set here given that high speed is only for Camera2 API, and that
+				// take photo whilst recording video isn't supported for high speed video - so for Camera2 API, setting
+				// picture size should have no effect. But set to a sensible value just in case.
+				new_size = new CameraController.Size(profile.videoFrameWidth, profile.videoFrameHeight);
 			}
 			else {
-				VideoProfile profile = getVideoProfile();
-				if( MyDebug.LOG )
-					Log.d(TAG, "video size: " + profile.videoFrameWidth + " x " + profile.videoFrameHeight);
 				double targetRatio = ((double) profile.videoFrameWidth) / (double) profile.videoFrameHeight;
 				new_size = getOptimalVideoPictureSize(sizes, targetRatio);
 			}
@@ -2657,67 +2673,64 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	 *  non-null), but not always (e.g., for slow motion mode).
 	 */
 	public VideoProfile getVideoProfile() {
+		VideoProfile video_profile;
+
 		// 4K UHD video is not yet supported by Android API (at least testing on Samsung S5 and Note 3, they do not return it via getSupportedVideoSizes(), nor via a CamcorderProfile (either QUALITY_HIGH, or anything else)
 		// but it does work if we explicitly set the resolution (at least tested on an S5)
 		if( camera_controller == null ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "camera not opened!");
-			return new VideoProfile( CamcorderProfile.get(0, CamcorderProfile.QUALITY_HIGH) );
+			video_profile = new VideoProfile( CamcorderProfile.get(0, CamcorderProfile.QUALITY_HIGH) );
+			Log.e(TAG, "camera not opened! returning default video profile for QUALITY_HIGH");
+			return video_profile;
 		}
-		if( video_high_speed ) {
+		/*if( video_high_speed ) {
 			// return a video profile for a high speed frame rate - note that if we have a capture rate factor of say 0.25x,
 			// the actual fps and bitrate of the resultant video would also be scaled by a factor of 0.25x
-			/*return new VideoProfile(MediaRecorder.AudioEncoder.AAC, MediaRecorder.OutputFormat.WEBM, 20000000,
-					MediaRecorder.VideoEncoder.VP8, this.video_high_speed_size.height, 120,
-					this.video_high_speed_size.width);*/
+			//return new VideoProfile(MediaRecorder.AudioEncoder.AAC, MediaRecorder.OutputFormat.WEBM, 20000000,
+			//		MediaRecorder.VideoEncoder.VP8, this.video_high_speed_size.height, 120,
+			//		this.video_high_speed_size.width);
 			return new VideoProfile(MediaRecorder.AudioEncoder.AAC, MediaRecorder.OutputFormat.MPEG_4, 4*14000000,
 					MediaRecorder.VideoEncoder.H264, this.video_high_speed_size.height, 120,
 					this.video_high_speed_size.width);
-		}
-		CamcorderProfile profile;
-		int cameraId = camera_controller.getCameraId();
+		}*/
 
-		if( applicationInterface.getForce4KPref() ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "force 4K UHD video");
-			profile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH);
-			profile.videoFrameWidth = 3840;
-			profile.videoFrameHeight = 2160;
-			profile.videoBitRate = (int)(profile.videoBitRate*2.8); // need a higher bitrate for the better quality - this is roughly based on the bitrate used by an S5's native camera app at 4K (47.6 Mbps, compared to 16.9 Mbps which is what's returned by the QUALITY_HIGH profile)
-		}
-		else if( this.video_quality_handler.getCurrentVideoQualityIndex() != -1 ) {
-			profile = getCamcorderProfile(this.video_quality_handler.getCurrentVideoQuality());
-		}
-		else {
-			profile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH);
-		}
-		if( MyDebug.LOG ) {
-			Log.d(TAG, "fileFormat: " + profile.fileFormat);
-			Log.d(TAG, "audioCodec: " + profile.audioCodec);
-			Log.d(TAG, "videoCodec: " + profile.videoCodec);
-		}
-
-		String bitrate_value = applicationInterface.getVideoBitratePref();
-		if( !bitrate_value.equals("default") ) {
-			try {
-				int bitrate = Integer.parseInt(bitrate_value);
-				if( MyDebug.LOG )
-					Log.d(TAG, "bitrate: " + bitrate);
-				profile.videoBitRate = bitrate;
-			}
-			catch(NumberFormatException exception) {
-				if( MyDebug.LOG )
-					Log.d(TAG, "bitrate invalid format, can't parse to int: " + bitrate_value);
-			}
-		}
-
+		// Get user settings
+		boolean record_audio = applicationInterface.getRecordAudioPref();
+		String channels_value = applicationInterface.getRecordAudioChannelsPref();
 		String fps_value = applicationInterface.getVideoFPSPref();
+		String bitrate_value = applicationInterface.getVideoBitratePref();
+		boolean force4k = applicationInterface.getForce4KPref();
+		// Use CamcorderProfile just to get the current sizes and defaults.
+		{
+			CamcorderProfile cam_profile;
+			int cameraId = camera_controller.getCameraId();
+
+			if( force4k ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "force 4K UHD video");
+				cam_profile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH);
+				cam_profile.videoFrameWidth = 3840;
+				cam_profile.videoFrameHeight = 2160;
+				cam_profile.videoBitRate = (int)(cam_profile.videoBitRate*2.8); // need a higher bitrate for the better quality - this is roughly based on the bitrate used by an S5's native camera app at 4K (47.6 Mbps, compared to 16.9 Mbps which is what's returned by the QUALITY_HIGH profile)
+			}
+			else if( this.video_quality_handler.getCurrentVideoQualityIndex() != -1 ) {
+				cam_profile = getCamcorderProfile(this.video_quality_handler.getCurrentVideoQuality());
+			}
+			else {
+				cam_profile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH);
+			}
+			video_profile = new VideoProfile(cam_profile);
+		}
+
+		//video_profile.fileFormat = MediaRecorder.OutputFormat.MPEG_4;
+		//video_profile.videoCodec = MediaRecorder.VideoEncoder.H264;
+
 		if( !fps_value.equals("default") ) {
 			try {
 				int fps = Integer.parseInt(fps_value);
 				if( MyDebug.LOG )
 					Log.d(TAG, "fps: " + fps);
-				profile.videoFrameRate = fps;
+				video_profile.videoFrameRate = fps;
+				video_profile.videoCaptureRate = fps;
 			}
 			catch(NumberFormatException exception) {
 				if( MyDebug.LOG )
@@ -2725,7 +2738,90 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			}
 		}
 
-		/*String pref_video_output_format = applicationInterface.getRecordVideoOutputFormatPref();
+		if( !bitrate_value.equals("default") ) {
+			try {
+				int bitrate = Integer.parseInt(bitrate_value);
+				if( MyDebug.LOG )
+					Log.d(TAG, "bitrate: " + bitrate);
+				video_profile.videoBitRate = bitrate;
+			}
+			catch(NumberFormatException exception) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "bitrate invalid format, can't parse to int: " + bitrate_value);
+			}
+		}
+		final int min_high_speed_bitrate_c = 4*14000000;
+		if( video_high_speed && video_profile.videoBitRate < min_high_speed_bitrate_c ) {
+			video_profile.videoBitRate = min_high_speed_bitrate_c;
+			if( MyDebug.LOG )
+				Log.d(TAG, "set minimum bitrate for high speed: " + video_profile.videoBitRate);
+		}
+
+		if( has_capture_rate_factor ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "set video profile frame rate for slow motion or timelapse");
+			// capture rate remains the same, and we adjust the frame rate of video
+			video_profile.videoFrameRate = (int)(video_profile.videoFrameRate * capture_rate_factor + 0.5f);
+			video_profile.videoBitRate = (int)(video_profile.videoBitRate * capture_rate_factor + 0.5f);
+			// audio not recorded with slow motion video
+			record_audio = false;
+		}
+
+		video_profile.videoSource = using_android_l ? MediaRecorder.VideoSource.SURFACE : MediaRecorder.VideoSource.CAMERA;
+
+		// Done with video
+
+		if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+				&& record_audio
+				&& ContextCompat.checkSelfPermission(getContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ) {
+			// needed for Android 6, in case users deny storage permission, otherwise we'll crash
+			// see https://developer.android.com/training/permissions/requesting.html
+			// we request permission when switching to video mode - if it wasn't granted, here we just switch it off
+			// we restrict check to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
+			if( MyDebug.LOG )
+				Log.e(TAG, "don't have RECORD_AUDIO permission");
+			// don't show a toast here, otherwise we'll keep showing toasts whenever getVideoProfile() is called; we only
+			// should show a toast when user starts recording video; so we indicate this via the no_audio_permission flag
+			record_audio = false;
+			video_profile.no_audio_permission = true;
+		}
+
+		video_profile.record_audio = record_audio;
+		if( record_audio ) {
+			String pref_audio_src = applicationInterface.getRecordAudioSourcePref();
+			if( MyDebug.LOG )
+				Log.d(TAG, "pref_audio_src: " + pref_audio_src);
+			switch(pref_audio_src) {
+				case "audio_src_mic":
+					video_profile.audioSource = MediaRecorder.AudioSource.MIC;
+					break;
+				case "audio_src_default":
+					video_profile.audioSource = MediaRecorder.AudioSource.DEFAULT;
+					break;
+				case "audio_src_voice_communication":
+					video_profile.audioSource = MediaRecorder.AudioSource.VOICE_COMMUNICATION;
+					break;
+				case "audio_src_camcorder":
+				default:
+					video_profile.audioSource = MediaRecorder.AudioSource.CAMCORDER;
+					break;
+			}
+			if( MyDebug.LOG )
+				Log.d(TAG, "audio_source: " + video_profile.audioSource);
+
+			if( MyDebug.LOG )
+				Log.d(TAG, "pref_audio_channels: " + channels_value);
+			if( channels_value.equals("audio_mono") ) {
+				video_profile.audioChannels = 1;
+			}
+			else if( channels_value.equals("audio_stereo") ) {
+				video_profile.audioChannels = 2;
+			}
+			// else keep with the value already stored in VideoProfile (set from the CamcorderProfile)
+		}
+
+		/*
+		String pref_video_output_format = applicationInterface.getRecordVideoOutputFormatPref();
 		if( MyDebug.LOG )
 			Log.d(TAG, "pref_video_output_format: " + pref_video_output_format);
 		if( pref_video_output_format.equals("output_format_default") ) {
@@ -2754,7 +2850,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			profile.audioCodec = MediaRecorder.AudioEncoder.VORBIS;
 		}*/
 
-		return new VideoProfile(profile);
+		if( MyDebug.LOG )
+			Log.d(TAG, "returning video_profile: " + video_profile);
+		return video_profile;
 	}
 	
 	private static String formatFloatToString(final float f) {
@@ -2905,9 +3003,12 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		final double ASPECT_TOLERANCE = 0.05;
         if( sizes == null )
         	return null;
-		if( video_high_speed ) {
+		if( is_video && video_high_speed ) {
+			VideoProfile profile = getVideoProfile();
+			if( MyDebug.LOG )
+				Log.d(TAG, "video size: " + profile.videoFrameWidth + " x " + profile.videoFrameHeight);
 			// preview size must match video resolution for high speed, see doc for CameraDevice.createConstrainedHighSpeedCaptureSession()
-			return new CameraController.Size(video_high_speed_size.width, video_high_speed_size.height);
+			return new CameraController.Size(profile.videoFrameWidth, profile.videoFrameHeight);
 		}
         CameraController.Size optimalSize = null;
         double minDiff = Double.MAX_VALUE;
@@ -3620,7 +3721,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			// use chooseBestPreviewFps() more widely.
 			// Update for v1.31: we no longer seem to need this - I no longer get a dark preview in photo or video mode if we don't set the fps range;
 			// but leaving the code as it is, to be safe.
-			boolean preview_too_dark = Build.MODEL.equals("Nexus 5") || Build.MODEL.equals("Nexus 6");
+			// Update for v1.43: implementing setPreviewFpsRange() for CameraController2 caused the dark preview problem on
+			// OnePlus 3T. So enable the preview_too_dark for all devices on Camera2.
+			boolean preview_too_dark = using_android_l || Build.MODEL.equals("Nexus 5") || Build.MODEL.equals("Nexus 6");
 			String fps_value = applicationInterface.getVideoFPSPref();
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "preview_too_dark? " + preview_too_dark);
@@ -3708,9 +3811,10 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				setFocusPref(false);
 			}*/
 			if( is_video ) {
-				if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
+				if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && applicationInterface.getRecordAudioPref() ) {
 					// check for audio permission now, rather than when user starts video recording
 					// we restrict the checks to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
+					// only request permission if record audio preference is enabled
 					if( MyDebug.LOG )
 						Log.d(TAG, "check for record audio permission");
 					if( ContextCompat.checkSelfPermission(getContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ) {
@@ -4455,10 +4559,12 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			if( MyDebug.LOG )
 				Log.d(TAG, "enable_sound? " + enable_sound);
 			camera_controller.enableShutterSound(enable_sound); // Camera2 API can disable video sound too
+
     		MediaRecorder local_video_recorder = new MediaRecorder();
     		this.camera_controller.unlock();
     		if( MyDebug.LOG )
     			Log.d(TAG, "set video listeners");
+
         	local_video_recorder.setOnInfoListener(new MediaRecorder.OnInfoListener() {
 				@Override
 				public void onInfo(MediaRecorder mr, int what, int extra) {
@@ -4488,45 +4594,11 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					});
 				}
 			});
+
         	camera_controller.initVideoRecorderPrePrepare(local_video_recorder);
-			boolean record_audio = applicationInterface.getRecordAudioPref();
-			if( has_capture_rate_factor ) {
-				// audio not recorded with slow motion video
-				record_audio = false;
-			}
-			if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ) {
-				// needed for Android 6, in case users deny storage permission, otherwise we'll crash
-				// see https://developer.android.com/training/permissions/requesting.html
-				// we request permission when switching to video mode - if it wasn't granted, here we just switch it off
-				// we restrict check to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
-				if( MyDebug.LOG )
-					Log.e(TAG, "don't have RECORD_AUDIO permission");
+        	if( profile.no_audio_permission ) {
 				showToast(null, R.string.permission_record_audio_not_available);
-				record_audio = false;
 			}
-			if( record_audio ) {
-        		String pref_audio_src = applicationInterface.getRecordAudioSourcePref();
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "pref_audio_src: " + pref_audio_src);
-        		int audio_source = MediaRecorder.AudioSource.CAMCORDER;
-				switch(pref_audio_src) {
-					case "audio_src_mic":
-						audio_source = MediaRecorder.AudioSource.MIC;
-						break;
-					case "audio_src_default":
-						audio_source = MediaRecorder.AudioSource.DEFAULT;
-						break;
-					case "audio_src_voice_communication":
-						audio_source = MediaRecorder.AudioSource.VOICE_COMMUNICATION;
-						break;
-				}
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "audio_source: " + audio_source);
-				local_video_recorder.setAudioSource(audio_source);
-			}
-    		if( MyDebug.LOG )
-    			Log.d(TAG, "set video source");
-			local_video_recorder.setVideoSource(using_android_l ? MediaRecorder.VideoSource.SURFACE : MediaRecorder.VideoSource.CAMERA);
 
     		boolean store_location = applicationInterface.getGeotaggingPref();
 			if( store_location && applicationInterface.getLocation() != null ) {
@@ -4538,60 +4610,10 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			}
 
     		if( MyDebug.LOG )
-    			Log.d(TAG, "set video profile");
-			if( has_capture_rate_factor ) {
-				if( MyDebug.LOG )
-					Log.d(TAG, "set video profile for slow motion");
-				// n.b., order may be important - output format should be first, at least
-				local_video_recorder.setOutputFormat(profile.fileFormat);
-				local_video_recorder.setVideoFrameRate((int)(profile.videoFrameRate * capture_rate_factor + 0.5f));
-				local_video_recorder.setCaptureRate(profile.videoFrameRate);
-				local_video_recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
-				local_video_recorder.setVideoEncodingBitRate((int)(profile.videoBitRate * capture_rate_factor + 0.5f));
-				local_video_recorder.setVideoEncoder(profile.videoCodec);
-			}
-			else if( record_audio ) {
-				if( profile.getCamcorderProfile() != null ) {
-					if( MyDebug.LOG )
-						Log.d(TAG, "set video profile from camcorderprofile");
-					local_video_recorder.setProfile(profile.getCamcorderProfile());
-				}
-				else {
-					local_video_recorder.setOutputFormat(profile.fileFormat);
-					local_video_recorder.setVideoFrameRate(profile.videoFrameRate);
-					local_video_recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
-					local_video_recorder.setVideoEncodingBitRate(profile.videoBitRate);
-					local_video_recorder.setVideoEncoder(profile.videoCodec);
-					local_video_recorder.setAudioEncoder(profile.audioCodec);
-				}
-        		String pref_audio_channels = applicationInterface.getRecordAudioChannelsPref();
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "pref_audio_channels: " + pref_audio_channels);
-        		if( pref_audio_channels.equals("audio_mono") ) {
-        			local_video_recorder.setAudioChannels(1);
-        		}
-        		else if( pref_audio_channels.equals("audio_stereo") ) {
-        			local_video_recorder.setAudioChannels(2);
-        		}
-			}
-			else {
-				// from http://stackoverflow.com/questions/5524672/is-it-possible-to-use-camcorderprofile-without-audio-source
-				if( MyDebug.LOG )
-					Log.d(TAG, "set video profile from parameters (without audio)");
-				// n.b., order may be important - output format should be first, at least
-				local_video_recorder.setOutputFormat(profile.fileFormat);
-				local_video_recorder.setVideoFrameRate(profile.videoFrameRate);
-				local_video_recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
-				local_video_recorder.setVideoEncodingBitRate(profile.videoBitRate);
-				local_video_recorder.setVideoEncoder(profile.videoCodec);
-			}
-    		if( MyDebug.LOG ) {
-    			Log.d(TAG, "video fileformat: " + profile.fileFormat);
-    			Log.d(TAG, "video framerate: " + profile.videoFrameRate);
-    			Log.d(TAG, "video size: " + profile.videoFrameWidth + " x " + profile.videoFrameHeight);
-    			Log.d(TAG, "video bitrate: " + profile.videoBitRate);
-    			Log.d(TAG, "video codec: " + profile.videoCodec);
-    		}
+	   			Log.d(TAG, "copy video profile to media recorder");
+
+			profile.copyToMediaRecorder(local_video_recorder);
+
 			boolean told_app_starting = false; // true if we called applicationInterface.startingVideo()
         	try {
 				ApplicationInterface.VideoMaxFileSize video_max_filesize = applicationInterface.getVideoMaxFileSizePref();
@@ -4640,13 +4662,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				else {
 					local_video_recorder.setOutputFile(pfd_saf.getFileDescriptor());
 				}
-
 				applicationInterface.cameraInOperation(true, true);
 				told_app_starting = true;
 				applicationInterface.startingVideo();
         		/*if( true ) // test
         			throw new IOException();*/
 				cameraSurface.setVideoRecorder(local_video_recorder);
+
 				local_video_recorder.setOrientationHint(getImageVideoRotation());
 				if( MyDebug.LOG )
 					Log.d(TAG, "about to prepare video recorder");
@@ -5708,6 +5730,14 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		if( MyDebug.LOG )
 			Log.d(TAG, "supportsPhotoVideoRecording");
     	return supports_photo_video_recording && !video_high_speed;
+	}
+
+	/** Returns true iff we're in video mode, and a high speed fps video mode is selected.
+	 */
+	public boolean isVideoHighSpeed() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "isVideoHighSpeed");
+		return is_video && video_high_speed;
 	}
     
     public boolean canDisableShutterSound() {

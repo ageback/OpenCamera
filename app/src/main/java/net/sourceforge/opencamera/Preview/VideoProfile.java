@@ -1,49 +1,86 @@
 package net.sourceforge.opencamera.Preview;
 
 import android.media.CamcorderProfile;
+import android.media.MediaRecorder;
 
 /** This is essentially similar to CamcorderProfile in that it encapsulates a set of video settings
-	 *  to be passed to MediaRecorder, but allows us to create values without having to create a
-	 *  CamcorderProfile (needed for slow motion / high speed video recording).
+	 *  to be passed to MediaRecorder, but allows us to store additional fields.
 	 */
 public class VideoProfile {
-    final private CamcorderProfile camcorderProfile;
-    public final int audioCodec;
-    public final int fileFormat;
-    public final int videoBitRate;
-    public final int videoCodec;
-    public final int videoFrameHeight;
-    public final int videoFrameRate;
-    public final int videoFrameWidth;
+    public boolean record_audio;
+    public boolean no_audio_permission; // set to true if record_audio==false, but where the user had requested audio and we don't have microphone permission
+    public int audioSource;
+    public int audioCodec;
+    public int audioChannels;
+    public int audioBitRate;
+    public int audioSampleRate;
+    public int fileFormat;
+    public int videoSource;
+    public int videoCodec;
+    public int videoFrameRate;
+    public int videoCaptureRate;
+    public int videoBitRate;
+    public int videoFrameHeight;
+    public int videoFrameWidth;
 
     VideoProfile(CamcorderProfile camcorderProfile) {
-        this.camcorderProfile = camcorderProfile;
-
+        this.record_audio = true;
+        this.no_audio_permission = false;
+        this.audioSource = MediaRecorder.AudioSource.CAMCORDER;
         this.audioCodec = camcorderProfile.audioCodec;
+        this.audioChannels = camcorderProfile.audioChannels;
+        this.audioBitRate = camcorderProfile.audioBitRate;
+        this.audioSampleRate = camcorderProfile.audioSampleRate;
         this.fileFormat = camcorderProfile.fileFormat;
-        this.videoBitRate = camcorderProfile.videoBitRate;
+        this.videoSource = MediaRecorder.VideoSource.CAMERA;
         this.videoCodec = camcorderProfile.videoCodec;
-        this.videoFrameHeight = camcorderProfile.videoFrameHeight;
         this.videoFrameRate = camcorderProfile.videoFrameRate;
+        this.videoCaptureRate = camcorderProfile.videoFrameRate;
+        this.videoBitRate = camcorderProfile.videoBitRate;
+        this.videoFrameHeight = camcorderProfile.videoFrameHeight;
         this.videoFrameWidth = camcorderProfile.videoFrameWidth;
     }
-    VideoProfile(int audioCodec, int fileFormat, int videoBitRate, int videoCodec, int videoFrameHeight, int videoFrameRate, int videoFrameWidth) {
-        this.camcorderProfile = null;
 
-        this.audioCodec = audioCodec;
-        this.fileFormat = fileFormat;
-        this.videoBitRate = videoBitRate;
-        this.videoCodec = videoCodec;
-        this.videoFrameHeight = videoFrameHeight;
-        this.videoFrameRate = videoFrameRate;
-        this.videoFrameWidth = videoFrameWidth;
+    public String toString() {
+        return ("\nAudioSource:        " + this.audioSource +
+                "\nVideoSource:        " + this.videoSource +
+                "\nFileFormat:         " + this.fileFormat +
+                "\nAudioCodec:         " + this.audioCodec +
+                "\nAudioChannels:      " + this.audioChannels +
+                "\nAudioBitrate:       " + this.audioBitRate +
+                "\nAudioSampleRate:    " + this.audioSampleRate +
+                "\nVideoCodec:         " + this.videoCodec +
+                "\nVideoFrameRate:     " + this.videoFrameRate +
+                "\nVideoCaptureRate:   " + this.videoCaptureRate +
+                "\nVideoBitRate:       " + this.videoBitRate +
+                "\nVideoWidth:         " + this.videoFrameWidth +
+                "\nVideoHeight:        " + this.videoFrameHeight
+        );
     }
 
-    /** Returns the CamcorderProfile this VideoProfile was created with, or null if it was not
-     *  created with a CamcorderProfile.
+    /**
+     * Copies the fields of this profile to a MediaRecorder instance.
      */
-    CamcorderProfile getCamcorderProfile() {
-        return this.camcorderProfile;
+    public void copyToMediaRecorder(MediaRecorder media_recorder) {
+        if( record_audio ) {
+            media_recorder.setAudioSource(this.audioSource);
+        }
+        media_recorder.setVideoSource(this.videoSource);
+        // n.b., order may be important - output format should be first, at least
+        // also match order of MediaRecorder.setProfile() just to be safe, see https://stackoverflow.com/questions/5524672/is-it-possible-to-use-camcorderprofile-without-audio-source
+        media_recorder.setOutputFormat(this.fileFormat);
+        media_recorder.setVideoFrameRate(this.videoFrameRate);
+        // it's probably safe to always call setCaptureRate, but to be safe (and keep compatibility with old Open Camera versions), we only do so when needed
+        if( this.videoCaptureRate != this.videoFrameRate )
+            media_recorder.setCaptureRate(this.videoCaptureRate);
+        media_recorder.setVideoSize(this.videoFrameWidth, this.videoFrameHeight);
+        media_recorder.setVideoEncodingBitRate(this.videoBitRate);
+        media_recorder.setVideoEncoder(this.videoCodec);
+        if( record_audio ) {
+            media_recorder.setAudioEncodingBitRate(this.audioBitRate);
+            media_recorder.setAudioChannels(this.audioChannels);
+            media_recorder.setAudioSamplingRate(this.audioSampleRate);
+            media_recorder.setAudioEncoder(this.audioCodec);
+        }
     }
 }
-
