@@ -437,4 +437,6 @@
     <string name="top_of_screen">在屏幕顶端</string>
     <string name="bottom_of_screen">在屏幕下方</string>
     <string name="centre_of_screen">在中间</string>
+    <string name="high_speed">高速</string>
+    <string name="preference_video_fps_default">默认</string>
 </resources>
