@@ -288,6 +288,14 @@
         <item>crop_guide_2.35</item>
         <item>crop_guide_2.4</item>
     </string-array>
+    <string-array name="preference_raw_entries">
+        <item>仅 JPEG</item>
+        <item>JPEG 和 DNG (RAW)</item>
+    </string-array>
+    <string-array name="preference_raw_values">
+        <item>preference_raw_no</item>
+        <item>preference_raw_yes</item>
+    </string-array>
     <string-array name="preference_stamp_entries">
         <item>不戳记</item>
         <item>戳记照片</item>
@@ -509,5 +517,49 @@
         <item>314572800</item>
         <item>524288000</item>
         <item>1073741824</item>
+    </string-array>
+    <string-array name="preference_save_zulu_time_entries">
+        <item>本地时间</item>
+        <item>UTC（祖鲁）</item>
+    </string-array>
+    <string-array name="preference_save_zulu_time_values">
+        <item>本地</item>
+        <item>祖鲁</item>
+    </string-array>
+    <string-array name="preference_expo_bracketing_n_images_entries">
+        <item>3</item>
+        <item>5</item>
+    </string-array>
+    <string-array name="preference_expo_bracketing_n_images_values">
+        <item>3</item>
+        <item>5</item>
+    </string-array>
+    <string-array name="preference_expo_bracketing_stops_entries">
+        <item>0.5</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+    <string-array name="preference_expo_bracketing_stops_values">
+        <item>0.5</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+    <string-array name="preference_front_camera_mirror_entries">
+        <item>无镜像</item>
+        <item>镜像照片</item>
+    </string-array>
+    <string-array name="preference_front_camera_mirror_values">
+        <item>preference_front_camera_mirror_no</item>
+        <item>preference_front_camera_mirror_photo</item>
+    </string-array>
+    <string-array name="preference_video_subtitle_entries">
+        <item>无字幕</item>
+        <item>录制字幕</item>
+    </string-array>
+    <string-array name="preference_video_subtitle_values">
+        <item>preference_video_subtitle_no</item>
+        <item>preference_video_subtitle_yes</item>
     </string-array>
 </resources>
