@@ -409,11 +409,6 @@ public class CameraController1 extends CameraController {
 		return camera_features;
 	}
 	
-	public long getDefaultExposureTime() {
-		// not supported for CameraController1
-		return 0L;
-	}
-
 	/** Important, from docs:
 	 *  "Changing scene mode may override other parameters (such as flash mode, focus mode, white balance).
 	 *  For example, suppose originally flash mode is on and supported flash modes are on/off. In night
@@ -422,13 +417,13 @@ public class CameraController1 extends CameraController {
 	 */
 	@Override
 	public SupportedValues setSceneMode(String value) {
-		String default_value = getDefaultSceneMode();
+		String default_value = SCENE_MODE_DEFAULT;
     	Camera.Parameters parameters = this.getParameters();
 		List<String> values = parameters.getSupportedSceneModes();
 		/*{
 			// test
 			values = new ArrayList<>();
-			values.add("auto");
+			values.add(ISO_DEFAULT);
 		}*/
 		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
 		if( supported_values != null ) {
@@ -459,7 +454,7 @@ public class CameraController1 extends CameraController {
 	}
 
 	public SupportedValues setColorEffect(String value) {
-		String default_value = getDefaultColorEffect();
+		String default_value = COLOR_EFFECT_DEFAULT;
     	Camera.Parameters parameters = this.getParameters();
 		List<String> values = parameters.getSupportedColorEffects();
 		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
@@ -480,7 +475,7 @@ public class CameraController1 extends CameraController {
 	}
 
 	public SupportedValues setWhiteBalance(String value) {
-		String default_value = getDefaultWhiteBalance();
+		String default_value = WHITE_BALANCE_DEFAULT;
     	Camera.Parameters parameters = this.getParameters();
 		List<String> values = parameters.getSupportedWhiteBalance();
 		if( values != null ) {
@@ -569,7 +564,7 @@ public class CameraController1 extends CameraController {
 			}
 		}
 		/*values = new ArrayList<>();
-		//values.add("auto");
+		//values.add(ISO_DEFAULT);
 		//values.add("ISO_HJR");
 		values.add("ISO50");
 		values.add("ISO64");
@@ -590,7 +585,7 @@ public class CameraController1 extends CameraController {
 		values.add("ISO2000");
 		values.add("ISO2500");
 		values.add("ISO3200");
-		values.add("auto");
+		values.add(ISO_DEFAULT);
 		//values.add("400");
 		//values.add("800");
 		//values.add("1600");
@@ -599,7 +594,7 @@ public class CameraController1 extends CameraController {
 			if( values == null ) {
 				// set a default for some devices which have an iso_key, but don't give a list of supported ISOs
 				values = new ArrayList<>();
-				values.add("auto");
+				values.add(ISO_DEFAULT);
 				values.add("50");
 				values.add("100");
 				values.add("200");
@@ -607,7 +602,7 @@ public class CameraController1 extends CameraController {
 				values.add("800");
 				values.add("1600");
 			}
-			SupportedValues supported_values = checkModeIsSupported(values, value, getDefaultISO());
+			SupportedValues supported_values = checkModeIsSupported(values, value, ISO_DEFAULT);
 			if( supported_values != null ) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "set: " + iso_key + " to: " + supported_values.selected_value);
@@ -758,7 +753,7 @@ public class CameraController1 extends CameraController {
 	}
 
 	@Override
-	public void setRaw(boolean want_raw) {
+	public void setRaw(boolean want_raw, int max_raw_images) {
 		// not supported for CameraController1
 	}
 

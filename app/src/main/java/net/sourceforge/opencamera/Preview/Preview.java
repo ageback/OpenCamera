@@ -1,5 +1,6 @@
 package net.sourceforge.opencamera.Preview;
 
+import net.sourceforge.opencamera.CameraController.RawImage;
 import net.sourceforge.opencamera.MyDebug;
 import net.sourceforge.opencamera.R;
 import net.sourceforge.opencamera.TakePhoto;
@@ -50,10 +51,8 @@ import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.SensorEvent;
 import android.hardware.SensorManager;
-import android.hardware.camera2.DngCreator;
 import android.location.Location;
 import android.media.CamcorderProfile;
-import android.media.Image;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -1689,10 +1688,10 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 		
 		if( this.supports_raw && applicationInterface.isRawPref() ) {
-			camera_controller.setRaw(true);
+			camera_controller.setRaw(true, applicationInterface.getMaxRawImages());
 		}
 		else {
-			camera_controller.setRaw(false);
+			camera_controller.setRaw(false, 0);
 		}
 
 		if( this.supports_expo_bracketing && applicationInterface.isExpoBracketingPref() ) {
@@ -2132,7 +2131,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			this.isos = null; // if supports_iso_range==true, caller shouldn't be using getSupportedISOs()
 
 			// now set the desired ISO mode/value
-			if( value.equals("auto") ) {
+			if( value.equals(CameraController.ISO_DEFAULT) ) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "setting auto iso");
 				camera_controller.setManualISO(false, 0);
@@ -2148,7 +2147,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				else {
 					// failed to parse
 					camera_controller.setManualISO(false, 0);
-					value = "auto"; // so we switch the preferences back to auto mode, rather than the invalid value
+					value = CameraController.ISO_DEFAULT; // so we switch the preferences back to auto mode, rather than the invalid value
 				}
 
 				// now save, so it's available for PreferenceActivity
@@ -2160,7 +2159,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			CameraController.SupportedValues supported_values = camera_controller.setISO(value);
 			if( supported_values != null ) {
 				isos = supported_values.values;
-				if( !supported_values.selected_value.equals("auto") ) {
+				if( !supported_values.selected_value.equals(CameraController.ISO_DEFAULT) ) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "has manual iso");
 					is_manual_iso = true;
@@ -5202,11 +5201,11 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				}
     	    }
 
-			public void onRawPictureTaken(DngCreator dngCreator, Image image) {
+			public void onRawPictureTaken(RawImage raw_image) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "onRawPictureTaken");
 				initDate();
-				if( !applicationInterface.onRawPictureTaken(dngCreator, image, current_date) ) {
+				if( !applicationInterface.onRawPictureTaken(raw_image, current_date) ) {
 					if( MyDebug.LOG )
 						Log.e(TAG, "applicationInterface.onRawPictureTaken failed");
 				}

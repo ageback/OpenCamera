@@ -93,6 +93,7 @@ public class CameraController2 extends CameraController {
 	private boolean want_burst;
 	private boolean want_raw;
 	//private boolean want_raw = true;
+	private int max_raw_images;
 	private android.util.Size raw_size;
 	private ImageReader imageReaderRaw;
 	private OnRawImageAvailableListener onRawImageAvailableListener;
@@ -104,8 +105,7 @@ public class CameraController2 extends CameraController {
 	private final List<byte []> pending_burst_images = new ArrayList<>(); // burst images that have been captured so far, but not yet sent to the application
 	private List<CaptureRequest> slow_burst_capture_requests; // the set of burst capture requests - used when not using captureBurst() (i.e., when use_expo_fast_burst==false)
 	private long slow_burst_start_ms = 0; // time when burst started (used for measuring performance of captures when not using fast burst)
-	private DngCreator pending_dngCreator;
-	private Image pending_image;
+	private RawImage pending_raw_image;
 	private ErrorCallback take_picture_error_cb;
 	private boolean want_video_high_speed;
 	private boolean is_video_high_speed; // whether we're actually recording in high speed
@@ -709,10 +709,9 @@ public class CameraController2 extends CameraController {
 			if( camera_settings.location != null ) {
                 dngCreator.setLocation(camera_settings.location);
 			}
-			
-			pending_dngCreator = dngCreator;
-			pending_image = image;
-			
+
+			pending_raw_image = new RawImage(dngCreator, image);
+
             PictureCallback cb = raw_cb;
             if( jpeg_cb == null ) {
 				if( MyDebug.LOG )
@@ -1537,7 +1536,7 @@ public class CameraController2 extends CameraController {
 			value = "candlelight";
 			break;
 		case CameraMetadata.CONTROL_SCENE_MODE_DISABLED:
-			value = "auto";
+			value = SCENE_MODE_DEFAULT;
 			break;
 		case CameraMetadata.CONTROL_SCENE_MODE_FIREWORKS:
 			value = "fireworks";
@@ -1591,7 +1590,7 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setSceneMode: " + value);
 		// we convert to/from strings to be compatible with original Android Camera API
-		String default_value = getDefaultSceneMode();
+		String default_value = SCENE_MODE_DEFAULT;
 		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES);
 		boolean has_disabled = false;
 		List<String> values = new ArrayList<>();
@@ -1604,7 +1603,7 @@ public class CameraController2 extends CameraController {
 			}
 		}
 		if( !has_disabled ) {
-			values.add(0, "auto");
+			values.add(0, SCENE_MODE_DEFAULT);
 		}
 		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
 		if( supported_values != null ) {
@@ -1622,7 +1621,7 @@ public class CameraController2 extends CameraController {
 				case "candlelight":
 					selected_value2 = CameraMetadata.CONTROL_SCENE_MODE_CANDLELIGHT;
 					break;
-				case "auto":
+				case SCENE_MODE_DEFAULT:
 					selected_value2 = CameraMetadata.CONTROL_SCENE_MODE_DISABLED;
 					break;
 				case "fireworks":
@@ -1713,7 +1712,7 @@ public class CameraController2 extends CameraController {
 			value = "negative";
 			break;
 		case CameraMetadata.CONTROL_EFFECT_MODE_OFF:
-			value = "none";
+			value = COLOR_EFFECT_DEFAULT;
 			break;
 		case CameraMetadata.CONTROL_EFFECT_MODE_POSTERIZE:
 			value = "posterize";
@@ -1741,7 +1740,7 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setColorEffect: " + value);
 		// we convert to/from strings to be compatible with original Android Camera API
-		String default_value = getDefaultColorEffect();
+		String default_value = COLOR_EFFECT_DEFAULT;
 		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_EFFECTS);
 		List<String> values = new ArrayList<>();
 		for(int value2 : values2) {
@@ -1766,7 +1765,7 @@ public class CameraController2 extends CameraController {
 				case "negative":
 					selected_value2 = CameraMetadata.CONTROL_EFFECT_MODE_NEGATIVE;
 					break;
-				case "none":
+				case COLOR_EFFECT_DEFAULT:
 					selected_value2 = CameraMetadata.CONTROL_EFFECT_MODE_OFF;
 					break;
 				case "posterize":
@@ -1817,7 +1816,7 @@ public class CameraController2 extends CameraController {
 		String value;
 		switch( value2 ) {
 		case CameraMetadata.CONTROL_AWB_MODE_AUTO:
-			value = "auto";
+			value = WHITE_BALANCE_DEFAULT;
 			break;
 		case CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT:
 			value = "cloudy-daylight";
@@ -1865,7 +1864,7 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setWhiteBalance: " + value);
 		// we convert to/from strings to be compatible with original Android Camera API
-		String default_value = getDefaultWhiteBalance();
+		String default_value = WHITE_BALANCE_DEFAULT;
 		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES);
 		List<String> values = new ArrayList<>();
 		for(int value2 : values2) {
@@ -1881,18 +1880,18 @@ public class CameraController2 extends CameraController {
 		}
 		{
 			// re-order so that auto is first, manual is second
-			boolean has_auto = values.remove("auto");
+			boolean has_auto = values.remove(WHITE_BALANCE_DEFAULT);
 			boolean has_manual = values.remove("manual");
 			if( has_manual )
 				values.add(0, "manual");
 			if( has_auto )
-				values.add(0, "auto");
+				values.add(0, WHITE_BALANCE_DEFAULT);
 		}
 		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
 		if( supported_values != null ) {
 			int selected_value2 = CameraMetadata.CONTROL_AWB_MODE_AUTO;
 			switch(supported_values.selected_value) {
-				case "auto":
+				case WHITE_BALANCE_DEFAULT:
 					selected_value2 = CameraMetadata.CONTROL_AWB_MODE_AUTO;
 					break;
 				case "cloudy-daylight":
@@ -2137,15 +2136,17 @@ public class CameraController2 extends CameraController {
 	}
 
 	@Override
-	public void setRaw(boolean want_raw) {
-		if( MyDebug.LOG )
+	public void setRaw(boolean want_raw, int max_raw_images) {
+		if( MyDebug.LOG ) {
 			Log.d(TAG, "setRaw: " + want_raw);
+			Log.d(TAG, "max_raw_images: " + max_raw_images);
+		}
 		if( camera == null ) {
 			if( MyDebug.LOG )
 				Log.e(TAG, "no camera");
 			return;
 		}
-		if( this.want_raw == want_raw ) {
+		if( this.want_raw == want_raw && this.max_raw_images == max_raw_images ) {
 			return;
 		}
 		if( want_raw && this.raw_size == null ) {
@@ -2160,6 +2161,7 @@ public class CameraController2 extends CameraController {
 			throw new RuntimeException(); // throw as RuntimeException, as this is a programming error
 		}
 		this.want_raw = want_raw;
+		this.max_raw_images = max_raw_images;
 	}
 
 	@Override
@@ -2320,7 +2322,8 @@ public class CameraController2 extends CameraController {
 				Log.e(TAG, "application needs to call setPictureSize()");
 			throw new RuntimeException(); // throw as RuntimeException, as this is a programming error
 		}
-		imageReader = ImageReader.newInstance(picture_width, picture_height, ImageFormat.JPEG, 2); 
+		// maxImages only needs to be 2, as we always read the JPEG data and close the image straight away in the imageReader
+		imageReader = ImageReader.newInstance(picture_width, picture_height, ImageFormat.JPEG, 2);
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "created new imageReader: " + imageReader.toString());
 			Log.d(TAG, "imageReader surface: " + imageReader.getSurface().toString());
@@ -2460,7 +2463,7 @@ public class CameraController2 extends CameraController {
 									Log.d(TAG, "all image callbacks now completed");
 								cb.onCompleted();
 							}
-							else if( pending_dngCreator != null ) {
+							else if( pending_raw_image != null ) {
 								if( MyDebug.LOG )
 									Log.d(TAG, "can now call pending raw callback");
 								takePendingRaw();
@@ -2476,7 +2479,9 @@ public class CameraController2 extends CameraController {
 			}
 		}, null);
 		if( want_raw && raw_size != null&& !previewIsVideoMode  ) {
-			imageReaderRaw = ImageReader.newInstance(raw_size.getWidth(), raw_size.getHeight(), ImageFormat.RAW_SENSOR, 2);
+			// unlike the JPEG imageReader, we can't read the data and close the image straight away, so we need to allow a larger
+			// value for maxImages
+			imageReaderRaw = ImageReader.newInstance(raw_size.getWidth(), raw_size.getHeight(), ImageFormat.RAW_SENSOR, max_raw_images);
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "created new imageReaderRaw: " + imageReaderRaw.toString());
 				Log.d(TAG, "imageReaderRaw surface: " + imageReaderRaw.getSurface().toString());
@@ -2489,8 +2494,7 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clearPending");
 		pending_burst_images.clear();
-		pending_dngCreator = null;
-		pending_image = null;
+		pending_raw_image = null;
 		if( onRawImageAvailableListener != null ) {
 			onRawImageAvailableListener.clear();
 		}
@@ -2503,13 +2507,12 @@ public class CameraController2 extends CameraController {
 	private void takePendingRaw() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "takePendingRaw");
-		if( pending_dngCreator != null ) {
+		if( pending_raw_image != null ) {
             PictureCallback cb = raw_cb;
             raw_cb = null;
-            cb.onRawPictureTaken(pending_dngCreator, pending_image);
-            // image and dngCreator should be closed by the application (we don't do it here, so that applications can keep hold of the data, e.g., in a queue for background processing)
-            pending_dngCreator = null;
-            pending_image = null;
+            cb.onRawPictureTaken(pending_raw_image);
+            // pending_raw_image should be closed by the application (we don't do it here, so that applications can keep hold of the data, e.g., in a queue for background processing)
+			pending_raw_image = null;
 			if( onRawImageAvailableListener != null ) {
 				onRawImageAvailableListener.clear();
 			}
@@ -2705,12 +2708,6 @@ public class CameraController2 extends CameraController {
 			Log.e(TAG, "   using " + (want_video_high_speed ? "high speed" : "ae")  + " preview fps ranges");
 
 		return l;
-	}
-
-	@Override
-	// note, responsibility of callers to check that this is within the valid min/max range
-	public long getDefaultExposureTime() {
-		return 1000000000L/30;
 	}
 
 	@Override

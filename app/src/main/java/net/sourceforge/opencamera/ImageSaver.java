@@ -1,6 +1,7 @@
 package net.sourceforge.opencamera;
 
 import net.sourceforge.opencamera.CameraController.CameraController;
+import net.sourceforge.opencamera.CameraController.RawImage;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -22,6 +23,7 @@ import java.util.concurrent.BlockingQueue;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -31,10 +33,8 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
-import android.hardware.camera2.DngCreator;
 import android.location.Location;
 import android.media.ExifInterface;
-import android.media.Image;
 import android.net.Uri;
 import android.os.Build;
 import android.renderscript.Allocation;
@@ -63,8 +63,12 @@ public class ImageSaver extends Thread {
 	 * Therefore we should always have n_images_to_save >= queue.size().
 	 */
 	private int n_images_to_save = 0;
-	private final BlockingQueue<Request> queue = new ArrayBlockingQueue<>(1); // since we remove from the queue and then process in the saver thread, in practice the number of background photos - including the one being processed - is one more than the length of this queue
-	
+	private final int queue_capacity;
+	private final BlockingQueue<Request> queue;
+	private final static int queue_cost_jpeg_c = 1;
+	//private final static int queue_cost_dng_c = 6;
+	private final static int queue_cost_dng_c = 1;
+
 	static class Request {
 		enum Type {
 			JPEG,
@@ -90,8 +94,7 @@ public class ImageSaver extends Thread {
 		 * If process_type==NORMAL, then multiple images are saved sequentially.
 		 */
 		final List<byte []> jpeg_images;
-		final DngCreator dngCreator; // for raw
-		final Image image; // for raw
+		final RawImage raw_image; // for raw
 		final boolean image_capture_intent;
 		final Uri image_capture_intent_uri;
 		final boolean using_camera2;
@@ -121,7 +124,7 @@ public class ImageSaver extends Thread {
 			ProcessType process_type,
 			SaveBase save_base,
 			List<byte []> jpeg_images,
-			DngCreator dngCreator, Image image,
+			RawImage raw_image,
 			boolean image_capture_intent, Uri image_capture_intent_uri,
 			boolean using_camera2, int image_quality,
 			boolean do_auto_stabilise, double level_angle,
@@ -137,8 +140,7 @@ public class ImageSaver extends Thread {
 			this.process_type = process_type;
 			this.save_base = save_base;
 			this.jpeg_images = jpeg_images;
-			this.dngCreator = dngCreator;
-			this.image = image;
+			this.raw_image = raw_image;
 			this.image_capture_intent = image_capture_intent;
 			this.image_capture_intent_uri = image_capture_intent_uri;
 			this.using_camera2 = using_camera2;
@@ -170,11 +172,78 @@ public class ImageSaver extends Thread {
 		if( MyDebug.LOG )
 			Log.d(TAG, "ImageSaver");
 		this.main_activity = main_activity;
+
+		ActivityManager activityManager = (ActivityManager) main_activity.getSystemService(Activity.ACTIVITY_SERVICE);
+		this.queue_capacity = getQueueSize(activityManager.getLargeMemoryClass());
+		this.queue = new ArrayBlockingQueue<>(queue_capacity); // since we remove from the queue and then process in the saver thread, in practice the number of background photos - including the one being processed - is one more than the length of this queue
+
 		this.hdrProcessor = new HDRProcessor(main_activity);
 
 		p.setAntiAlias(true);
 	}
-	
+
+	/** Compute a sensible size for the queue, based on the device's memory (large heap).
+	 */
+	private int getQueueSize(int large_heap_memory) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "large max memory = " + large_heap_memory + "MB");
+		int max_queue_size;
+		/*if( large_heap_memory >= 512 ) {
+			// This should be at least 5*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a burst of 5 photos
+			// (e.g., in expo mode) with RAW+JPEG without blocking (we subtract 1, as the first image can be immediately
+			// taken off the queue).
+			// This should be at most 85 for large heap 512MB (estimate based on reserving 80MB for post-processing
+			// operations, then estimate a JPEG image at 5MB).
+			max_queue_size = 34;
+		}
+		else if( large_heap_memory >= 256 ) {
+			// This should be at least 19 so we can take a burst of 20 photos with JPEG without blocking (we subtract 1,
+			// as the first image can be immediately taken off the queue).
+			// This should be at most 34 for large heap 256MB.
+			max_queue_size = 19;
+		}
+		else if( large_heap_memory >= 128 ) {
+			// This should be at least 1*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a photo with RAW+JPEG
+			// without blocking (we subtract 1, as the first image can be immediately taken off the queue).
+			// This should be at most 8 for large heap 256MB.
+			max_queue_size = 8;
+		}
+		else {
+			// This should be at least 1*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a photo with RAW+JPEG
+			// without blocking (we subtract 1, as the first image can be immediately taken off the queue).
+			max_queue_size = 6;
+		}*/
+		max_queue_size = 1;
+		if( MyDebug.LOG )
+			Log.d(TAG, "max_queue_size = " + max_queue_size);
+		return max_queue_size;
+	}
+
+	/** Computes the cost for a particular request.
+	 * @param is_raw Whether RAW/DNG or JPEG.
+	 * @param n_jpegs If is_raw is false, this is the number of JPEG images that are in the request.
+	 */
+	int computeCost(boolean is_raw, int n_jpegs) {
+		int cost;
+		if( is_raw )
+			cost = queue_cost_dng_c;
+		else {
+			//cost = n_jpegs * queue_cost_jpeg_c;
+			cost = (n_jpegs > 1 ? 2 : 1) * queue_cost_jpeg_c;
+		}
+		return cost;
+	}
+
+	/** Returns the maximum number of DNG images that might be held by the image saver queue at once, before blocking.
+	 */
+	int getMaxDNG() {
+		int max_dng = (queue_capacity+1)/queue_cost_dng_c;
+		max_dng++; // increase by 1, as the user can still take one extra photo if the queue is exactly full
+		if( MyDebug.LOG )
+			Log.d(TAG, "max_dng = " + max_dng);
+		return max_dng;
+	}
+
 	void onDestroy() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "onDestroy");
@@ -200,7 +269,7 @@ public class ImageSaver extends Thread {
 				if( request.type == Request.Type.RAW ) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "request is raw");
-					success = saveImageNowRaw(request.dngCreator, request.image, request.current_date);
+					success = saveImageNowRaw(request);
 				}
 				else if( request.type == Request.Type.JPEG ) {
 					if( MyDebug.LOG )
@@ -273,7 +342,7 @@ public class ImageSaver extends Thread {
 				is_hdr,
 				save_expo,
 				images,
-				null, null,
+				null,
 				image_capture_intent, image_capture_intent_uri,
 				using_camera2, image_quality,
 				do_auto_stabilise, level_angle,
@@ -294,7 +363,7 @@ public class ImageSaver extends Thread {
 	 *  successfully.
 	 */
 	boolean saveImageRaw(boolean do_in_background,
-			DngCreator dngCreator, Image image,
+			RawImage raw_image,
 			Date current_date) {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "saveImageRaw");
@@ -305,7 +374,7 @@ public class ImageSaver extends Thread {
 				false,
 				false,
 				null,
-				dngCreator, image,
+				raw_image,
 				false, null,
 				false, 0,
 				false, 0.0,
@@ -341,7 +410,7 @@ public class ImageSaver extends Thread {
 				Request.ProcessType.AVERAGE,
 				save_base,
 				new ArrayList<byte[]>(),
-				null, null,
+				null,
 				image_capture_intent, image_capture_intent_uri,
 				using_camera2, image_quality,
 				do_auto_stabilise, level_angle,
@@ -378,8 +447,7 @@ public class ImageSaver extends Thread {
 		if( do_in_background ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "add background request");
-			addRequest(pending_image_average_request);
-			addDummyRequest();
+			addRequest(pending_image_average_request, 2);
 		}
 		else {
 			// wait for queue to be empty
@@ -396,7 +464,7 @@ public class ImageSaver extends Thread {
 			boolean is_hdr,
 			boolean save_expo,
 			List<byte []> jpeg_images,
-			DngCreator dngCreator, Image image,
+			RawImage raw_image,
 			boolean image_capture_intent, Uri image_capture_intent_uri,
 			boolean using_camera2, int image_quality,
 			boolean do_auto_stabilise, double level_angle,
@@ -420,7 +488,7 @@ public class ImageSaver extends Thread {
 				is_hdr ? Request.ProcessType.HDR : Request.ProcessType.NORMAL,
 				save_expo ? Request.SaveBase.SAVEBASE_ALL : Request.SaveBase.SAVEBASE_NONE,
 				jpeg_images,
-				dngCreator, image,
+				raw_image,
 				image_capture_intent, image_capture_intent_uri,
 				using_camera2, image_quality,
 				do_auto_stabilise, level_angle,
@@ -436,21 +504,15 @@ public class ImageSaver extends Thread {
 		if( do_in_background ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "add background request");
-			addRequest(request);
-			if( ( request.process_type == Request.ProcessType.HDR && request.jpeg_images.size() > 1 ) || ( !is_raw && request.jpeg_images.size() > 1 ) ) {
-				// For (multi-image) HDR, we also add a dummy request, effectively giving it a cost of 2 - to reflect the fact that HDR is more memory intensive
-				// (arguably it should have a cost of 3, to reflect the 3 JPEGs, but one can consider this comparable to RAW+JPEG, which have a cost
-				// of 2, due to RAW and JPEG each needing their own request).
-				// Similarly for saving multiple images (expo-bracketing)
-				addDummyRequest();
-			}
+			int cost = computeCost(is_raw, is_raw ? 0 : request.jpeg_images.size());
+			addRequest(request, cost);
 			success = true; // always return true when done in background
 		}
 		else {
 			// wait for queue to be empty
 			waitUntilDone();
 			if( is_raw ) {
-				success = saveImageNowRaw(request.dngCreator, request.image, request.current_date);
+				success = saveImageNowRaw(request);
 			}
 			else {
 				success = saveImageNow(request);
@@ -464,9 +526,9 @@ public class ImageSaver extends Thread {
 	
 	/** Adds a request to the background queue, blocking if the queue is already full
 	 */
-	private void addRequest(Request request) {
+	private void addRequest(Request request, int cost) {
 		if( MyDebug.LOG )
-			Log.d(TAG, "addRequest");
+			Log.d(TAG, "addRequest, cost: " + cost);
 		// this should not be synchronized on "this": BlockingQueue is thread safe, and if it's blocking in queue.put(), we'll hang because
 		// the saver queue will need to synchronize on "this" in order to notifyAll() the main thread
 		boolean done = false;
@@ -495,6 +557,12 @@ public class ImageSaver extends Thread {
 					Log.e(TAG, "interrupted while trying to add to ImageSaver queue");
 			}
 		}
+		if( cost > 0 ) {
+			// add "dummy" requests to simulate the cost
+			for(int i=0;i<cost-1;i++) {
+				addDummyRequest();
+			}
+		}
 	}
 
 	private void addDummyRequest() {
@@ -502,7 +570,7 @@ public class ImageSaver extends Thread {
 			Request.ProcessType.NORMAL,
             Request.SaveBase.SAVEBASE_NONE,
 			null,
-			null, null,
+			null,
 			false, null,
 			false, 0,
 			false, 0.0,
@@ -515,7 +583,7 @@ public class ImageSaver extends Thread {
 			1);
 		if( MyDebug.LOG )
 			Log.d(TAG, "add dummy request");
-		addRequest(dummy_request);
+		addRequest(dummy_request, 1); // cost must be 1, so we don't have infinite recursion!
 	}
 
 	/** Wait until the queue is empty and all pending images have been saved.
@@ -1279,13 +1347,6 @@ public class ImageSaver extends Thread {
 		}
     	long time_s = System.currentTimeMillis();
 		
-		// unpack:
-		final boolean image_capture_intent = request.image_capture_intent;
-		final boolean using_camera2 = request.using_camera2;
-		final Date current_date = request.current_date;
-		final boolean store_location = request.store_location;
-		final boolean store_geo_direction = request.store_geo_direction;
-
         boolean success = false;
 		final MyApplicationInterface applicationInterface = main_activity.getApplicationInterface();
 		StorageUtils storageUtils = main_activity.getStorageUtils();
@@ -1347,7 +1408,7 @@ public class ImageSaver extends Thread {
 		File picFile = null;
 		Uri saveUri = null; // if non-null, then picFile is a temporary file, which afterwards we should redirect to saveUri
         try {
-			if( image_capture_intent ) {
+			if( request.image_capture_intent ) {
     			if( MyDebug.LOG )
     				Log.d(TAG, "image_capture_intent");
     			if( request.image_capture_intent_uri != null )
@@ -1417,10 +1478,10 @@ public class ImageSaver extends Thread {
     			}
 			}
 			else if( storageUtils.isUsingSAF() ) {
-				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, "jpg", current_date);
+				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, "jpg", request.current_date);
 			}
 			else {
-    			picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, "jpg", current_date);
+    			picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, "jpg", request.current_date);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "save to: " + picFile.getAbsolutePath());
 			}
@@ -1480,42 +1541,12 @@ public class ImageSaver extends Thread {
 							}
 						}
 	            	}
-	            	else if( store_geo_direction || hasCustomExif(request.custom_tag_artist, request.custom_tag_copyright) ) {
-    	            	if( MyDebug.LOG )
-        	    			Log.d(TAG, "add additional exif info");
-    	            	try {
-	    	            	ExifInterface exif = new ExifInterface(picFile.getAbsolutePath());
-							modifyExif(exif, using_camera2, current_date, store_location, store_geo_direction, request.geo_direction, request.custom_tag_artist, request.custom_tag_copyright);
-	    	            	exif.saveAttributes();
-    	            	}
-    		    		catch(NoClassDefFoundError exception) {
-    		    			// have had Google Play crashes from new ExifInterface() elsewhere for Galaxy Ace4 (vivalto3g), Galaxy S Duos3 (vivalto3gvn), so also catch here just in case
-    		    			if( MyDebug.LOG )
-    		    				Log.e(TAG, "exif orientation NoClassDefFoundError");
-    		    			exception.printStackTrace();
-    		    		}
-    	        		if( MyDebug.LOG ) {
-    	        			Log.d(TAG, "Save single image performance: time after adding GPS direction exif info: " + (System.currentTimeMillis() - time_s));
-    	        		}
-	            	}
-	            	else if( needGPSTimestampHack(using_camera2, store_location) ) {
-    	            	if( MyDebug.LOG )
-        	    			Log.d(TAG, "remove GPS timestamp hack");
-    	            	try {
-	    	            	ExifInterface exif = new ExifInterface(picFile.getAbsolutePath());
-	    	            	fixGPSTimestamp(exif, current_date);
-	    	            	exif.saveAttributes();
-    	            	}
-    		    		catch(NoClassDefFoundError exception) {
-    		    			// have had Google Play crashes from new ExifInterface() elsewhere for Galaxy Ace4 (vivalto3g), Galaxy S Duos3 (vivalto3gvn), so also catch here just in case
-    		    			if( MyDebug.LOG )
-    		    				Log.e(TAG, "exif orientation NoClassDefFoundError");
-    		    			exception.printStackTrace();
-    		    		}
-    	        		if( MyDebug.LOG ) {
-    	        			Log.d(TAG, "Save single image performance: time after removing GPS timestamp hack: " + (System.currentTimeMillis() - time_s));
-    	        		}
-	            	}
+	            	else {
+	            		updateExif(request, picFile);
+						if( MyDebug.LOG ) {
+							Log.d(TAG, "Save single image performance: time after updateExif: " + (System.currentTimeMillis() - time_s));
+						}
+					}
 
     	            if( saveUri == null ) {
     	            	// broadcast for SAF is done later, when we've actually written out the file
@@ -1523,7 +1554,7 @@ public class ImageSaver extends Thread {
     	            	main_activity.test_last_saved_image = picFile.getAbsolutePath();
     	            }
 	            }
-	            if( image_capture_intent ) {
+	            if( request.image_capture_intent ) {
     	    		if( MyDebug.LOG )
     	    			Log.d(TAG, "finish activity due to being called from intent");
 	            	main_activity.setResult(Activity.RESULT_OK);
@@ -1555,7 +1586,7 @@ public class ImageSaver extends Thread {
     	            	storageUtils.broadcastFile(real_file, true, false, true);
     	            	main_activity.test_last_saved_image = real_file.getAbsolutePath();
                     }
-                    else if( !image_capture_intent ) {
+                    else if( !request.image_capture_intent ) {
     					if( MyDebug.LOG )
     						Log.d(TAG, "announce SAF uri");
                     	// announce the SAF Uri
@@ -1686,6 +1717,8 @@ public class ImageSaver extends Thread {
         return success;
 	}
 
+	/** As setExifFromFile, but can read the Exif tags directly from the jpeg data rather than a file.
+	 */
     @RequiresApi(api = Build.VERSION_CODES.N)
     private void setExifFromData(final Request request, byte [] data, File to_file) throws IOException {
         if( MyDebug.LOG ) {
@@ -1707,7 +1740,7 @@ public class ImageSaver extends Thread {
     }
 
 	/** Used to transfer exif tags, if we had to convert the jpeg info to a bitmap (for post-processing such as
-	 *  auto-stabilise or photo stamp).
+	 *  auto-stabilise or photo stamp). Also then applies the Exif tags according to the preferences in the request.
 	 *  Note that we use several ExifInterface tags that are now deprecated in API level 23 and 24. These are replaced with new tags that have
 	 *  the same string value (e.g., TAG_APERTURE replaced with TAG_F_NUMBER, but both have value "FNumber"). We use the deprecated versions
 	 *  to avoid complicating the code (we'd still have to read the deprecated values for older devices).
@@ -1732,7 +1765,7 @@ public class ImageSaver extends Thread {
 		}
 	}
 
-    /** Transfers exif tags from exif to exif_new.
+    /** Transfers exif tags from exif to exif_new, and then applies any extra Exif tags according to the preferences in the request.
 	 *  Note that we use several ExifInterface tags that are now deprecated in API level 23 and 24. These are replaced with new tags that have
 	 *  the same string value (e.g., TAG_APERTURE replaced with TAG_F_NUMBER, but both have value "FNumber"). We use the deprecated versions
 	 *  to avoid complicating the code (we'd still have to read the deprecated values for older devices).
@@ -2020,14 +2053,14 @@ public class ImageSaver extends Thread {
 					exif_new.setAttribute(ExifInterface.TAG_USER_COMMENT, exif_user_comment);
 			}
 
-			modifyExif(exif_new, request.using_camera2, request.current_date, request.store_location, request.store_geo_direction, request.geo_direction, request.custom_tag_artist, request.custom_tag_copyright);
+			modifyExif(exif_new, request.type == Request.Type.JPEG, request.using_camera2, request.current_date, request.store_location, request.store_geo_direction, request.geo_direction, request.custom_tag_artist, request.custom_tag_copyright);
 			exif_new.saveAttributes();
 	}
 
 	/** May be run in saver thread or picture callback thread (depending on whether running in background).
 	 */
 	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
-	private boolean saveImageNowRaw(DngCreator dngCreator, Image image, Date current_date) {
+	private boolean saveImageNowRaw(Request request) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "saveImageNowRaw");
 
@@ -2042,19 +2075,20 @@ public class ImageSaver extends Thread {
 		main_activity.savingImage(true);
 
         OutputStream output = null;
+        RawImage raw_image = request.raw_image;
         try {
     		File picFile = null;
     		Uri saveUri = null;
 
 			if( storageUtils.isUsingSAF() ) {
-				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, "", "dng", current_date);
+				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, "", "dng", request.current_date);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "saveUri: " + saveUri);
 	    		// When using SAF, we don't save to a temp file first (unlike for JPEGs). Firstly we don't need to modify Exif, so don't
 	    		// need a real file; secondly copying to a temp file is much slower for RAW.
 			}
 			else {
-        		picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, "", "dng", current_date);
+        		picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, "", "dng", request.current_date);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "save to: " + picFile.getAbsolutePath());
 			}
@@ -2065,11 +2099,9 @@ public class ImageSaver extends Thread {
     		else {
     		    output = main_activity.getContentResolver().openOutputStream(saveUri);
     		}
-            dngCreator.writeImage(output, image);
-    		image.close();
-    		image = null;
-    		dngCreator.close();
-    		dngCreator = null;
+            raw_image.writeImage(output);
+			raw_image.close();
+			raw_image = null;
     		output.close();
     		output = null;
 
@@ -2137,14 +2169,10 @@ public class ImageSaver extends Thread {
 					e.printStackTrace();
 				}
         	}
-        	if( image != null ) {
-        		image.close();
-        	}
-        	if( dngCreator != null ) {
-        		dngCreator.close();
+        	if( raw_image != null ) {
+        		raw_image.close();
         	}
         }
-
 
     	System.gc();
 
@@ -2253,13 +2281,54 @@ public class ImageSaver extends Thread {
 		return bitmap;
     }
 
+	/** Makes various modifications to the saved image file, according to the preferences in request.
+	 */
+    private void updateExif(Request request, File picFile) throws IOException {
+		if( MyDebug.LOG )
+			Log.d(TAG, "updateExif: " + picFile);
+		if( request.store_geo_direction || hasCustomExif(request.custom_tag_artist, request.custom_tag_copyright) ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "add additional exif info");
+			try {
+				ExifInterface exif = new ExifInterface(picFile.getAbsolutePath());
+				modifyExif(exif, request.type == Request.Type.JPEG, request.using_camera2, request.current_date, request.store_location, request.store_geo_direction, request.geo_direction, request.custom_tag_artist, request.custom_tag_copyright);
+				exif.saveAttributes();
+			}
+			catch(NoClassDefFoundError exception) {
+				// have had Google Play crashes from new ExifInterface() elsewhere for Galaxy Ace4 (vivalto3g), Galaxy S Duos3 (vivalto3gvn), so also catch here just in case
+				if( MyDebug.LOG )
+					Log.e(TAG, "exif orientation NoClassDefFoundError");
+				exception.printStackTrace();
+			}
+		}
+		else if( needGPSTimestampHack(request.type == Request.Type.JPEG, request.using_camera2, request.store_location) ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "remove GPS timestamp hack");
+			try {
+				ExifInterface exif = new ExifInterface(picFile.getAbsolutePath());
+				fixGPSTimestamp(exif, request.current_date);
+				exif.saveAttributes();
+			}
+			catch(NoClassDefFoundError exception) {
+				// have had Google Play crashes from new ExifInterface() elsewhere for Galaxy Ace4 (vivalto3g), Galaxy S Duos3 (vivalto3gvn), so also catch here just in case
+				if( MyDebug.LOG )
+					Log.e(TAG, "exif orientation NoClassDefFoundError");
+				exception.printStackTrace();
+			}
+		}
+		else {
+			if( MyDebug.LOG )
+				Log.d(TAG, "no exif data to update for: " + picFile);
+		}
+	}
+
 	/** Makes various modifications to the exif data, if necessary.
 	 */
-    private void modifyExif(ExifInterface exif, boolean using_camera2, Date current_date, boolean store_location, boolean store_geo_direction, double geo_direction, String custom_tag_artist, String custom_tag_copyright) {
+    private void modifyExif(ExifInterface exif, boolean is_jpeg, boolean using_camera2, Date current_date, boolean store_location, boolean store_geo_direction, double geo_direction, String custom_tag_artist, String custom_tag_copyright) {
 		setGPSDirectionExif(exif, store_geo_direction, geo_direction);
 		setDateTimeExif(exif);
 		setCustomExif(exif, custom_tag_artist, custom_tag_copyright);
-		if( needGPSTimestampHack(using_camera2, store_location) ) {
+		if( needGPSTimestampHack(is_jpeg, using_camera2, store_location) ) {
 			fixGPSTimestamp(exif, current_date);
 		}
 	}
@@ -2351,8 +2420,8 @@ public class ImageSaver extends Thread {
 			Log.d(TAG, "fixGPSTimestamp exit");
 	}
 	
-	private boolean needGPSTimestampHack(boolean using_camera2, boolean store_location) {
-		if( using_camera2 ) {
+	private boolean needGPSTimestampHack(boolean is_jpeg, boolean using_camera2, boolean store_location) {
+		if( is_jpeg && using_camera2 ) {
     		return store_location;
 		}
 		return false;
