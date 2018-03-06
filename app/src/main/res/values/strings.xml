@@ -230,7 +230,7 @@
     <string name="preference_donate">Donate to support development</string>
     <string name="preference_donate_summary">If you like this app, please consider making a donation to support development. You can do this by purchasing my "donation app" - click this option to open up the page for my donation app. Thanks!</string>
     <string name="preference_use_camera2">Use Camera2 API</string>
-    <string name="preference_use_camera2_summary">Enables Android 5\'s Camera2 API - offers extra features, but may not work properly on all devices (will cause a restart)</string>
+    <string name="preference_use_camera2_summary">Enables extra features such as manual modes for exposure, focus, white balance, along with RAW (if supported by the device), but may not work properly on all devices (will cause a restart)</string>
     <string name="preference_about">About</string>
     <string name="preference_about_summary">App and debug information</string>
     <string name="preference_reset">Reset settings</string>
@@ -387,8 +387,8 @@
     <string name="duration_45m">45 minutes</string>
     <string name="duration_1h">1 hour</string>
 
-    <string name="preference_show_take_photo">Show take photo icon</string>
-    <string name="preference_show_take_photo_summary">Show the icon for taking photos and recording videos. Useful if your device has a hardware shutter button and you\'d rather use that.</string>
+    <string name="preference_show_take_photo">Show \"Take Photo\" icon</string>
+    <string name="preference_show_take_photo_summary">Show the icon for taking photos and recording videos. Uncheck if you\'d rather take photos by other methods (e.g., if your device has a hardware shutter button, or using the volume keys).</string>
 
     <string name="video_pause">Video paused</string>
     <string name="video_resume">Video resumed</string>
@@ -467,6 +467,11 @@
     <string name="preference_exif_artist_summary">Text to store in the image metadata for the "artist" tag  (JPEG format only). (Leave blank for none.)</string>
     <string name="preference_exif_copyright">Copyright</string>
     <string name="preference_exif_copyright_summary">Text to store in the image metadata for the "copyright" tag  (JPEG format only). (Leave blank for none.)</string>
+
+    <string name="processing">Processing…</string>
+
+    <string name="preference_raw_no">JPEG only</string>
+    <string name="preference_raw_yes">JPEG and DNG (RAW)</string>
 
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text"><b>v1.41:</b>\n\n

@@ -10,6 +10,7 @@ import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyApplicationInterface;
 import net.sourceforge.opencamera.MyDebug;
 import net.sourceforge.opencamera.PreferenceKeys;
+import net.sourceforge.opencamera.Preview.ApplicationInterface;
 import net.sourceforge.opencamera.R;
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.Preview.Preview;
@@ -63,6 +64,7 @@ public class DrawPreview {
 	private boolean has_stamp_pref;
 	private boolean is_raw_pref;
 	private boolean is_face_detection_pref;
+	private boolean is_audio_enabled_pref;
 	private boolean auto_stabilise_pref;
 	private String preference_grid_pref;
 
@@ -107,11 +109,14 @@ public class DrawPreview {
 
 	private Bitmap raw_bitmap;
 	private Bitmap auto_stabilise_bitmap;
+	private Bitmap dro_bitmap;
 	private Bitmap hdr_bitmap;
+	private Bitmap expo_bitmap;
 	private Bitmap nr_bitmap;
 	private Bitmap photostamp_bitmap;
 	private Bitmap flash_bitmap;
 	private Bitmap face_detection_bitmap;
+	private Bitmap audio_disabled_bitmap;
 	private final Rect icon_dest = new Rect();
 	private long needs_flash_time = -1; // time when flash symbol comes on (used for fade-in effect)
 
@@ -132,6 +137,7 @@ public class DrawPreview {
     private boolean taking_picture; // true iff camera is in process of capturing a picture (including any necessary prior steps such as autofocus, flash/precapture)
 	private boolean capture_started; // true iff the camera is capturing
     private boolean front_screen_flash; // true iff the front screen display should maximise to simulate flash
+	private boolean image_queue_full; // whether we can no longer take new photos due to image queue being full (or rather, would become full if a new photo taken)
     
 	private boolean continuous_focus_moving;
 	private long continuous_focus_moving_ms;
@@ -160,11 +166,14 @@ public class DrawPreview {
     	location_off_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_gps_off_white_48dp);
 		raw_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.raw_icon);
 		auto_stabilise_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.auto_stabilise_icon);
+		dro_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.dro_icon);
 		hdr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_hdr_on_white_48dp);
+		expo_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.expo_icon);
 		nr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.nr_icon);
 		photostamp_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_text_format_white_48dp);
 		flash_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.flash_on);
 		face_detection_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_face_white_48dp);
+		audio_disabled_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_mic_off_white_48dp);
 
 		ybounds_text = getContext().getResources().getString(R.string.zoom) + getContext().getResources().getString(R.string.angle) + getContext().getResources().getString(R.string.direction);
 	}
@@ -189,9 +198,17 @@ public class DrawPreview {
 			auto_stabilise_bitmap.recycle();
 			auto_stabilise_bitmap = null;
 		}
+		if( dro_bitmap != null ) {
+			dro_bitmap.recycle();
+			dro_bitmap = null;
+		}
 		if( hdr_bitmap != null ) {
 			hdr_bitmap.recycle();
 			hdr_bitmap = null;
+		}
+		if( expo_bitmap != null ) {
+			expo_bitmap.recycle();
+			expo_bitmap = null;
 		}
 		if( nr_bitmap != null ) {
 			nr_bitmap.recycle();
@@ -208,6 +225,10 @@ public class DrawPreview {
 		if( face_detection_bitmap != null ) {
 			face_detection_bitmap.recycle();
 			face_detection_bitmap = null;
+		}
+		if( audio_disabled_bitmap != null ) {
+			audio_disabled_bitmap.recycle();
+			audio_disabled_bitmap = null;
 		}
 	}
 
@@ -260,6 +281,10 @@ public class DrawPreview {
 			capture_started = false;
     	}
     }
+
+    public void setImageQueueFull(boolean image_queue_full) {
+		this.image_queue_full = image_queue_full;
+	}
 	
 	public void turnFrontScreenFlashOn() {
 		if( MyDebug.LOG )
@@ -313,6 +338,8 @@ public class DrawPreview {
 			Log.d(TAG, "updateSettings");
 
 		photoMode = applicationInterface.getPhotoMode();
+		if( MyDebug.LOG )
+			Log.d(TAG, "photoMode: " + photoMode);
 
 		show_time_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowTimePreferenceKey, true);
 		show_free_memory_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowFreeMemoryPreferenceKey, true);
@@ -337,8 +364,9 @@ public class DrawPreview {
 		immersive_mode_everything_pref = immersive_mode.equals("immersive_mode_everything");
 
 		has_stamp_pref = applicationInterface.getStampPref().equals("preference_stamp_yes");
-		is_raw_pref = applicationInterface.isRawPref();
+		is_raw_pref = applicationInterface.getRawPref() != ApplicationInterface.RawPref.RAWPREF_JPEG_ONLY;
 		is_face_detection_pref = applicationInterface.getFaceDetectionPref();
+		is_audio_enabled_pref = applicationInterface.getRecordAudioPref();
 
 		auto_stabilise_pref = applicationInterface.getAutoStabilisePref();
 
@@ -856,21 +884,33 @@ public class DrawPreview {
 				}
 			}
 
-			if( ( photoMode == MyApplicationInterface.PhotoMode.HDR || photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ) &&
-					!applicationInterface.isVideoPref() ) { // HDR or NR not supported for video mode
+			if( (
+					photoMode == MyApplicationInterface.PhotoMode.DRO ||
+					photoMode == MyApplicationInterface.PhotoMode.HDR ||
+					photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ||
+					photoMode == MyApplicationInterface.PhotoMode.NoiseReduction
+					) &&
+					!applicationInterface.isVideoPref() ) { // these photo modes not supported for video mode
 				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
 				p.setStyle(Paint.Style.FILL);
 				p.setColor(Color.BLACK);
 				p.setAlpha(64);
 				canvas.drawRect(icon_dest, p);
 				p.setAlpha(255);
-				canvas.drawBitmap(photoMode == MyApplicationInterface.PhotoMode.HDR ? hdr_bitmap : nr_bitmap, null, icon_dest, p);
+				Bitmap bitmap = photoMode == MyApplicationInterface.PhotoMode.DRO ? dro_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.HDR ? hdr_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ? expo_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ? nr_bitmap :
+								null;
+				if( bitmap != null ) {
+					canvas.drawBitmap(bitmap, null, icon_dest, p);
 
-				if( ui_rotation == 180 ) {
-					location_x2 -= icon_size + flash_padding;
-				}
-				else {
-					location_x2 += icon_size + flash_padding;
+					if( ui_rotation == 180 ) {
+						location_x2 -= icon_size + flash_padding;
+					}
+					else {
+						location_x2 += icon_size + flash_padding;
+					}
 				}
 			}
 
@@ -882,6 +922,23 @@ public class DrawPreview {
 				canvas.drawRect(icon_dest, p);
 				p.setAlpha(255);
 				canvas.drawBitmap(photostamp_bitmap, null, icon_dest, p);
+
+				if( ui_rotation == 180 ) {
+					location_x2 -= icon_size + flash_padding;
+				}
+				else {
+					location_x2 += icon_size + flash_padding;
+				}
+			}
+
+			if( !is_audio_enabled_pref && applicationInterface.isVideoPref() ) {
+				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
+				p.setStyle(Paint.Style.FILL);
+				p.setColor(Color.BLACK);
+				p.setAlpha(64);
+				canvas.drawRect(icon_dest, p);
+				p.setAlpha(255);
+				canvas.drawBitmap(audio_disabled_bitmap, null, icon_dest, p);
 
 				if( ui_rotation == 180 ) {
 					location_x2 -= icon_size + flash_padding;
@@ -1123,6 +1180,14 @@ public class DrawPreview {
 							applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.capturing), color, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
 						}
 					}
+				}
+			}
+			else if( image_queue_full ) {
+				if( ((int)(time_ms / 500)) % 2 == 0 ) {
+					p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
+					p.setTextAlign(Paint.Align.CENTER);
+					int pixels_offset_y = 3 * text_y; // avoid overwriting the zoom, and also allow a bit extra space
+					applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.processing), Color.LTGRAY, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
 				}
 			}
 
@@ -1563,6 +1628,8 @@ public class DrawPreview {
 		/*if( MyDebug.LOG )
 			Log.d(TAG, "onDrawPreview");*/
 		if( !has_settings ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "onDrawPreview: need to update settings");
 			updateSettings();
 		}
 		Preview preview = main_activity.getPreview();

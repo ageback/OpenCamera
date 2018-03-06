@@ -871,6 +871,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 
 		updateGalleryIcon(); // update in case images deleted whilst idle
 
+		applicationInterface.reset(); // should be called before opening the camera in preview.onResume()
+
 		preview.onResume();
 
 		if( MyDebug.LOG ) {
@@ -1035,6 +1037,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			int cameraId = getNextCameraId();
 		    View switchCameraButton = findViewById(R.id.switch_camera);
 		    switchCameraButton.setEnabled(false); // prevent slowdown if user repeatedly clicks
+			applicationInterface.reset();
 			this.preview.setCamera(cameraId);
 		    switchCameraButton.setEnabled(true);
 			// no need to call mainUI.setSwitchCameraContentDescription - this will be called from PreviewcameraSetup when the
@@ -1049,6 +1052,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		mainUI.destroyPopup(); // important as we don't want to use a cached popup, as we can show different options depending on whether we're in photo or video mode
 	    View switchVideoButton = findViewById(R.id.switch_video);
 	    switchVideoButton.setEnabled(false); // prevent slowdown if user repeatedly clicks
+		applicationInterface.reset();
 		this.preview.switchVideo(false, true);
 		switchVideoButton.setEnabled(true);
 
@@ -1903,6 +1907,14 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 		});
     }
+
+	/** Called when the number of images being saved in ImageSaver changes.
+	 */
+	void imageQueueChanged() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "imageQueueChanged");
+		applicationInterface.getDrawPreview().setImageQueueFull( !applicationInterface.canTakeNewPhoto() );
+	}
 
     public void clickedGallery(View view) {
 		if( MyDebug.LOG )
@@ -2786,8 +2798,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     }
 
     public boolean supportsNoiseReduction() {
-		//return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsExpoBracketing() );
-		return false; // currently blocked for release
+		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsExpoBracketing() );
+		//return false; // currently blocked for release
 	}
     
     private int maxExpoBracketingNImages() {

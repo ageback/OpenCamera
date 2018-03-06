@@ -106,8 +106,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 	
 	// camera properties which are saved in bundle, but not stored in preferences (so will be remembered if the app goes into background, but not after restart)
 	private int cameraId = 0;
-	private int zoom_factor = 0;
 	private float focus_distance = 0.0f;
+	// camera properties that aren't saved even in the bundle; these should also be reset in reset()
+	private int zoom_factor = 0; // don't save zoom, as doing so tends to confuse users; other camera applications don't seem to save zoom when pause/resuming
 
 	MyApplicationInterface(MainActivity main_activity, Bundle savedInstanceState) {
 		long debug_time = 0;
@@ -128,7 +129,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		
 		this.imageSaver = new ImageSaver(main_activity);
 		this.imageSaver.start();
-		
+
         if( savedInstanceState != null ) {
 			// load the things we saved in onSaveInstanceState().
             if( MyDebug.LOG )
@@ -136,9 +137,6 @@ public class MyApplicationInterface implements ApplicationInterface {
     		cameraId = savedInstanceState.getInt("cameraId", 0);
 			if( MyDebug.LOG )
 				Log.d(TAG, "found cameraId: " + cameraId);
-    		zoom_factor = savedInstanceState.getInt("zoom_factor", 0);
-			if( MyDebug.LOG )
-				Log.d(TAG, "found zoom_factor: " + zoom_factor);
 			focus_distance = savedInstanceState.getFloat("focus_distance", 0.0f);
 			if( MyDebug.LOG )
 				Log.d(TAG, "found focus_distance: " + focus_distance);
@@ -158,9 +156,6 @@ public class MyApplicationInterface implements ApplicationInterface {
 		if( MyDebug.LOG )
 			Log.d(TAG, "save cameraId: " + cameraId);
     	state.putInt("cameraId", cameraId);
-		if( MyDebug.LOG )
-			Log.d(TAG, "save zoom_factor: " + zoom_factor);
-    	state.putInt("zoom_factor", zoom_factor);
 		if( MyDebug.LOG )
 			Log.d(TAG, "save focus_distance: " + focus_distance);
     	state.putFloat("focus_distance", focus_distance);
@@ -424,11 +419,8 @@ public class MyApplicationInterface implements ApplicationInterface {
     
     @Override
 	public boolean getForce4KPref() {
-		if( cameraId == 0 && sharedPreferences.getBoolean(PreferenceKeys.getForceVideo4KPreferenceKey(), false) && main_activity.supportsForceVideo4K() ) {
-			return true;
-		}
-		return false;
-    }
+		return cameraId == 0 && sharedPreferences.getBoolean(PreferenceKeys.getForceVideo4KPreferenceKey(), false) && main_activity.supportsForceVideo4K();
+	}
     
     @Override
     public String getVideoBitratePref() {
@@ -696,10 +688,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 
     public boolean getAutoStabilisePref() {
 		boolean auto_stabilise = sharedPreferences.getBoolean(PreferenceKeys.AutoStabilisePreferenceKey, false);
-		if( auto_stabilise && main_activity.supportsAutoStabilise() )
-			return true;
-		return false;
-    }
+		return auto_stabilise && main_activity.supportsAutoStabilise();
+	}
 
     public String getStampPref() {
     	return sharedPreferences.getString(PreferenceKeys.StampPreferenceKey, "preference_stamp_no");
@@ -755,6 +745,35 @@ public class MyApplicationInterface implements ApplicationInterface {
 	}
 
 	@Override
+	public boolean canTakeNewPhoto() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "canTakeNewPhoto");
+    	int n_raw, n_jpegs;
+    	if( main_activity.getPreview().isVideo() ) {
+			n_raw = 0;
+			n_jpegs = 1;
+		}
+		else {
+			if( main_activity.getPreview().supportsRaw() && this.getRawPref() == RawPref.RAWPREF_JPEG_DNG ) {
+				n_raw = 1;
+				n_jpegs = 1;
+			}
+			else {
+				n_raw = 0;
+				n_jpegs = 1;
+			}
+
+			if( main_activity.getPreview().supportsExpoBracketing() && this.isExpoBracketingPref() ) {
+				n_raw = 0;
+				n_jpegs = this.getExpoBracketingNImagesPref();
+			}
+		}
+
+		//return true;
+    	return !imageSaver.queueWouldBlock(n_raw, n_jpegs);
+	}
+
+	@Override
     public long getExposureTimePref() {
     	return sharedPreferences.getLong(PreferenceKeys.ExposureTimePreferenceKey, CameraController.EXPOSURE_TIME_DEFAULT);
     }
@@ -767,17 +786,13 @@ public class MyApplicationInterface implements ApplicationInterface {
     @Override
 	public boolean isExpoBracketingPref() {
     	PhotoMode photo_mode = getPhotoMode();
-    	if( photo_mode == PhotoMode.HDR || photo_mode == PhotoMode.ExpoBracketing )
-			return true;
-		return false;
-    }
+		return photo_mode == PhotoMode.HDR || photo_mode == PhotoMode.ExpoBracketing;
+	}
 
     @Override
     public boolean isCameraBurstPref() {
     	PhotoMode photo_mode = getPhotoMode();
-    	if( photo_mode == PhotoMode.NoiseReduction )
-			return true;
-		return false;
+		return photo_mode == PhotoMode.NoiseReduction;
 	}
 
     @Override
@@ -837,6 +852,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 		// video recording, the caller should override. We don't override here, as this preference may be used to affect how
 		// the CameraController is set up, and we don't always re-setup the camera when switching between photo and video modes.
 		String photo_mode_pref = sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std");
+		/*if( MyDebug.LOG )
+			Log.d(TAG, "photo_mode_pref: " + photo_mode_pref);*/
 		boolean dro = photo_mode_pref.equals("preference_photo_mode_dro");
 		if( dro && main_activity.supportsDRO() )
 			return PhotoMode.DRO;
@@ -859,10 +876,14 @@ public class MyApplicationInterface implements ApplicationInterface {
 	}
 
 	@Override
-	public boolean isRawPref() {
+	public RawPref getRawPref() {
     	if( isImageCaptureIntent() )
-    		return false;
-    	return sharedPreferences.getString(PreferenceKeys.RawPreferenceKey, "preference_raw_no").equals("preference_raw_yes");
+    		return RawPref.RAWPREF_JPEG_ONLY;
+		switch( sharedPreferences.getString(PreferenceKeys.RawPreferenceKey, "preference_raw_no") ) {
+			case "preference_raw_yes":
+				return RawPref.RAWPREF_JPEG_DNG;
+		}
+		return RawPref.RAWPREF_JPEG_ONLY;
     }
 
 	@Override
@@ -892,6 +913,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 	public void cameraSetup() {
 		main_activity.cameraSetup();
 		drawPreview.clearContinuousFocusMove();
+		drawPreview.updateSettings(); // otherwise icons like HDR won't show after force-restart, because we only know that HDR is supported after the camera is opened
 	}
 
 	@Override
@@ -1672,6 +1694,15 @@ public class MyApplicationInterface implements ApplicationInterface {
 		return Color.parseColor(color);
     }
 
+	/** Should be called to reset parameters which aren't expected to be saved (e.g., resetting zoom when application is paused,
+	 *  when switching between photo/video modes, or switching cameras).
+	 */
+	void reset() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "reset");
+		this.zoom_factor = 0;
+	}
+
     @Override
     public void onDrawPreview(Canvas canvas) {
     	drawPreview.onDrawPreview(canvas);
@@ -2063,6 +2094,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 				}
 			}
 			catch(FileNotFoundException e) {
+				// note, Android Studio reports a warning that FileNotFoundException isn't thrown, but it can be
+				// thrown by DocumentsContract.deleteDocument - and we get an error if we try to remove the catch!
 				if( MyDebug.LOG )
 					Log.e(TAG, "exception when deleting " + image_uri);
 				e.printStackTrace();
