@@ -432,4 +432,7 @@
     <string name="processing">正在处理…</string>
     <string name="preference_raw_no">仅 JPEG</string>
     <string name="preference_raw_yes">JPEG 和 DNG (RAW)</string>
+    <string name="preference_stamp_dateformat_none">无</string>
+    <string name="preference_stamp_dateformat_default">默认</string>
+    <string name="preference_raw_only">"仅 DNG (RAW) "</string>
 </resources>
