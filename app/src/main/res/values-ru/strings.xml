@@ -35,7 +35,7 @@
     <string name="exposure_locked">Экспозиция заблокирована</string>
     <string name="exposure_unlocked">Экспозиция разблокирована</string>
     <string name="cancelled_timer">Таймер отменен</string>
-    <string name="cancelled_burst_mode">Режим серийной съемки отменен</string>
+    <string name="cancelled_repeat_mode">Режим серийной съемки отменен</string>
     <string name="started_timer">Таймер запущен</string>
     <string name="failed_to_save_video">Не удалось сохранить видеофайл</string>
     <string name="failed_to_record_video">Не удалось записать видео</string>
@@ -394,4 +394,11 @@
 
     <string name="preference_raw_no">Только JPEG</string>
     <string name="preference_raw_yes">JPEG и DNG (RAW)</string>
+
+    <string name="preference_stamp_dateformat_default">По умолчанию</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">гггг-мм-дд</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">дд/мм/гггг</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">мм/дд/гггг</string>
+    <string name="preference_stamp_dateformat_none">Нет</string>
+
 </resources>

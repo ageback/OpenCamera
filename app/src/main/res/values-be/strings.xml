@@ -35,7 +35,7 @@
     <string name="exposure_locked">Экспазіцыя заблакавана</string>
     <string name="exposure_unlocked">Экспазіцыя разблакавана</string>
     <string name="cancelled_timer">Таймер быў скасаваны</string>
-    <string name="cancelled_burst_mode">Рэжым серыйнай здымкі быў скасаваны</string>
+    <string name="cancelled_repeat_mode">Рэжым серыйнай здымкі быў скасаваны</string>
     <string name="started_timer">Таймер работы</string>
     <string name="failed_to_save_video">Не атрымалася захаваць відэафайл</string>
     <string name="failed_to_record_video">Не атрымалася запісаць відэа</string>
@@ -271,4 +271,11 @@
     <string name="duration_45m">45 хвілін</string>
     <string name="duration_1h">1 гадзіна</string>
     <string name="preference_video_fps_default">Прадвызначана</string>
+
+    <string name="preference_stamp_dateformat_default">Прадвызначана</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">г-м-дз</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">дз/м/г</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">м/дз/г</string>
+    <string name="preference_stamp_dateformat_none">Няма</string>
+
 </resources>

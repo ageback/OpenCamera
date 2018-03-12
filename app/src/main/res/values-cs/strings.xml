@@ -35,7 +35,7 @@
     <string name="exposure_locked">Expozice zamčena</string>
     <string name="exposure_unlocked">Expozice odemčena</string>
     <string name="cancelled_timer">Časovač zrušen</string>
-    <string name="cancelled_burst_mode">Sekvenční snímání zrušeno</string>
+    <string name="cancelled_repeat_mode">Sekvenční snímání zrušeno</string>
     <string name="started_timer">Časovač spuštěn</string>
     <string name="failed_to_save_video">Selhalo ukládání videa</string>
     <string name="failed_to_record_video">Selhalo natáčení videa</string>
@@ -275,4 +275,11 @@
     <string name="duration_45m">45 minut</string>
     <string name="duration_1h">1 hodina</string>
     <string name="preference_video_fps_default">Implicitní</string>
+
+    <string name="preference_stamp_dateformat_default">Implicitní</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">rrrr-mm-dd</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">dd/mm/rrrr</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">mm/dd/rrrr</string>
+    <string name="preference_stamp_dateformat_none">Žádné</string>
+
 </resources>

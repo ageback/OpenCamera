@@ -1259,7 +1259,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		waitUntilImageQueueEmpty(); // in theory not needed as we could continue running in the background, but best to be safe
 		closePopup();
 		preview.cancelTimer(); // best to cancel any timer, in case we take a photo while settings window is open, or when changing settings
-		preview.cancelBurst(); // similarly cancel the auto-repeat burst mode!
+		preview.cancelRepeat(); // similarly cancel the auto-repeat mode!
 		preview.stopVideo(false); // important to stop video, as we'll be changing camera parameters when the settings window closes
 		stopAudioListeners();
 		
@@ -1523,38 +1523,55 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	private MyPreferenceFragment getPreferenceFragment() {
         return (MyPreferenceFragment)getFragmentManager().findFragmentByTag("PREFERENCE_FRAGMENT");
     }
-    
+
+    private boolean settingsIsOpen() {
+		return getPreferenceFragment() != null;
+	}
+
+	/** Call when the settings is going to be closed.
+	 */
+	private void settingsClosing() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "close settings");
+		setWindowFlagsForCamera();
+		showPreview(true);
+
+		preferencesListener.stopListening();
+
+		// Update the cached settings in DrawPreview
+		// Note that some GUI related settings won't trigger preferencesListener.anyChanges(), so
+		// we always call this. Perhaps we could add more classifications to PreferencesListener
+		// to mark settings that need us to update DrawPreview but not call updateForSettings().
+		// However, DrawPreview.updateSettings() should be a quick function (the main point is
+		// to avoid reading the preferences in every single frame).
+		applicationInterface.getDrawPreview().updateSettings();
+
+		if( preferencesListener.anyChanges() ) {
+			updateForSettings();
+		}
+		else {
+			if( MyDebug.LOG )
+				Log.d(TAG, "no need to call updateForSettings() for changes made to preferences");
+		}
+	}
+
     @Override
     public void onBackPressed() {
-        final MyPreferenceFragment fragment = getPreferenceFragment();
+		if( MyDebug.LOG )
+			Log.d(TAG, "onBackPressed");
         if( screen_is_locked ) {
 			preview.showToast(screen_locked_toast, R.string.screen_is_locked);
         	return;
         }
-        if( fragment != null ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "close settings");
-			setWindowFlagsForCamera();
-			showPreview(true);
-
-			preferencesListener.stopListening();
-
-			// Update the cached settings in DrawPreview
-			// Note that some GUI related settings won't trigger preferencesListener.anyChanges(), so
-			// we always call this. Perhaps we could add more classifications to PreferencesListener
-			// to mark settings that need us to update DrawPreview but not call updateForSettings().
-			// However, DrawPreview.updateSettings() should be a quick function (the main point is
-			// to avoid reading the preferences in every single frame).
-			applicationInterface.getDrawPreview().updateSettings();
-
-			if( preferencesListener.anyChanges() ) {
-				updateForSettings();
-			}
-			else {
-				if( MyDebug.LOG )
-					Log.d(TAG, "no need to call updateForSettings() for changes made to preferences");
-			}
+        if( settingsIsOpen() ) {
+        	settingsClosing();
         }
+        else if( preview != null && preview.isPreviewPaused() ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "preview was paused, so unpause it");
+			preview.startCameraPreview();
+			return;
+		}
         else {
 			if( popupIsOpen() ) {
     			closePopup();
@@ -1927,19 +1944,23 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			Log.d(TAG, "openGallery");
 		//Intent intent = new Intent(Intent.ACTION_VIEW, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
 		Uri uri = applicationInterface.getStorageUtils().getLastMediaScanned();
+		boolean is_raw = false; // note that getLastMediaScanned() will never return RAW images, as we only record JPEGs
 		if( uri == null ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "go to latest media");
 			StorageUtils.Media media = applicationInterface.getStorageUtils().getLatestMedia();
 			if( media != null ) {
 				uri = media.uri;
+				is_raw = media.path != null && media.path.toLowerCase(Locale.US).endsWith(".dng");
 			}
 		}
 
 		if( uri != null ) {
 			// check uri exists
-			if( MyDebug.LOG )
+			if( MyDebug.LOG ) {
 				Log.d(TAG, "found most recent uri: " + uri);
+				Log.d(TAG, "is_raw: " + is_raw);
+			}
 			try {
 				ContentResolver cr = getContentResolver();
 				ParcelFileDescriptor pfd = cr.openFileDescriptor(uri, "r");
@@ -1947,6 +1968,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					if( MyDebug.LOG )
 						Log.d(TAG, "uri no longer exists (1): " + uri);
 					uri = null;
+					is_raw = false;
 				}
 				else {
 					pfd.close();
@@ -1956,24 +1978,37 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				if( MyDebug.LOG )
 					Log.d(TAG, "uri no longer exists (2): " + uri);
 				uri = null;
+				is_raw = false;
 			}
 		}
 		if( uri == null ) {
 			uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+			is_raw = false;
 		}
 		if( !is_test ) {
 			// don't do if testing, as unclear how to exit activity to finish test (for testGallery())
 			if( MyDebug.LOG )
 				Log.d(TAG, "launch uri:" + uri);
 			final String REVIEW_ACTION = "com.android.camera.action.REVIEW";
-			try {
+			boolean done = false;
+			if( !is_raw ) {
 				// REVIEW_ACTION means we can view video files without autoplaying
-				Intent intent = new Intent(REVIEW_ACTION, uri);
-				this.startActivity(intent);
-			}
-			catch(ActivityNotFoundException e) {
+				// however, Google Photos at least has problems with going to a RAW photo (in RAW only mode),
+				// unless we first pause and resume Open Camera
 				if( MyDebug.LOG )
-					Log.d(TAG, "REVIEW_ACTION intent didn't work, try ACTION_VIEW");
+					Log.d(TAG, "try REVIEW_ACTION");
+				try {
+					Intent intent = new Intent(REVIEW_ACTION, uri);
+					this.startActivity(intent);
+					done = true;
+				}
+				catch(ActivityNotFoundException e) {
+					e.printStackTrace();
+				}
+			}
+			if( !done ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "try ACTION_VIEW");
 				Intent intent = new Intent(Intent.ACTION_VIEW, uri);
 				// from http://stackoverflow.com/questions/11073832/no-activity-found-to-handle-intent - needed to fix crash if no gallery app installed
 				//Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("blah")); // test
@@ -2779,18 +2814,23 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	}
     
     public boolean supportsAutoStabilise() {
+		if( applicationInterface.isRawOnly() )
+			return false; // if not saving JPEGs, no point having auto-stabilise mode, as it won't affect the RAW images
     	return this.supports_auto_stabilise;
     }
 
 	public boolean supportsDRO() {
+		if( applicationInterface.isRawOnly(MyApplicationInterface.PhotoMode.DRO) )
+			return false; // if not saving JPEGs, no point having DRO mode, as it won't affect the RAW images
 		// require at least Android 5, for the Renderscript support in HDRProcessor
 		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP );
 	}
 
     public boolean supportsHDR() {
     	// we also require the device have sufficient memory to do the processing, simplest to use the same test as we do for auto-stabilise...
+		// (note we don't call supportsAutoStabilise(), as that does other checks specifically for auto-stabilise, e.g., calling applicationInterface.isRawOnly() - which would get an infinite loop if called from here!)
 		// also require at least Android 5, for the Renderscript support in HDRProcessor
-		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && this.supportsAutoStabilise() && preview.supportsExpoBracketing() );
+		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && this.supports_auto_stabilise && preview.supportsExpoBracketing() );
     }
     
     public boolean supportsExpoBracketing() {
@@ -2993,6 +3033,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 			else if( photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing ) {
 				photo_mode_string = getResources().getString(R.string.photo_mode_expo_bracketing_full);
+			}
+			else if( photo_mode == MyApplicationInterface.PhotoMode.NoiseReduction ) {
+				photo_mode_string = getResources().getString(R.string.photo_mode_noise_reduction);
 			}
 			if( photo_mode_string != null ) {
 				toast_string += "\n" + getResources().getString(R.string.photo_mode) + ": " + photo_mode_string;

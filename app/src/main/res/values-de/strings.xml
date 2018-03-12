@@ -35,7 +35,7 @@
     <string name="exposure_locked">Belichtung gesperrt</string>
     <string name="exposure_unlocked">Belichtung entsperrt</string>
     <string name="cancelled_timer">Timer abgebrochen</string>
-    <string name="cancelled_burst_mode">Serienbilder abgebrochen</string>
+    <string name="cancelled_repeat_mode">Serienbilder abgebrochen</string>
     <string name="started_timer">Timer gestartet</string>
     <string name="failed_to_save_video">Fehler beim Speichern des Videos</string>
     <string name="failed_to_record_video">Fehler bei der Videoaufnahme</string>
@@ -394,4 +394,11 @@
 
     <string name="preference_raw_no">Nur JPEG</string>
     <string name="preference_raw_yes">JPEG und DNG (RAW)</string>
+
+    <string name="preference_stamp_dateformat_default">Standard</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">JJJJ-MM-TT</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">TT/MM/JJJJ</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">MM/TT/JJJJ</string>
+    <string name="preference_stamp_dateformat_none">Kein Datum-Stempel</string>
+
 </resources>
