@@ -84,6 +84,7 @@ public class ImageSaver extends Thread {
 			AVERAGE
 		}
 		final ProcessType process_type; // for jpeg
+		final boolean suffix_from_0; // if true, images with same datetime will be appended _0, _1 etc (only relevant for the main image; if saving the "base" images, they'll use their own format)
 		enum SaveBase {
 			SAVEBASE_NONE,
 			SAVEBASE_FIRST,
@@ -124,6 +125,7 @@ public class ImageSaver extends Thread {
 		
 		Request(Type type,
 			ProcessType process_type,
+			boolean suffix_from_0,
 			SaveBase save_base,
 			List<byte []> jpeg_images,
 			RawImage raw_image,
@@ -140,6 +142,7 @@ public class ImageSaver extends Thread {
 			int sample_factor) {
 			this.type = type;
 			this.process_type = process_type;
+			this.suffix_from_0 = suffix_from_0;
 			this.save_base = save_base;
 			this.jpeg_images = jpeg_images;
 			this.raw_image = raw_image;
@@ -194,20 +197,20 @@ public class ImageSaver extends Thread {
 			// This should be at least 5*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a burst of 5 photos
 			// (e.g., in expo mode) with RAW+JPEG without blocking (we subtract 1, as the first image can be immediately
 			// taken off the queue).
-			// This should be at most 85 for large heap 512MB (estimate based on reserving 80MB for post-processing
+			// This should also be at least 19 so we can take a burst of 20 photos with JPEG without blocking (we subtract 1,
+			// as the first image can be immediately taken off the queue).
+			// This should be at most 70 for large heap 512MB (estimate based on reserving 160MB for post-processing and HDR
 			// operations, then estimate a JPEG image at 5MB).
 			max_queue_size = 34;
 		}
 		else if( large_heap_memory >= 256 ) {
-			// This should be at least 19 so we can take a burst of 20 photos with JPEG without blocking (we subtract 1,
-			// as the first image can be immediately taken off the queue).
-			// This should be at most 34 for large heap 256MB.
-			max_queue_size = 19;
+			// This should be at most 19 for large heap 256MB.
+			max_queue_size = 12;
 		}
 		else if( large_heap_memory >= 128 ) {
 			// This should be at least 1*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a photo with RAW+JPEG
 			// without blocking (we subtract 1, as the first image can be immediately taken off the queue).
-			// This should be at most 8 for large heap 256MB.
+			// This should be at most 8 for large heap 128MB (allowing 80MB for post-processing).
 			max_queue_size = 8;
 		}
 		else {
@@ -223,10 +226,17 @@ public class ImageSaver extends Thread {
 	}
 
 	/** Computes the cost for a particular request.
+	 *  Note that for RAW+DNG mode, computeCost() is called twice for a given photo (one for each
+	 *  of the two requests: one RAW, one JPEG).
 	 * @param is_raw Whether RAW/DNG or JPEG.
 	 * @param n_jpegs If is_raw is false, this is the number of JPEG images that are in the request.
 	 */
-	private int computeCost(boolean is_raw, int n_jpegs) {
+	private int computeRequestCost(boolean is_raw, int n_jpegs) {
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "computeRequestCost");
+			Log.d(TAG, "is_raw: " + is_raw);
+			Log.d(TAG, "n_jpegs: " + n_jpegs);
+		}
 		int cost;
 		if( is_raw )
 			cost = queue_cost_dng_c;
@@ -237,26 +247,37 @@ public class ImageSaver extends Thread {
 		return cost;
 	}
 
-	/** Whether taking an extra photo would overflow the queue, resulting in the UI hanging.
-	 *  Ideally this should be refactored to use common code with computeCost(), but note that
-	 *  for RAW+DNG mode, computeCost() is called twice (one for each of the two requests: one RAW,
-	 *  one JPEG), where as for queueWouldBlock(), we need to know if the queue would block with a
-	 *  single call to this method.
+	/** Computes the cost (in terms of number of slots on the image queue) of a new photo.
+	 * @param has_raw Whether this is RAW+JPEG or RAW only.
+	 * @param n_jpegs If has_raw is false, the number of JPEGs that will be taken.
+	 * @return
 	 */
-	boolean queueWouldBlock(int n_raw, int n_jpegs) {
+	int computePhotoCost(boolean has_raw, int n_jpegs) {
 		if( MyDebug.LOG ) {
-			Log.d(TAG, "queueWouldBlock");
-			Log.d(TAG, "n_raw: " + n_raw);
+			Log.d(TAG, "computePhotoCost");
+			Log.d(TAG, "has_raw: " + has_raw);
 			Log.d(TAG, "n_jpegs: " + n_jpegs);
 		}
-		int extra_cost;
-		if( n_raw > 0 )
-			extra_cost = n_raw*queue_cost_dng_c + n_jpegs*queue_cost_jpeg_c;
+		int cost;
+		if( has_raw ) {
+			// even in RAW only mode, we still include the cost of a JPEG, as we still take a JPEG photo
+			cost = computeRequestCost(true, 0) + computeRequestCost(false, 1);
+		}
 		else
-			extra_cost = (n_jpegs > 1 ? 2 : 1) * queue_cost_jpeg_c;
+			cost = computeRequestCost(false, n_jpegs);
+		if( MyDebug.LOG )
+			Log.d(TAG, "cost: " + cost);
+		return cost;
+	}
+
+	/** Whether taking an extra photo would overflow the queue, resulting in the UI hanging.
+	 * @param photo_cost The result returned by computePhotoCost().
+	 */
+	boolean queueWouldBlock(int photo_cost) {
 		if( MyDebug.LOG ) {
+			Log.d(TAG, "queueWouldBlock");
+			Log.d(TAG, "photo_cost: " + photo_cost);
 			Log.d(TAG, "n_images_to_save: " + n_images_to_save);
-			Log.d(TAG, "extra_cost: " + extra_cost);
 			Log.d(TAG, "queue_capacity: " + queue_capacity);
 		}
 		// we add one to queue, to account for the image currently being processed; n_images_to_save includes an image
@@ -267,7 +288,7 @@ public class ImageSaver extends Thread {
 			// to disallow ever taking photos!
 			return false;
 		}
-		else if( n_images_to_save + extra_cost > queue_capacity + 1 ) {
+		else if( n_images_to_save + photo_cost > queue_capacity + 1 ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "queue would block");
 			return true;
@@ -366,6 +387,7 @@ public class ImageSaver extends Thread {
 	 */
 	boolean saveImageJpeg(boolean do_in_background,
 			boolean is_hdr,
+			boolean suffix_from_0,
 			boolean save_expo,
 			List<byte []> images,
 			boolean image_capture_intent, Uri image_capture_intent_uri,
@@ -387,6 +409,7 @@ public class ImageSaver extends Thread {
 		return saveImage(do_in_background,
 				false,
 				is_hdr,
+				suffix_from_0,
 				save_expo,
 				images,
 				null,
@@ -420,6 +443,7 @@ public class ImageSaver extends Thread {
 				true,
 				false,
 				false,
+				false,
 				null,
 				raw_image,
 				false, null,
@@ -437,6 +461,7 @@ public class ImageSaver extends Thread {
 	private Request pending_image_average_request = null;
 
 	void startImageAverage(boolean do_in_background,
+			boolean suffix_from_0,
 			Request.SaveBase save_base,
 			boolean image_capture_intent, Uri image_capture_intent_uri,
 			boolean using_camera2, int image_quality,
@@ -455,6 +480,7 @@ public class ImageSaver extends Thread {
 		}
 		pending_image_average_request = new Request(Request.Type.JPEG,
 				Request.ProcessType.AVERAGE,
+				suffix_from_0,
 				save_base,
 				new ArrayList<byte[]>(),
 				null,
@@ -494,7 +520,7 @@ public class ImageSaver extends Thread {
 		if( do_in_background ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "add background request");
-			int cost = computeCost(false, pending_image_average_request.jpeg_images.size());
+			int cost = computeRequestCost(false, pending_image_average_request.jpeg_images.size());
 			addRequest(pending_image_average_request, cost);
 		}
 		else {
@@ -510,6 +536,7 @@ public class ImageSaver extends Thread {
 	private boolean saveImage(boolean do_in_background,
 			boolean is_raw,
 			boolean is_hdr,
+			boolean suffix_from_0,
 			boolean save_expo,
 			List<byte []> jpeg_images,
 			RawImage raw_image,
@@ -534,6 +561,7 @@ public class ImageSaver extends Thread {
 		
 		Request request = new Request(is_raw ? Request.Type.RAW : Request.Type.JPEG,
 				is_hdr ? Request.ProcessType.HDR : Request.ProcessType.NORMAL,
+				suffix_from_0,
 				save_expo ? Request.SaveBase.SAVEBASE_ALL : Request.SaveBase.SAVEBASE_NONE,
 				jpeg_images,
 				raw_image,
@@ -552,7 +580,7 @@ public class ImageSaver extends Thread {
 		if( do_in_background ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "add background request");
-			int cost = computeCost(is_raw, is_raw ? 0 : request.jpeg_images.size());
+			int cost = computeRequestCost(is_raw, is_raw ? 0 : request.jpeg_images.size());
 			addRequest(request, cost);
 			success = true; // always return true when done in background
 		}
@@ -626,6 +654,7 @@ public class ImageSaver extends Thread {
 	private void addDummyRequest() {
 		Request dummy_request = new Request(Request.Type.DUMMY,
 			Request.ProcessType.NORMAL,
+            false,
             Request.SaveBase.SAVEBASE_NONE,
 			null,
 			null,
@@ -1024,7 +1053,8 @@ public class ImageSaver extends Thread {
 				}
 			}
 			else {
-				success = saveSingleImageNow(request, request.jpeg_images.get(0), null, "", true, true);
+				String suffix = "";
+				success = saveSingleImageNow(request, request.jpeg_images.get(0), null, suffix, true, true);
 			}
 		}
 
@@ -1570,10 +1600,10 @@ public class ImageSaver extends Thread {
     			}
 			}
 			else if( storageUtils.isUsingSAF() ) {
-				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, "jpg", request.current_date);
+				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, request.suffix_from_0, "jpg", request.current_date);
 			}
 			else {
-    			picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, "jpg", request.current_date);
+    			picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, filename_suffix, request.suffix_from_0, "jpg", request.current_date);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "save to: " + picFile.getAbsolutePath());
 			}
@@ -2176,14 +2206,14 @@ public class ImageSaver extends Thread {
     		Uri saveUri = null;
 
 			if( storageUtils.isUsingSAF() ) {
-				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, "", "dng", request.current_date);
+				saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_IMAGE, "", request.suffix_from_0, "dng", request.current_date);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "saveUri: " + saveUri);
 	    		// When using SAF, we don't save to a temp file first (unlike for JPEGs). Firstly we don't need to modify Exif, so don't
 	    		// need a real file; secondly copying to a temp file is much slower for RAW.
 			}
 			else {
-        		picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, "", "dng", request.current_date);
+        		picFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_IMAGE, "", request.suffix_from_0, "dng", request.current_date);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "save to: " + picFile.getAbsolutePath());
 			}
