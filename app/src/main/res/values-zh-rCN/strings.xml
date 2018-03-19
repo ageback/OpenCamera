@@ -435,4 +435,27 @@
     <string name="preference_stamp_dateformat_none">无</string>
     <string name="preference_stamp_dateformat_default">默认</string>
     <string name="preference_raw_only">"仅 DNG (RAW) "</string>
+    <string name="photo_mode_standard_full">标准</string>
+    <string name="photo_mode_fast_burst_full">快速连拍</string>
+    <string name="photo_mode_noise_reduction_full">降噪</string>
+    <string name="preference_video_fps_15">15</string>
+    <string name="preference_video_fps_24">24</string>
+    <string name="preference_video_fps_25">25</string>
+    <string name="preference_video_fps_30">30</string>
+    <string name="preference_video_fps_60">60</string>
+    <string name="preference_video_fps_96">96</string>
+    <string name="preference_video_fps_100">100</string>
+    <string name="preference_video_fps_120">120</string>
+    <string name="preference_video_fps_240">240</string>
+    <string name="preference_fast_burst_n_images">照片数量</string>
+    <string name="preference_fast_burst_n_images_entries_2">2</string>
+    <string name="preference_fast_burst_n_images_entries_3">3</string>
+    <string name="preference_fast_burst_n_images_entries_4">4</string>
+    <string name="preference_fast_burst_n_images_entries_5">5</string>
+    <string name="preference_fast_burst_n_images_entries_6">6</string>
+    <string name="preference_fast_burst_n_images_entries_8">8</string>
+    <string name="preference_fast_burst_n_images_entries_10">10</string>
+    <string name="preference_fast_burst_n_images_entries_12">12</string>
+    <string name="preference_fast_burst_n_images_entries_15">15</string>
+    <string name="preference_fast_burst_n_images_entries_20">20</string>
 </resources>
