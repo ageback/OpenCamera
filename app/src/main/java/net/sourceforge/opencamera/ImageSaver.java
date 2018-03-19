@@ -68,8 +68,8 @@ public class ImageSaver extends Thread {
 	private final int queue_capacity;
 	private final BlockingQueue<Request> queue;
 	private final static int queue_cost_jpeg_c = 1;
-	//private final static int queue_cost_dng_c = 6;
-	private final static int queue_cost_dng_c = 1;
+	private final static int queue_cost_dng_c = 6;
+	//private final static int queue_cost_dng_c = 1;
 
 	static class Request {
 		enum Type {
@@ -179,7 +179,7 @@ public class ImageSaver extends Thread {
 		this.main_activity = main_activity;
 
 		ActivityManager activityManager = (ActivityManager) main_activity.getSystemService(Activity.ACTIVITY_SERVICE);
-		this.queue_capacity = getQueueSize(activityManager.getLargeMemoryClass());
+		this.queue_capacity = computeQueueSize(activityManager.getLargeMemoryClass());
 		this.queue = new ArrayBlockingQueue<>(queue_capacity); // since we remove from the queue and then process in the saver thread, in practice the number of background photos - including the one being processed - is one more than the length of this queue
 
 		this.hdrProcessor = new HDRProcessor(main_activity);
@@ -187,13 +187,20 @@ public class ImageSaver extends Thread {
 		p.setAntiAlias(true);
 	}
 
+	/** Returns the length of the image saver queue. In practice, the number of images that can be taken at once before the UI
+	 *  blocks is 1 more than this, as 1 image will be taken off the queue to process straight away.
+	 */
+	public int getQueueSize() {
+		return this.queue_capacity;
+	}
+
 	/** Compute a sensible size for the queue, based on the device's memory (large heap).
 	 */
-	private int getQueueSize(int large_heap_memory) {
+	public static int computeQueueSize(int large_heap_memory) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "large max memory = " + large_heap_memory + "MB");
 		int max_queue_size;
-		/*if( large_heap_memory >= 512 ) {
+		if( large_heap_memory >= 512 ) {
 			// This should be at least 5*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a burst of 5 photos
 			// (e.g., in expo mode) with RAW+JPEG without blocking (we subtract 1, as the first image can be immediately
 			// taken off the queue).
@@ -217,21 +224,21 @@ public class ImageSaver extends Thread {
 			// This should be at least 1*(queue_cost_jpeg_c+queue_cost_dng_c)-1 so we can take a photo with RAW+JPEG
 			// without blocking (we subtract 1, as the first image can be immediately taken off the queue).
 			max_queue_size = 6;
-		}*/
+		}
 		//max_queue_size = 1;
-		max_queue_size = 3;
+		//max_queue_size = 3;
 		if( MyDebug.LOG )
 			Log.d(TAG, "max_queue_size = " + max_queue_size);
 		return max_queue_size;
 	}
 
 	/** Computes the cost for a particular request.
-	 *  Note that for RAW+DNG mode, computeCost() is called twice for a given photo (one for each
+	 *  Note that for RAW+DNG mode, computeRequestCost() is called twice for a given photo (one for each
 	 *  of the two requests: one RAW, one JPEG).
 	 * @param is_raw Whether RAW/DNG or JPEG.
 	 * @param n_jpegs If is_raw is false, this is the number of JPEG images that are in the request.
 	 */
-	private int computeRequestCost(boolean is_raw, int n_jpegs) {
+	public static int computeRequestCost(boolean is_raw, int n_jpegs) {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "computeRequestCost");
 			Log.d(TAG, "is_raw: " + is_raw);
@@ -241,8 +248,8 @@ public class ImageSaver extends Thread {
 		if( is_raw )
 			cost = queue_cost_dng_c;
 		else {
-			//cost = n_jpegs * queue_cost_jpeg_c;
-			cost = (n_jpegs > 1 ? 2 : 1) * queue_cost_jpeg_c;
+			cost = n_jpegs * queue_cost_jpeg_c;
+			//cost = (n_jpegs > 1 ? 2 : 1) * queue_cost_jpeg_c;
 		}
 		return cost;
 	}
@@ -304,6 +311,10 @@ public class ImageSaver extends Thread {
 		if( MyDebug.LOG )
 			Log.d(TAG, "max_dng = " + max_dng);
 		return max_dng;
+	}
+
+	int getNImagesToSave() {
+		return n_images_to_save;
 	}
 
 	void onDestroy() {
@@ -1033,31 +1044,41 @@ public class ImageSaver extends Thread {
 	        System.gc();
 		}
 		else {
-			if( request.jpeg_images.size() > 1 ) {
-				if( MyDebug.LOG )
-					Log.d(TAG, "saveImageNow called with multiple images");
-				int mid_image = request.jpeg_images.size()/2;
-				success = true;
-				for(int i=0;i<request.jpeg_images.size();i++) {
-					// note, even if one image fails, we still try saving the other images - might as well give the user as many images as we can...
-					byte [] image = request.jpeg_images.get(i);
-					// see note above how we used to use "_EXP" for the suffix
-					//String filename_suffix = "_EXP" + i;
-					String filename_suffix = "_" + i;
-					boolean share_image = i == mid_image;
-					if( !saveSingleImageNow(request, image, null, filename_suffix, true, share_image) ) {
-						if( MyDebug.LOG )
-							Log.e(TAG, "saveSingleImageNow failed for exposure image");
-						success = false; // require all images to be saved in order for success to be true (used for pausing the preview)
-					}
-				}
-			}
-			else {
-				String suffix = "";
-				success = saveSingleImageNow(request, request.jpeg_images.get(0), null, suffix, true, true);
-			}
+			// see note above how we used to use "_EXP" for the suffix for multiple images
+			//String suffix = "_EXP";
+			String suffix = "_";
+			success = saveImages(request, suffix, false, true, true);
 		}
 
+		return success;
+	}
+
+	/** Saves all the JPEG images in request.jpeg_images.
+	 * @param request The request to save.
+	 * @param suffix If there is more than one image and first_only is false, the i-th image
+	 *               filename will be appended with (suffix+i).
+	 * @param first_only If true, only save the first image.
+	 * @param update_thumbnail Whether to update the thumbnail and show the animation.
+	 * @param share If true, the median image will be marked as the one to share (for pause preview
+	 *              option).
+	 * @return Whether all images were successfully saved.
+	 */
+	private boolean saveImages(Request request, String suffix, boolean first_only, boolean update_thumbnail, boolean share) {
+		boolean success = true;
+		int mid_image = request.jpeg_images.size()/2;
+		for(int i=0;i<request.jpeg_images.size();i++) {
+			// note, even if one image fails, we still try saving the other images - might as well give the user as many images as we can...
+			byte [] image = request.jpeg_images.get(i);
+			String filename_suffix = (request.jpeg_images.size() > 1 && !first_only) ? suffix + i : "";
+			boolean share_image = share && (i == mid_image);
+			if( !saveSingleImageNow(request, image, null, filename_suffix, update_thumbnail, share_image) ) {
+				if( MyDebug.LOG )
+					Log.e(TAG, "saveSingleImageNow failed for image: " + i);
+				success = false;
+			}
+			if( first_only )
+				break; // only requested the first
+		}
 		return success;
 	}
 
@@ -1069,20 +1090,10 @@ public class ImageSaver extends Thread {
 		if( !request.image_capture_intent && request.save_base != Request.SaveBase.SAVEBASE_NONE ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "save base images");
-			for(int i=0;i<request.jpeg_images.size();i++) {
-				// note, even if one image fails, we still try saving the other images - might as well give the user as many images as we can...
-				byte [] image = request.jpeg_images.get(i);
-				String filename_suffix = suffix + i;
-				// don't update the thumbnails, only do this for the final image - so user doesn't think it's complete, click gallery, then wonder why the final image isn't there
-				// also don't mark these images as being shared
-				if( !saveSingleImageNow(request, image, null, filename_suffix, false, false) ) {
-					if( MyDebug.LOG )
-						Log.e(TAG, "saveSingleImageNow failed for exposure image");
-					// we don't set success to false here - as for deciding whether to pause preview or not (which is all we use the success return for), all that matters is whether we saved the final HDR image
-				}
-				if( request.save_base == Request.SaveBase.SAVEBASE_FIRST )
-					break; // only requested the first
-			}
+			// don't update the thumbnails, only do this for the final image - so user doesn't think it's complete, click gallery, then wonder why the final image isn't there
+			// also don't mark these images as being shared
+			saveImages(request, suffix, request.save_base == Request.SaveBase.SAVEBASE_FIRST, false, false);
+			// ignore return of saveImages - as for deciding whether to pause preview or not (which is all we use the success return for), all that matters is whether we saved the final HDR image
 		}
 	}
 

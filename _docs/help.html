@@ -36,6 +36,15 @@
   ga('send', 'pageview');
 </script>
 
+<!-- Google adsense auto ads -->
+<script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({
+          google_ad_client: "ca-pub-1960368062214160",
+          enable_page_level_ads: true
+     });
+</script>
+
 </head>
 
 <body>
@@ -182,19 +191,12 @@ will be available which instead work by making the screen flash (note, front scr
 	be processed in other applications to create HDR images. For Android, you can try my own
 	<a href="https://play.google.com/store/apps/details?id=uk.org.opencamera.vibrancehdr">Vibrance HDR</a>. For
 	PC platforms, try <a href="http://qtpfsgui.sourceforge.net/">Luminance HDR</a>.</li>
+	<li><b>[]]]</b> - Enables Fast Burst mode. Takes multiple images in quick succession. (Only available on some
+	devices, and if Camera2 API is used.) In this mode, you can change the number of photos to take from the
+	popup menu.</li>
 </ul></li>
 <li><b>Auto-level</b> - Enable the auto-level feature for photos (see
 <a href="#auto_stabilise">below</a>). (Only available if the device has enough memory.)</li>
-<li><b>White balance</b> - Choose a method to control how the white balance is set. See
-<a href="http://digital-photography-school.com/introduction-to-white-balance">here</a> for an
-explanation of white balance. (Only available if the camera supports different white balance
-settings.) If Camera2 API is enabled, then you can also set "manual". In this mode, manual
-control over the white balance temperature is available from the exposure compensation icon
-<img src="ic_exposure_white_48dp.png" alt="Exposure Compensation icon" width="32" height="32">.</li>
-<li><b>Scene mode</b> - Choose a scene mode to apply. (Only available if the camera supports scene
-modes.)</li>
-<li><b>Color effect</b> - Choose a color effect to apply. (Only available if the camera supports
-color effects.)</li>
 <li><b>Camera resolution</b> - Change the photo resolution (also available under Settings/Photo
 Settings/"Camera resolution".</li>
 <li><b>Video resolution</b> - Change the photo resolution (also available under Settings/Video
@@ -205,8 +207,17 @@ Settings/Timer.</li>
 interval between each repeated photo can be set under Settings/"Repeat mode interval".</li>
 <li><b>Grid</b> - Whether to display one of a choice of grids on the camera preview. Also available
 under Settings/On screen GUI/"Show a grid".</li>
+<li><b>White balance</b> - Choose a method to control how the white balance is set. See
+<a href="http://digital-photography-school.com/introduction-to-white-balance">here</a> for an
+explanation of white balance. (Only available if the camera supports different white balance
+settings.) If Camera2 API is enabled, then you can also set "manual". In this mode, manual
+control over the white balance temperature is available from the exposure compensation icon
+<img src="ic_exposure_white_48dp.png" alt="Exposure Compensation icon" width="32" height="32">.</li>
+<li><b>Scene mode</b> - Choose a scene mode to apply. (Only available if the camera supports scene
+modes.)</li>
+<li><b>Color effect</b> - Choose a color effect to apply. (Only available if the camera supports
+color effects.)</li>
 </ul>
-<p>See <a href="#settings">Settings</a> for more info on the other settings.</p>
 
 <p><img src="settings.png" alt="Settings icon" width="32" height="32"><b>Settings</b> - Click to open the <a href="#settings">Settings</a>. (If your phone/tablet
 has a hardware menu button, pressing that should also open the settings.)</p>
@@ -269,12 +280,12 @@ feature.</p>
 
 <p><a name="dro"></a><b>DRO</b></p>
 
-<p>Dynamic Range Optimisation (DRO) is a technique that optimise the dynamic range available in the image. In particular, dark
+<p>Dynamic Range Optimisation (DRO) is a technique that optimises the dynamic range available in the image. In particular, dark
 regions will have their brightness boosted to bring out the detail. This mode is useful for capturing scenes with a wide range
 of brightness (e.g., on a bright sunny day) as well as being useful to automatically optimise photos in low light scenes. Also
 see <a href="#dro_vs_hdr">DRO vs HDR</a>.</p>
 
-<p>Note that if Camera2 API is used, DRO will give improved performance in bright scenes.</p>
+<p>Note that if Camera2 API is used, DRO will give improved quality in bright scenes.</p>
 
 <p><a name="hdr"></a><b>HDR</b></p>
 
@@ -296,7 +307,8 @@ the grass. Meanwhile the tree branches in the foreground is a bit too dark.</p>
 <p>Some things to note about Open Camera's HDR feature:</p>
 <ul>
 <li>Taking photos with HDR is significantly slower than regular photos (although note that HDR will give much faster performance if Camera2 API is enabled, see Settings - not all devices support this).</li>
-<li>HDR isn't suitable for scenes with movement, due to combining an image from multiple shots.</li>
+<li>HDR isn't so good for scenes with movement, due to combining an image from multiple shots. Open Camera does apply "deghosting"
+to reduce the problem, but this isn't perfect.</li>
 <li>Although Open Camera applies auto-alignment to the images, it's still best to try to hold your device steady while the photo is
 being taken.</li>
 <li>HDR can sometimes result in less accurate colour reproduction (due to trying to estimate the colours from multiple exposures).</li>
@@ -314,7 +326,6 @@ apps that advertise "HDR" don't even make use of multiple images - this is more 
 <li>Photos will still take longer to process compared with Standard photo mode, but it will still be faster than HDR.</li>
 <li>HDR will in general be better at scenes with a high range of brightness values. It can take advantage of the information from
 three separate images, rather than reprocessing a single image.</li>
-<li>DRO is available on both old and Camera2 APIs (though it still requires Android 5.0).</li>
 </ul>
 
 <p><a name="settings"></a><b>Settings</b></p>
@@ -358,7 +369,9 @@ cancel the timer.</p>
 button again to cancel.</p>-->
 
 <p><b>Repeat mode interval</b> - Specify the delay (if any) between photos in repeat mode. Note that if a delay
-is selected, note that this does not include the time taken to auto-focus and take each photo.</p>
+is selected, note that this does not include the time taken to auto-focus and take each photo. Similarly, "No
+delay" still means there will be some time between each photo. If you want to take a burst of photos, use the
+Fast Burst photo mode if it's available on your device (requires Camera2 API to be enabled).</p>
 
 <p><b>More camera controls...</b> - Select to access the following controls:</p>
 
@@ -660,8 +673,8 @@ as a workaround). Note that this is enabled by default for Samsung devices.</p>
 in HDR or Exposure Bracketing photo modes (disabling this option will result in a longer delay between the photos being
 taken, but may give more stable behaviour if your device is having problems with this).</p>
 
-<p><b>Use background thread</b> - Whether to process and save photo in the background. Normally this should
-be left set to true for faster operation, but it's an option just in case.</p>
+<!--<p><b>Use background thread</b> - Whether to process and save photo in the background. Normally this should
+be left set to true for faster operation, but it's an option just in case.</p>-->
 
 <p><b>Video settings</b> - Select to access the following controls:</p>
 
@@ -779,10 +792,11 @@ in Android 5. Turning this option on or off will cause Open Camera to restart. T
 (including manual ISO/exposure, manual focus, HDR, exposure bracketing).
 Note that not all Android 5 devices have full support for the Camera2 API (Open Camera will only show this
 option if all cameras report either "LIMITED" or "FULL" support for the API; "LEGACY" devices are not supported).
-Supported devices include the Nexuses 5/6 onwards. Also note that even if devices support Camera2 API, many
+Also note that even if devices support Camera2 API, many
 devices have extremely poor support, leading to bugs such as poor flash behaviour, or video recording not working.
 These are not necessarily bugs in Open Camera, but problems with manufacturer support for Camera2 API. If you have
-problems with flash behaviour, try the "Use alternative flash method" setting under "Photo Settings".</p>
+problems with flash behaviour, try the "Use alternative flash method" setting under "Photo Settings".
+Please see <a href="devices.html">here</a> for more details on device compatibility.</p>
 
 <p><b>About</b> - Provides various debug information about the app and your device's camera. You can also copy
 this information to the clipboard.</p>
@@ -932,6 +946,13 @@ offer translations. If you think a particular translation is inaccurate, please 
 <p><b>Why is the screen forced to maximum brightness?</b> - If you don't like this feature, you can switch it off
 by going to Settings/On screen GUI/Force maximum brightness.</p>
 
+<p><b>Does Open Camera support selfie sticks / bluetooth remotes?</b> - Open Camera has support for some selfie sticks
+though different sticks work in different ways, so it's hard to guarantee this. Sticks which work by triggering a
+volume key press should work (and the behaviour can be configured by Settings/More camera controls/"Volume keys"). If
+you have a Mi Band 2 or Amazfit Bip/Arc, you can try using
+<a href="https://play.google.com/store/apps/details?id=com.miband2.mibandselfie">Mi Band 2 &amp; Amazfit Selfie</a> in
+conjunction with Open Camera.</p>
+
 <p><b>Why is auto-level slow?</b> - This feature requires doing a decompress of the JPEG data, followed by a
 rotation of a multi-megapixel image, then recompressing, which typically results in a short pause on most devices.
 And as devices get faster CPUs, they typically come with cameras with even bigger megapixels! This is why I've made
@@ -965,8 +986,13 @@ webpage you're reading now, but not in the app). There are however some clones o
 Please ensure that you've downloaded from one of the places listed above
 on this page.</p>
 
-<p><b>My device has Android 5, why can't I select the Camera2 API?</b> - Only some Android 5 devices support the new
-Camera2 API, such as the Nexus 5 and Nexus 6.</p>
+<p><b>Does Open Camera support features like manual controls for exposure/ISO/focus, and RAW?</b> - Enable
+Settings/"Use Camera2 API" for such features (if the option isn't there, it's not supported on your device).
+This is turned off by default as some <a href="devices.html">devices</a> have poor behaviour.</p>
+
+<p><b>My device has Android 5 or later, why can't I select the Camera2 API?</b> - Some Android 5+ devices only have
+"legacy" Camera2 support, which means it isn't any better than the original Camera API. Open Camera doesn't support
+enabling Camera2 on such devices.</p>
 
 <p><b>Why doesn't Open Camera's HDR images look like other HDR camera apps?</b> - There are a great many different ways
 of applying a HDR algorithm, some may do better or worse in different circumstances; some may look more or less pleasing

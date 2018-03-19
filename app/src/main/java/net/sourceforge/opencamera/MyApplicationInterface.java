@@ -84,6 +84,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 	private final SharedPreferences sharedPreferences;
 
 	private boolean last_images_saf; // whether the last images array are using SAF or not
+
 	/** This class keeps track of the images saved in this batch, for use with Pause Preview option, so we can share or trash images.
 	 */
 	private static class LastImage {
@@ -105,6 +106,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 	}
 	private final List<LastImage> last_images = new ArrayList<>();
 	
+	private final ToastBoxer photo_delete_toast = new ToastBoxer();
+
 	// camera properties which are saved in bundle, but not stored in preferences (so will be remembered if the app goes into background, but not after restart)
 	private int cameraId = 0;
 	private float focus_distance = 0.0f;
@@ -185,7 +188,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		return storageUtils;
 	}
 	
-	ImageSaver getImageSaver() {
+	public ImageSaver getImageSaver() {
 		return imageSaver;
 	}
 
@@ -779,11 +782,46 @@ public class MyApplicationInterface implements ApplicationInterface {
 				n_raw = 0;
 				n_jpegs = this.getExpoBracketingNImagesPref();
 			}
+			else if( main_activity.getPreview().supportsBurst() && this.isCameraBurstPref() ) {
+				n_raw = 0;
+				if( this.getBurstForNoiseReduction() ) {
+					n_jpegs = 8;
+				}
+				else {
+					n_jpegs = this.getBurstNImages();
+				}
+			}
 		}
 
 		int photo_cost = imageSaver.computePhotoCost(n_raw > 0, n_jpegs);
     	if( imageSaver.queueWouldBlock(photo_cost) )
     		return false;
+
+    	// even if the queue isn't full, we may apply additional limits
+		PhotoMode photo_mode = getPhotoMode();
+		if( photo_mode == PhotoMode.FastBurst ) {
+			// only allow one fast burst at a time, so require queue to be empty
+			if( imageSaver.getNImagesToSave() > 0 ) {
+				return false;
+			}
+		}
+		if( n_jpegs > 1 ) {
+			// if in any other kind of burst mode (e.g., expo burst, HDR), allow a max of 3 photos in memory
+			if( imageSaver.getNImagesToSave() >= 3*photo_cost ) {
+				return false;
+			}
+		}
+		if( n_raw > 0 ) {
+			// if RAW mode, allow a max of photos
+			if( imageSaver.getNImagesToSave() >= 3*photo_cost ) {
+				return false;
+			}
+		}
+		// otherwise, still have a max limit of 5 photos
+		if( imageSaver.getNImagesToSave() >= 5*photo_cost ) {
+			return false;
+		}
+
     	return true;
 	}
 
@@ -813,7 +851,18 @@ public class MyApplicationInterface implements ApplicationInterface {
 	public int getBurstNImages() {
     	PhotoMode photo_mode = getPhotoMode();
 		if( photo_mode == PhotoMode.FastBurst ) {
-			return 20;
+			String n_images_value = sharedPreferences.getString(PreferenceKeys.FastBurstNImagesPreferenceKey, "5");
+			int n_images;
+			try {
+				n_images = Integer.parseInt(n_images_value);
+			}
+			catch(NumberFormatException e) {
+				if( MyDebug.LOG )
+					Log.e(TAG, "failed to parse FastBurstNImagesPreferenceKey value: " + n_images_value);
+				e.printStackTrace();
+				n_images = 5;
+			}
+			return n_images;
 		}
 		return 1;
 	}
@@ -920,6 +969,11 @@ public class MyApplicationInterface implements ApplicationInterface {
     		return RawPref.RAWPREF_JPEG_ONLY;
 		if( main_activity.getPreview().isVideo() )
     		return RawPref.RAWPREF_JPEG_ONLY; // video snapshot mode
+    	PhotoMode photo_mode = getPhotoMode();
+    	if( photo_mode == PhotoMode.FastBurst ) {
+    		// don't allow fast burst with RAW!
+    		return RawPref.RAWPREF_JPEG_ONLY;
+		}
 		switch( sharedPreferences.getString(PreferenceKeys.RawPreferenceKey, "preference_raw_no") ) {
 			case "preference_raw_yes":
 			case "preference_raw_only":
@@ -1861,9 +1915,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 	
 	private boolean saveInBackground(boolean image_capture_intent) {
 		boolean do_in_background = true;
-		if( !sharedPreferences.getBoolean(PreferenceKeys.BackgroundPhotoSavingPreferenceKey, true) )
+		/*if( !sharedPreferences.getBoolean(PreferenceKeys.BackgroundPhotoSavingPreferenceKey, true) )
 			do_in_background = false;
-		else if( image_capture_intent )
+		else*/ if( image_capture_intent )
 			do_in_background = false;
 		else if( getPausePreviewPref() )
 			do_in_background = false;
@@ -2184,7 +2238,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			else {
 				if( MyDebug.LOG )
 					Log.d(TAG, "successfully deleted " + image_name);
-	    	    preview.showToast(null, R.string.photo_deleted);
+	    	    preview.showToast(photo_delete_toast, R.string.photo_deleted);
             	storageUtils.broadcastFile(file, false, false, true);
 			}
 		}

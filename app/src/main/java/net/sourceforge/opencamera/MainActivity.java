@@ -17,6 +17,8 @@ import java.util.Locale;
 import java.util.Map;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -844,6 +846,19 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		}
 	};
 
+	/* To support https://play.google.com/store/apps/details?id=com.miband2.mibandselfie .
+	 * Allows using the Mi Band 2 as a Bluetooth remote for Open Camera to take photos or start/stop
+	 * videos.
+	 */
+    private final BroadcastReceiver cameraReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "cameraReceiver.onReceive");
+	    	MainActivity.this.takePicture(false);
+        }
+    };
+
 	@Override
     protected void onResume() {
 		long debug_time = 0;
@@ -860,6 +875,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         mSensorManager.registerListener(accelerometerListener, mSensorAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         mSensorManager.registerListener(magneticListener, mSensorMagnetic, SensorManager.SENSOR_DELAY_NORMAL);
         orientationEventListener.enable();
+
+        registerReceiver(cameraReceiver, new IntentFilter("com.miband2.action.CAMERA"));
 
         initSpeechRecognizer();
         initLocation();
@@ -906,6 +923,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         mSensorManager.unregisterListener(accelerometerListener);
         mSensorManager.unregisterListener(magneticListener);
         orientationEventListener.disable();
+        unregisterReceiver(cameraReceiver);
         freeAudioListener(false);
         freeSpeechRecognizer();
         applicationInterface.getLocationSupplier().freeLocationListeners();
@@ -3040,8 +3058,13 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			else if( photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing ) {
 				photo_mode_string = getResources().getString(R.string.photo_mode_expo_bracketing_full);
 			}
+			else if( photo_mode == MyApplicationInterface.PhotoMode.FastBurst ) {
+				photo_mode_string = getResources().getString(R.string.photo_mode_fast_burst_full);
+				int n_images = applicationInterface.getBurstNImages();
+				photo_mode_string += " (" + n_images + ")";
+			}
 			else if( photo_mode == MyApplicationInterface.PhotoMode.NoiseReduction ) {
-				photo_mode_string = getResources().getString(R.string.photo_mode_noise_reduction);
+				photo_mode_string = getResources().getString(R.string.photo_mode_noise_reduction_full);
 			}
 			if( photo_mode_string != null ) {
 				toast_string += "\n" + getResources().getString(R.string.photo_mode) + ": " + photo_mode_string;
