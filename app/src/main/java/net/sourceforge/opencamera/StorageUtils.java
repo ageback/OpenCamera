@@ -43,6 +43,7 @@ public class StorageUtils {
     static final int MEDIA_TYPE_VIDEO = 2;
 
 	private final Context context;
+	private final MyApplicationInterface applicationInterface;
     private Uri last_media_scanned;
 
 	private final static File base_folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
@@ -50,8 +51,9 @@ public class StorageUtils {
 	// for testing:
 	public volatile boolean failed_to_scan;
 	
-	StorageUtils(Context context) {
+	StorageUtils(Context context, MyApplicationInterface applicationInterface) {
 		this.context = context;
+		this.applicationInterface = applicationInterface;
 	}
 	
 	Uri getLastMediaScanned() {
@@ -233,6 +235,7 @@ public class StorageUtils {
         		 				Log.d(TAG, "set last_media_scanned to " + last_media_scanned);
     		 			}
     		 			announceUri(uri, is_new_picture, is_new_video);
+    		 			applicationInterface.scannedFile(file, uri);
 
     	    			// it seems caller apps seem to prefer the content:// Uri rather than one based on a File
 						// update for Android 7: seems that passing file uris is now restricted anyway, see https://code.google.com/p/android/issues/detail?id=203555
@@ -430,9 +433,9 @@ public class StorageUtils {
 		return null;
 	}
 
-	private String createMediaFilename(int type, String suffix, boolean suffix_from_0, int count, String extension, Date current_date) {
+	private String createMediaFilename(int type, String suffix, int count, String extension, Date current_date) {
         String index = "";
-        if( suffix_from_0 || count > 0 ) {
+        if( count > 0 ) {
             index = "_" + count; // try to find a unique filename
         }
 		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -466,7 +469,7 @@ public class StorageUtils {
     
     // only valid if !isUsingSAF()
     @SuppressLint("SimpleDateFormat")
-	File createOutputMediaFile(int type, String suffix, boolean suffix_from_0, String extension, Date current_date) throws IOException {
+	File createOutputMediaFile(int type, String suffix, String extension, Date current_date) throws IOException {
     	File mediaStorageDir = getImageFolder();
 
         // Create the storage directory if it does not exist
@@ -482,7 +485,7 @@ public class StorageUtils {
         // Create a media file name
         File mediaFile = null;
         for(int count=0;count<100;count++) {
-        	String mediaFilename = createMediaFilename(type, suffix, suffix_from_0, count, extension, current_date);
+        	String mediaFilename = createMediaFilename(type, suffix, count, extension, current_date);
             mediaFile = new File(mediaStorageDir.getPath() + File.separator + mediaFilename);
             if( !mediaFile.exists() ) {
             	break;
@@ -535,7 +538,7 @@ public class StorageUtils {
 
     // only valid if isUsingSAF()
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    Uri createOutputMediaFileSAF(int type, String suffix, boolean suffix_from_0, String extension, Date current_date) throws IOException {
+    Uri createOutputMediaFileSAF(int type, String suffix, String extension, Date current_date) throws IOException {
 		String mimeType;
 		if( type == MEDIA_TYPE_IMAGE ) {
 			if( extension.equals("dng") ) {
@@ -555,7 +558,7 @@ public class StorageUtils {
 			throw new RuntimeException();
 		}
 		// note that DocumentsContract.createDocument will automatically append to the filename if it already exists
-		String mediaFilename = createMediaFilename(type, suffix, suffix_from_0, 0, extension, current_date);
+		String mediaFilename = createMediaFilename(type, suffix, 0, extension, current_date);
 		return createOutputFileSAF(mediaFilename, mimeType);
     }
 

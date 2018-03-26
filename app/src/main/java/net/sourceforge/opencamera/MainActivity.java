@@ -1108,7 +1108,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		seekBar.setProgress(new_value);
 	}
     
-    private static double exponentialScaling(double frac, double min, double max) {
+    public static long exponentialScaling(double frac, double min, double max) {
 		/* We use S(frac) = A * e^(s * frac)
 		 * We want S(0) = min, S(1) = max
 		 * So A = min
@@ -1116,7 +1116,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		 * => s = ln(max/min)
 		 */
 		double s = Math.log(max / min);
-		return min * Math.exp(s * frac);
+		return (long)(min * Math.exp(s * frac) + 0.5f); // add 0.5f so we round to nearest
 	}
 
     private static double exponentialScalingInverse(double value, double min, double max) {
@@ -1387,6 +1387,31 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 			bundle.putIntArray("video_widths", widths);
 			bundle.putIntArray("video_heights", heights);
+		}
+
+		// set up supported fps values
+		if( preview.usingCamera2API() ) {
+			// with Camera2, we know what frame rates are supported
+			int [] candidate_fps = {15, 24, 25, 30, 60, 96, 100, 120, 240};
+			List<Integer> video_fps = new ArrayList<>();
+			for(int fps : candidate_fps) {
+				if( this.preview.getVideoQualityHander().videoSupportsFrameRateHighSpeed(fps) ||
+						this.preview.getVideoQualityHander().videoSupportsFrameRate(fps) ) {
+					video_fps.add(fps);
+				}
+			}
+			int [] video_fps_array = new int[video_fps.size()];
+			int i=0;
+			for(Integer fps : video_fps) {
+				video_fps_array[i++] = fps;
+			}
+			bundle.putIntArray("video_fps", video_fps_array);
+		}
+		else {
+			// with old API, we don't know what frame rates are supported, so we make it up and let the user try
+			// probably shouldn't allow 120fps, but we did in the past, and there may be some devices where this did work?
+			int [] video_fps = {15, 24, 25, 30, 60, 96, 100, 120};
+			bundle.putIntArray("video_fps", video_fps);
 		}
 		
 		putBundleExtra(bundle, "flash_values", this.preview.getSupportedFlashValues());
@@ -1750,8 +1775,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     /** Sets the window flags for when the settings window is open.
      */
     public void setWindowFlagsForSettings() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setWindowFlagsForSettings");
 		// allow screen rotation
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+
 		// revert to standard screen blank behaviour
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // settings should still be protected by screen lock
@@ -2710,7 +2738,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 							long exposure_time = min_exposure_time + (long)(scaling * (max_exposure_time - min_exposure_time));*/
 							long min_exposure_time = preview.getMinimumExposureTime();
 							long max_exposure_time = preview.getMaximumExposureTime();
-							long exposure_time = (long)exponentialScaling(frac, min_exposure_time, max_exposure_time);
+							long exposure_time = exponentialScaling(frac, min_exposure_time, max_exposure_time);
 							preview.setExposureTime(exposure_time);
 						}
 

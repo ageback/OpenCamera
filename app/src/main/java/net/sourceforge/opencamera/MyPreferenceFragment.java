@@ -118,6 +118,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		final int [] preview_heights = bundle.getIntArray("preview_heights");
 		final int [] video_widths = bundle.getIntArray("video_widths");
 		final int [] video_heights = bundle.getIntArray("video_heights");
+		final int [] video_fps = bundle.getIntArray("video_fps");
 
 		final int resolution_width = bundle.getInt("resolution_width");
 		final int resolution_height = bundle.getInt("resolution_height");
@@ -145,6 +146,35 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			Preference pref = findPreference("preference_resolution");
 			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_photo_settings");
         	pg.removePreference(pref);
+		}
+
+		if( video_fps != null ) {
+			// build video fps settings
+			CharSequence [] entries = new CharSequence[video_fps.length+1];
+			CharSequence [] values = new CharSequence[video_fps.length+1];
+			int i=0;
+			// default:
+			entries[i] = getResources().getString(R.string.preference_video_fps_default);
+			values[i] = "default";
+			i++;
+			for(int fps : video_fps) {
+				entries[i] = "" + fps;
+				values[i] = "" + fps;
+				i++;
+			}
+
+			ListPreference lp = (ListPreference)findPreference("preference_video_fps");
+			lp.setEntries(entries);
+			lp.setEntryValues(values);
+			String fps_preference_key = PreferenceKeys.getVideoFPSPreferenceKey(cameraId);
+			if( MyDebug.LOG )
+				Log.d(TAG, "fps_preference_key: " + fps_preference_key);
+			String fps_value = sharedPreferences.getString(fps_preference_key, "default");
+			if( MyDebug.LOG )
+				Log.d(TAG, "fps_value: " + fps_value);
+			lp.setValue(fps_value);
+			// now set the key, so we save for the correct cameraId
+			lp.setKey(fps_preference_key);
 		}
 
 		{
@@ -388,6 +418,17 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
 			pg.removePreference(pref);
         }
+		{
+			// remove preference_category_photo_debugging category if empty (which will be the case for old api)
+        	PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
+			if( MyDebug.LOG )
+				Log.d(TAG, "preference_category_photo_debugging children: " + pg.getPreferenceCount());
+        	if( pg.getPreferenceCount() == 0 ) {
+        		// pg.getParent() requires API level 26
+	        	PreferenceGroup parent = (PreferenceGroup)this.findPreference("preference_screen_photo_settings");
+        		parent.removePreference(pg);
+			}
+		}
 
 		final boolean supports_camera2 = bundle.getBoolean("supports_camera2");
 		if( MyDebug.LOG )

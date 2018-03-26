@@ -43,11 +43,18 @@
 <pre>
 Version 1.43 (Work in progress)
 
+FIXED   Fixed crash when sharing images (if not using Storage Access Framework) on some Android 7+
+        devices.
 FIXED   Fixed crash related to devices that don't support video.
 FIXED   Problems when taking HDR or expo photos quickly without pause, the second photo would use
         incorrect exposure.
 FIXED   On-screen icons (e.g., for HDR) didn't show after restarting.
 FIXED   When using volume keys to switch auto-level on/off, user interface wasn't updating properly.
+FIXED   Face detection mode on Camera2 API wasn't affecting resultant exposure etc.
+FIXED   Bug with video subtitles (.SRT) option, overlapping subtitles could appear briefly when
+        pausing/resuming video.
+FIXED   Bug on some devices (e.g., Nokia 8) where manual sliders (e.g., for manual ISO) could only
+        go up to 1 less than the true maximum allowed value.
 FIXED   Some stored "values" for zh-rCN shouldn't have been translated.
 ADDED   New Fast Burst photo mode (Camera2 API only).
 ADDED   Option to save only in RAW/DNG format (requires Android 7).
@@ -55,10 +62,14 @@ ADDED   New options under "Photo settings" to support Artist and/or Copyright Ex
         (requires Android 7).
 ADDED   On-screen icons for DRO and Expo Bracketing modes.
 ADDED   On-screen icon for when audio is disabled in video mode.
+UPDATED Now targetting Android 8.1.
 UPDATED Improved appearance of on-screen text and photo stamp text (draw fonts with outline, rather
         than shaded background).
 UPDATED Improved layout of on-screen information.
 UPDATED Improved look of popup menu.
+UPDATED Improved support for setting frame rates (including high speed support) when using Camera2
+        API. Thanks to George Joseph.
+UPDATED Video frame rate preference is now stored per-camera (as with video resolution).
 UPDATED Burst mode now renamed to Repeat mode (note, some translations may still refer to "burst").
 UPDATED Some preferences in settings now show the currently selected value.
 UPDATED Improved performance when going to settings in portrait mode.
