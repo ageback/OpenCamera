@@ -48,6 +48,7 @@ public class MainUI {
 
     private int current_orientation;
 	private boolean ui_placement_right = true;
+	private boolean view_rotate_animation;
 
 	private boolean immersive_mode;
     private boolean show_gui_photo = true; // result of call to showGUI() - false means a "reduced" GUI is displayed, whilst taking photo or video
@@ -121,7 +122,9 @@ public class MainUI {
 	/** Similar view.setRotation(ui_rotation), but achieves this via an animation.
 	 */
 	private void setViewRotation(View view, float ui_rotation) {
-		//view.setRotation(ui_rotation);
+		if( !view_rotate_animation ) {
+			view.setRotation(ui_rotation);
+		}
 		float rotate_by = ui_rotation - view.getRotation();
 		if( rotate_by > 181.0f )
 			rotate_by -= 360.0f;
@@ -589,7 +592,9 @@ public class MainUI {
 				if( MyDebug.LOG ) {
 					Log.d(TAG, "current_orientation is now: " + current_orientation);
 				}
+				view_rotate_animation = true;
 			    layoutUI();
+				view_rotate_animation = false;
 			}
 		}
 	}
@@ -888,7 +893,7 @@ public class MainUI {
 			exposure_seek_bar.setVisibility(View.GONE);
 
 			// with Camera2 API, when using manual ISO we instead show sliders for ISO range and exposure time
-			if( main_activity.getPreview().supportsISORange()) {
+			if( main_activity.getPreview().supportsISORange() ) {
 				manual_exposure_seek_bar.setVisibility(View.VISIBLE);
 				SeekBar exposure_time_seek_bar = ((SeekBar)main_activity.findViewById(R.id.exposure_time_seekbar));
 				if( main_activity.getPreview().supportsExposureTime() ) {
