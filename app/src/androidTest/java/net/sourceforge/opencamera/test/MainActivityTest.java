@@ -3900,7 +3900,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		subTestTakePhotoPreviewPaused(false, false);
 	}
 
-	private void subTestTakePhotoPreviewPausedTrash(boolean is_raw) throws InterruptedException {
+	/** Tests pause preview option.
+	 * @param share If true, share the image; else, trash it.
+	 */
+	private void subTestTakePhotoPreviewPausedShareTrash(boolean is_raw, boolean share) throws InterruptedException {
 		// count initial files in folder
 		File folder = mActivity.getImageFolder();
 		int n_files = getNFiles(folder);
@@ -3974,38 +3977,50 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 	    assertTrue(trashButton.getVisibility() == View.VISIBLE);
 	    assertTrue(shareButton.getVisibility() == View.VISIBLE);
 
-		Log.d(TAG, "about to click trash");
-		clickView(trashButton);
-		Log.d(TAG, "done click trash");
+		if( share ) {
+			Log.d(TAG, "about to click share");
+			clickView(shareButton);
+			Log.d(TAG, "done click share");
 
-		// check photo(s) deleted
-		n_new_files = folder.listFiles().length - n_files;
-		Log.d(TAG, "n_new_files: " + n_new_files);
-		assertTrue(n_new_files == 0);
+			// check photo(s) not deleted
+			n_new_files = folder.listFiles().length - n_files;
+			Log.d(TAG, "n_new_files: " + n_new_files);
+			assertTrue(n_new_files == exp_n_new_files);
+		}
+		else {
+			Log.d(TAG, "about to click trash");
+			clickView(trashButton);
+			Log.d(TAG, "done click trash");
 
-		assertTrue(mPreview.isPreviewStarted()); // check preview restarted
-	    assertTrue(switchCameraButton.getVisibility() == View.VISIBLE);
-	    assertTrue(switchVideoButton.getVisibility() == View.VISIBLE);
-	    //assertTrue(flashButton.getVisibility() == flashVisibility);
-	    //assertTrue(focusButton.getVisibility() == focusVisibility);
-	    assertTrue(exposureButton.getVisibility() == exposureVisibility);
-	    assertTrue(exposureLockButton.getVisibility() == exposureLockVisibility);
-	    assertTrue(audioControlButton.getVisibility() == (has_audio_control_button ? View.VISIBLE : View.GONE));
-	    assertTrue(popupButton.getVisibility() == View.VISIBLE);
-	    assertTrue(trashButton.getVisibility() == View.GONE);
-	    assertTrue(shareButton.getVisibility() == View.GONE);
+			// check photo(s) deleted
+			n_new_files = folder.listFiles().length - n_files;
+			Log.d(TAG, "n_new_files: " + n_new_files);
+			assertTrue(n_new_files == 0);
 
-	    // icon may be null, or have been set to another image - only changed after a delay
-	    Thread.sleep(2000);
-		Log.d(TAG, "gallery_bitmap: " + mActivity.gallery_bitmap);
-		Log.d(TAG, "thumbnail: " + thumbnail);
-		assertTrue(mActivity.gallery_bitmap != thumbnail);
+			assertTrue(mPreview.isPreviewStarted()); // check preview restarted
+			assertTrue(switchCameraButton.getVisibility() == View.VISIBLE);
+			assertTrue(switchVideoButton.getVisibility() == View.VISIBLE);
+			//assertTrue(flashButton.getVisibility() == flashVisibility);
+			//assertTrue(focusButton.getVisibility() == focusVisibility);
+			assertTrue(exposureButton.getVisibility() == exposureVisibility);
+			assertTrue(exposureLockButton.getVisibility() == exposureLockVisibility);
+			assertTrue(audioControlButton.getVisibility() == (has_audio_control_button ? View.VISIBLE : View.GONE));
+			assertTrue(popupButton.getVisibility() == View.VISIBLE);
+			assertTrue(trashButton.getVisibility() == View.GONE);
+			assertTrue(shareButton.getVisibility() == View.GONE);
+
+			// icon may be null, or have been set to another image - only changed after a delay
+			Thread.sleep(2000);
+			Log.d(TAG, "gallery_bitmap: " + mActivity.gallery_bitmap);
+			Log.d(TAG, "thumbnail: " + thumbnail);
+			assertTrue(mActivity.gallery_bitmap != thumbnail);
+		}
 	}
 
 	public void testTakePhotoPreviewPausedTrash() throws InterruptedException {
 		Log.d(TAG, "testTakePhotoPreviewPausedTrash");
 		setToDefault();
-		subTestTakePhotoPreviewPausedTrash(false);
+		subTestTakePhotoPreviewPausedShareTrash(false, false);
 	}
 
 	/** Equivalent of testTakePhotoPreviewPausedTrash(), but for Storage Access Framework.
@@ -4027,7 +4042,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		editor.apply();
 		updateForSettings();
 
-		subTestTakePhotoPreviewPausedTrash(false);
+		subTestTakePhotoPreviewPausedShareTrash(false, false);
 	}
 
 	/** Like testTakePhotoPreviewPausedTrash() but taking 2 photos, only deleting the most recent - make
@@ -4041,7 +4056,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		mPreview.count_cameraTakePicture = 0; // need to reset
 
-		subTestTakePhotoPreviewPausedTrash(false);
+		subTestTakePhotoPreviewPausedShareTrash(false, false);
 	}
 
 	/** Equivalent of testTakePhotoPreviewPausedTrash(), but with Raw enabled.
@@ -4058,7 +4073,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		editor.apply();
 		updateForSettings();
 
-		subTestTakePhotoPreviewPausedTrash(true);
+		subTestTakePhotoPreviewPausedShareTrash(true, false);
 	}
 
 	/** Take a photo with RAW that we keep, then take a photo without RAW that we delete, and ensure we
@@ -4086,7 +4101,13 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		updateForSettings();
 		mPreview.count_cameraTakePicture = 0; // need to reset
 
-		subTestTakePhotoPreviewPausedTrash(false);
+		subTestTakePhotoPreviewPausedShareTrash(false, false);
+	}
+
+	public void testTakePhotoPreviewPausedShare() throws InterruptedException {
+		Log.d(TAG, "testTakePhotoPreviewPausedShare");
+		setToDefault();
+		subTestTakePhotoPreviewPausedShareTrash(false, true);
 	}
 
 	/* Tests that we don't do an extra autofocus when taking a photo, if recently touch-focused.
@@ -5124,7 +5145,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		setToDefault();
 		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
 		SharedPreferences.Editor editor = settings.edit();
-		editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId()), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6 or OnePlus 3T)
+		editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6 or OnePlus 3T)
 		editor.apply();
 		updateForSettings();
 
@@ -5303,7 +5324,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		setToDefault();
 		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
 		SharedPreferences.Editor editor = settings.edit();
-		editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId()), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6 or OnePlus 3T)
+		editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6 or OnePlus 3T)
 		//editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "23592960"); // approx 4.5s on Nexus 6 at 4K
 		editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "35389440"); // approx 4.5s on OnePlus 3T at 4K
 		editor.putString(PreferenceKeys.getVideoMaxDurationPreferenceKey(), "5");
@@ -5344,7 +5365,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		setToDefault();
 		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
 		SharedPreferences.Editor editor = settings.edit();
-		editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId()), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
+		editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
 		//editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "26214400"); // approx 5s on Nexus 6 at 4K
 		//editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "15728640"); // approx 5s on Nexus 6 at 4K
 		editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "26214400"); // approx 5s on OnePlus 3T at 4K
@@ -5471,22 +5492,38 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		subTestTakeVideo(false, false, true, false, null, 5000, false, false);
 	}
 
-	/* Test can be reliable on some devices, test no longer run as part of test suites.
+	/** Will likely be unreliable on OnePlus 3T with Camera2.
 	 */
 	public void testTakeVideoFPS() throws InterruptedException {
 		Log.d(TAG, "testTakeVideoFPS");
 
 		setToDefault();
-		final String [] fps_values = new String[]{"15", "24", "25", "30", "60"};
-		for(String fps_value : fps_values) {
+		// different frame rates only reliable for Camera2, but at least make sure we don't crash on old api
+		final int [] fps_values = mPreview.usingCamera2API() ? new int[]{15, 25, 30, 60, 120, 240} : new int[]{30};
+		for(int fps_value : fps_values) {
+			if( mPreview.usingCamera2API() ) {
+				if( mPreview.getVideoQualityHander().videoSupportsFrameRateHighSpeed(fps_value) ) {
+					Log.d(TAG, "fps supported at HIGH SPEED: " + fps_value);
+				}
+				else if( mPreview.getVideoQualityHander().videoSupportsFrameRate(fps_value) ) {
+					Log.d(TAG, "fps supported at normal speed: " + fps_value);
+				}
+				else {
+					Log.d(TAG, "fps is NOT supported: " + fps_value);
+					continue;
+				}
+				assertTrue( mPreview.fpsIsHighSpeed("" + fps_value) == (fps_value >= 60) );
+			}
+
 			SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
 			SharedPreferences.Editor editor = settings.edit();
-			editor.putString(PreferenceKeys.getVideoFPSPreferenceKey(mPreview.getCameraId()), fps_value);
+			editor.putString(PreferenceKeys.getVideoFPSPreferenceKey(mPreview.getCameraId()), "" + fps_value);
 			editor.apply();
-			restart(); // should restart to emulate what happens in real app
+			updateForSettings();
 
 			Log.d(TAG, "test video with fps: " + fps_value);
-			boolean allow_failure = fps_value.equals("24") || fps_value.equals("25") || fps_value.equals("60");
+			//boolean allow_failure = fps_value.equals("24") || fps_value.equals("25") || fps_value.equals("60");
+			boolean allow_failure = false;
 			subTestTakeVideo(false, false, allow_failure, false, null, 5000, false, false);
 		}
 	}
@@ -5504,7 +5541,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			SharedPreferences.Editor editor = settings.edit();
 			editor.putString(PreferenceKeys.getVideoBitratePreferenceKey(), bitrate_value);
 			editor.apply();
-			restart(); // should restart to emulate what happens in real app
+			updateForSettings();
 
 			Log.d(TAG, "test video with bitrate: " + bitrate_value);
 			boolean allow_failure = bitrate_value.equals("30000000") || bitrate_value.equals("50000000");
