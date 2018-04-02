@@ -237,7 +237,7 @@
     <string name="gallery">图库</string>
     <string name="exposure">曝光</string>
     <string name="exposure_lock">曝光锁定</string>
-    <string name="focus_mode">聚焦模式</string>
+    <string name="focus_mode">对焦模式</string>
     <string name="flash_mode">闪光模式</string>
     <string name="switch_to_front_camera">切换为前置相机</string>
     <string name="switch_to_back_camera">切换为后置相机</string>
@@ -412,7 +412,7 @@
     <string name="donate">捐助</string>
     <string name="whats_new">有何更新:</string>
     <string name="photo_mode_noise_reduction">降噪</string>
-    <string name="photo_mode_expo_bracketing"></string>
+    <string name="photo_mode_expo_bracketing">曝光包围</string>
     <string name="photo_mode_dro">DRO</string>
     <string name="face_detected">面部</string>
     <string name="faces_detected">面部</string>
@@ -458,4 +458,11 @@
     <string name="preference_fast_burst_n_images_entries_12">12</string>
     <string name="preference_fast_burst_n_images_entries_15">15</string>
     <string name="preference_fast_burst_n_images_entries_20">20</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">yyyy-mm-dd (ISO 8601)</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">dd/mm/yyyy</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">mm/dd/yyyy</string>
+    <string name="photo_mode_hdr">HDR</string>
+    <string name="photo_mode_fast_burst">快速连拍</string>
+    <string name="preference_slow_motion">慢镜头</string>
+
 </resources>
