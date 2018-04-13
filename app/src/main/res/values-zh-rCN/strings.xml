@@ -470,5 +470,8 @@
     <string name="flash_on">开启闪光</string>
     <string name="flash_torch">手电筒</string>
     <string name="flash_red_eye">红眼</string>
+    <string name="flash_frontscreen_auto">屏幕闪光自动</string>
+    <string name="flash_frontscreen_on">屏幕闪光开启</string>
+    <string name="flash_frontscreen_torch">屏幕手电筒</string>
 
 </resources>
