@@ -465,4 +465,10 @@
     <string name="photo_mode_fast_burst">快速连拍</string>
     <string name="preference_slow_motion">慢镜头</string>
 
+    <string name="flash_off">关闭闪光</string>
+    <string name="flash_auto">自动闪光</string>
+    <string name="flash_on">开启闪光</string>
+    <string name="flash_torch">手电筒</string>
+    <string name="flash_red_eye">红眼</string>
+
 </resources>
