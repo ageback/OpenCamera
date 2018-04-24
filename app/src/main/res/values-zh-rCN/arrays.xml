@@ -141,9 +141,9 @@
         <item>双击</item>
         </string-array>
     <string-array name="preference_touch_capture_values">
-        <item>none</item>
-        <item>single</item>
-        <item>double</item>
+        <item>无</item>
+        <item>单击</item>
+        <item>双击</item>
     </string-array>
     <string-array name="preference_volume_keys_entries">
         <item>对焦 (或开始/停止录像)</item>
@@ -441,9 +441,9 @@
         <item>语音命令: \"cheese\"</item>
     </string-array>
     <string-array name="preference_audio_control_values">
-        <item>none</item>
-        <item>noise</item>
-        <item>voice</item>
+        <item>无</item>
+        <item>噪声</item>
+        <item>语音</item>
     </string-array>
     <string-array name="preference_audio_noise_control_sensitivity_entries">
         <item>+3 (高灵敏度)</item>
