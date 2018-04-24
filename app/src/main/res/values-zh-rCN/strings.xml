@@ -473,5 +473,15 @@
     <string name="flash_frontscreen_auto">屏幕闪光自动</string>
     <string name="flash_frontscreen_on">屏幕闪光开启</string>
     <string name="flash_frontscreen_torch">屏幕手电筒</string>
+    <string name="preference_video_capture_rate">速度</string>
+    <string name="preference_video_capture_rate_normal">普通</string>
+    <string name="slow_motion_enabled">已启用慢镜头</string>
+    <string name="slow_motion_disabled">已禁用慢镜头</string>
+    <string name="anti_banding_auto">自动</string>
+    <string name="anti_banding_50hz">50Hz</string>
+    <string name="anti_banding_60hz">60Hz</string>
+    <string name="anti_banding_off">关闭</string>
+    <string name="preference_antibanding">抗条纹</string>
+    <string name="preference_antibanding_summary">算法来帮助灯光闪烁。%s</string>
 
 </resources>
