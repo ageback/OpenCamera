@@ -2,6 +2,7 @@ package net.sourceforge.opencamera.CameraController;
 
 import net.sourceforge.opencamera.MyDebug;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -31,6 +32,7 @@ public abstract class CameraController {
 	public static final String SCENE_MODE_DEFAULT = "auto"; // chosen to match Camera.Parameters.SCENE_MODE_AUTO, but we also use compatible values for Camera2 API
 	public static final String COLOR_EFFECT_DEFAULT = "none"; // chosen to match Camera.Parameters.EFFECT_NONE, but we also use compatible values for Camera2 API
 	public static final String WHITE_BALANCE_DEFAULT = "auto"; // chosen to match Camera.Parameters.WHITE_BALANCE_AUTO, but we also use compatible values for Camera2 API
+	public static final String ANTIBANDING_DEFAULT = "auto"; // chosen to match Camera.Parameters.ANTIBANDING_AUTO, but we also use compatible values for Camera2 API
 	public static final String ISO_DEFAULT = "auto";
 	public static final long EXPOSURE_TIME_DEFAULT = 1000000000L/30; // note, responsibility of callers to check that this is within the valid min/max range
 
@@ -99,7 +101,7 @@ public abstract class CameraController {
 			return false;
 		}
 
-		public static Size findSize(List<Size> sizes, Size size, int fps, boolean return_closest) {
+		public static Size findSize(List<Size> sizes, Size size, double fps, boolean return_closest) {
 			Size last_s = null;
 			for(Size s : sizes) {
 				if (size.equals(s)) {
@@ -117,7 +119,8 @@ public abstract class CameraController {
 		}
 	}
 
-	public static class RangeSorter implements Comparator<int[]> {
+    // Android docs and FindBugs recommend that Comparators also be Serializable
+	public static class RangeSorter implements Comparator<int[]>, Serializable {
 		private static final long serialVersionUID = 5802214721073728212L;
 		@Override
 		public int compare(int[] o1, int[] o2) {
@@ -126,7 +129,8 @@ public abstract class CameraController {
 		}
 	}
 
-	public static class SizeSorter implements Comparator<Size> {
+    // Android docs and FindBugs recommend that Comparators also be Serializable
+	public static class SizeSorter implements Comparator<Size>, Serializable {
 		private static final long serialVersionUID = 5802214721073718212L;
 
 		@Override
@@ -138,10 +142,10 @@ public abstract class CameraController {
 	public static class Size {
 		public final int width;
 		public final int height;
-		public final List<int[]> fps_ranges;
+		final List<int[]> fps_ranges;
 		public final boolean high_speed;
 
-		public Size(int width, int height, List<int[]> fps_ranges, boolean high_speed) {
+		Size(int width, int height, List<int[]> fps_ranges, boolean high_speed) {
 			this.width = width;
 			this.height = height;
 			this.fps_ranges = fps_ranges;
@@ -153,7 +157,7 @@ public abstract class CameraController {
 			this(width, height, new ArrayList<int[]>(), false);
 		}
 
-		public boolean supportsFrameRate(int fps) {
+		boolean supportsFrameRate(double fps) {
 			for (int[] f : this.fps_ranges) {
 				if (f[0] <= fps && fps <= f[1])
 					return true;
@@ -293,6 +297,8 @@ public abstract class CameraController {
 	public abstract String getWhiteBalance();
 	public abstract boolean setWhiteBalanceTemperature(int temperature);
 	public abstract int getWhiteBalanceTemperature();
+	public abstract SupportedValues setAntiBanding(String value);
+	public abstract String getAntiBanding();
 	/** Set an ISO value. Only supported if supports_iso_range is false.
 	 */
 	public abstract SupportedValues setISO(String value);

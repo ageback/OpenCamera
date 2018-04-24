@@ -535,20 +535,21 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     			Log.d(TAG, "launching from photo intent");
 			applicationInterface.setVideoPref(false);
 		}
-		else if( MyTileService.TILE_ID.equals(action) || ACTION_SHORTCUT_CAMERA.equals(action) ) {
+		else if( (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && MyTileService.TILE_ID.equals(action)) || ACTION_SHORTCUT_CAMERA.equals(action) ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "launching from quick settings tile or application shortcut for Open Camera: photo mode");
 			applicationInterface.setVideoPref(false);
 		}
-		else if( MyTileServiceVideo.TILE_ID.equals(action) || ACTION_SHORTCUT_VIDEO.equals(action) ) {
+		else if( (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && MyTileServiceVideo.TILE_ID.equals(action)) || ACTION_SHORTCUT_VIDEO.equals(action) ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "launching from quick settings tile or application shortcut for Open Camera: video mode");
 			applicationInterface.setVideoPref(true);
 		}
-		else if( MyTileServiceFrontCamera.TILE_ID.equals(action) || ACTION_SHORTCUT_SELFIE.equals(action) ) {
+		else if( (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && MyTileServiceFrontCamera.TILE_ID.equals(action)) || ACTION_SHORTCUT_SELFIE.equals(action) ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "launching from quick settings tile or application shortcut for Open Camera: selfie mode");
-			for(int i=0;i<preview.getCameraControllerManager().getNumberOfCameras();i++) {
+			int n_cameras = preview.getCameraControllerManager().getNumberOfCameras();
+			for(int i=0;i<n_cameras;i++) {
 				if( preview.getCameraControllerManager().isFrontFacing(i) ) {
 					if (MyDebug.LOG)
 						Log.d(TAG, "found front camera: " + i);
@@ -578,12 +579,13 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
         	CameraControllerManager2 manager2 = new CameraControllerManager2(this);
         	supports_camera2 = true;
-        	if( manager2.getNumberOfCameras() == 0 ) {
+			int n_cameras = manager2.getNumberOfCameras();
+        	if( n_cameras == 0 ) {
         		if( MyDebug.LOG )
         			Log.d(TAG, "Camera2 reports 0 cameras");
             	supports_camera2 = false;
         	}
-        	for(int i=0;i<manager2.getNumberOfCameras() && supports_camera2;i++) {
+        	for(int i=0;i<n_cameras && supports_camera2;i++) {
         		if( !manager2.allowCamera2Support(i) ) {
         			if( MyDebug.LOG )
         				Log.d(TAG, "camera " + i + " doesn't have limited or full support for Camera2 API");
@@ -923,7 +925,13 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         mSensorManager.unregisterListener(accelerometerListener);
         mSensorManager.unregisterListener(magneticListener);
         orientationEventListener.disable();
-        unregisterReceiver(cameraReceiver);
+        try {
+			unregisterReceiver(cameraReceiver);
+		}
+		catch(IllegalArgumentException e) {
+        	// this can happen if not registered - simplest to just catch the exception
+        	e.printStackTrace();
+		}
         freeAudioListener(false);
         freeSpeechRecognizer();
         applicationInterface.getLocationSupplier().freeLocationListeners();
@@ -1139,7 +1147,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		if( MyDebug.LOG )
 			Log.d(TAG, "clickedExposureLock");
     	this.preview.toggleExposureLock();
-	    ImageButton exposureLockButton = (ImageButton) findViewById(R.id.exposure_lock);
+	    ImageButton exposureLockButton = findViewById(R.id.exposure_lock);
 		exposureLockButton.setImageResource(preview.isExposureLocked() ? R.drawable.exposure_locked : R.drawable.exposure_unlocked);
 		preview.showToast(exposure_lock_toast, preview.isExposureLocked() ? R.string.exposure_locked : R.string.exposure_unlocked);
     }
@@ -1318,6 +1326,17 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		if( this.preview.getCameraController() != null ) {
 			bundle.putString("parameters_string", preview.getCameraController().getParametersString());
 		}
+		List<String> antibanding = this.preview.getSupportedAntiBanding();
+		putBundleExtra(bundle, "antibanding", antibanding);
+		if( antibanding != null ) {
+			String [] entries_arr = new String[antibanding.size()];
+			int i=0;
+			for(String value: antibanding) {
+				entries_arr[i] = getMainUI().getEntryForAntiBanding(value);
+				i++;
+			}
+			bundle.putStringArray("antibanding_entries", entries_arr);
+		}
 
 		List<CameraController.Size> preview_sizes = this.preview.getSupportedPreviewSizes();
 		if( preview_sizes != null ) {
@@ -1352,7 +1371,35 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			bundle.putInt("resolution_width", preview.getCurrentPictureSize().width);
 			bundle.putInt("resolution_height", preview.getCurrentPictureSize().height);
 		}
-		
+
+		//List<String> video_quality = this.preview.getVideoQualityHander().getSupportedVideoQuality();
+		String fps_value = applicationInterface.getVideoFPSPref(); // n.b., this takes into account slow motion mode putting us into a high frame rate
+		if( MyDebug.LOG )
+			Log.d(TAG, "fps_value: " + fps_value);
+		List<String> video_quality = this.preview.getSupportedVideoQuality(fps_value);
+		if( video_quality == null || video_quality.size() == 0 ) {
+			Log.e(TAG, "can't find any supported video sizes for current fps!");
+			// fall back to unfiltered list
+			video_quality = this.preview.getVideoQualityHander().getSupportedVideoQuality();
+		}
+		if( video_quality != null && this.preview.getCameraController() != null ) {
+			String [] video_quality_arr = new String[video_quality.size()];
+			String [] video_quality_string_arr = new String[video_quality.size()];
+			int i=0;
+			for(String value: video_quality) {
+				video_quality_arr[i] = value;
+				video_quality_string_arr[i] = this.preview.getCamcorderProfileDescription(value);
+				i++;
+			}
+			bundle.putStringArray("video_quality", video_quality_arr);
+			bundle.putStringArray("video_quality_string", video_quality_string_arr);
+
+			String video_quality_preference_key = PreferenceKeys.getVideoQualityPreferenceKey(this.preview.getCameraId(), this.preview.fpsIsHighSpeed(fps_value));
+			if( MyDebug.LOG )
+				Log.d(TAG, "video_quality_preference_key: " + video_quality_preference_key);
+			bundle.putString("video_quality_preference_key", video_quality_preference_key);
+		}
+
 		if( preview.getVideoQualityHander().getCurrentVideoQuality() != null ) {
 			bundle.putString("current_video_quality", preview.getVideoQualityHander().getCurrentVideoQuality());
 		}
@@ -1361,6 +1408,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		bundle.putInt("video_frame_height", camcorder_profile.videoFrameHeight);
 		bundle.putInt("video_bit_rate", camcorder_profile.videoBitRate);
 		bundle.putInt("video_frame_rate", camcorder_profile.videoFrameRate);
+		bundle.putDouble("video_capture_rate", camcorder_profile.videoCaptureRate);
+		bundle.putBoolean("video_high_speed", preview.isVideoHighSpeed());
+		bundle.putFloat("video_capture_rate_factor", applicationInterface.getVideoCaptureRateFactor());
 
 		List<CameraController.Size> video_sizes = this.preview.getVideoQualityHander().getSupportedVideoSizes();
 		if( video_sizes != null ) {
@@ -1803,7 +1853,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     public void showPreview(boolean show) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "showPreview: " + show);
-		final ViewGroup container = (ViewGroup)findViewById(R.id.hide_container);
+		final ViewGroup container = findViewById(R.id.hide_container);
 		container.setVisibility(show ? View.GONE : View.VISIBLE);
     }
     
@@ -1812,7 +1862,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	private void updateGalleryIconToBlank() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "updateGalleryIconToBlank");
-    	ImageButton galleryButton = (ImageButton) this.findViewById(R.id.gallery);
+    	ImageButton galleryButton = this.findViewById(R.id.gallery);
 	    int bottom = galleryButton.getPaddingBottom();
 	    int top = galleryButton.getPaddingTop();
 	    int right = galleryButton.getPaddingRight();
@@ -1831,7 +1881,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     void updateGalleryIcon(Bitmap thumbnail) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "updateGalleryIcon: " + thumbnail);
-    	ImageButton galleryButton = (ImageButton) this.findViewById(R.id.gallery);
+    	ImageButton galleryButton = this.findViewById(R.id.gallery);
 		galleryButton.setImageBitmap(thumbnail);
 		gallery_bitmap = thumbnail;
     }
@@ -1931,7 +1981,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 
 		this.runOnUiThread(new Runnable() {
 			public void run() {
-				final ImageButton galleryButton = (ImageButton) findViewById(R.id.gallery);
+				final ImageButton galleryButton = findViewById(R.id.gallery);
 				if( started ) {
 					//galleryButton.setColorFilter(0x80ffffff, PorterDuff.Mode.MULTIPLY);
 					if( gallery_save_anim == null ) {
@@ -2192,10 +2242,18 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			// n.b., fragments have to be static (as they might be inserted into a new Activity - see http://stackoverflow.com/questions/15571010/fragment-inner-class-should-be-static),
 			// so we access the MainActivity via the fragment's getActivity().
 			MainActivity main_activity = (MainActivity)this.getActivity();
-			main_activity.setWindowFlagsForCamera();
-			main_activity.showPreview(true);
-			String new_save_location = this.getChosenFolder();
-			main_activity.updateSaveFolder(new_save_location);
+			// activity may be null, see https://stackoverflow.com/questions/13116104/best-practice-to-reference-the-parent-activity-of-a-fragment
+			// have had Google Play crashes from this
+			if( main_activity != null ) {
+				main_activity.setWindowFlagsForCamera();
+				main_activity.showPreview(true);
+				String new_save_location = this.getChosenFolder();
+				main_activity.updateSaveFolder(new_save_location);
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.e(TAG, "activity no longer exists!");
+			}
 			super.onDismiss(dialog);
 		}
 	}
@@ -2565,8 +2623,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				Log.d(TAG, "set up zoom");
 			if( MyDebug.LOG )
 				Log.d(TAG, "has_zoom? " + preview.supportsZoom());
-		    ZoomControls zoomControls = (ZoomControls) findViewById(R.id.zoom);
-		    SeekBar zoomSeekBar = (SeekBar) findViewById(R.id.zoom_seekbar);
+		    ZoomControls zoomControls = findViewById(R.id.zoom);
+		    SeekBar zoomSeekBar = findViewById(R.id.zoom_seekbar);
 
 			if( preview.supportsZoom() ) {
 				if( sharedPreferences.getBoolean(PreferenceKeys.ShowZoomControlsPreferenceKey, false) ) {
@@ -2643,7 +2701,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		{
 			if( MyDebug.LOG )
 				Log.d(TAG, "set up manual focus");
-		    SeekBar focusSeekBar = (SeekBar) findViewById(R.id.focus_seekbar);
+		    SeekBar focusSeekBar = findViewById(R.id.focus_seekbar);
 		    focusSeekBar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 			setProgressSeekbarScaled(focusSeekBar, 0.0, preview.getMinimumFocusDistance(), preview.getCameraController().getFocusDistance());
 		    focusSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
@@ -2672,7 +2730,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			if( preview.supportsISORange()) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "set up iso");
-				SeekBar iso_seek_bar = ((SeekBar)findViewById(R.id.iso_seekbar));
+				SeekBar iso_seek_bar = findViewById(R.id.iso_seekbar);
 			    iso_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 				setProgressSeekbarExponential(iso_seek_bar, preview.getMinimumISO(), preview.getMaximumISO(), preview.getCameraController().getISO());
 				iso_seek_bar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
@@ -2707,7 +2765,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				if( preview.supportsExposureTime() ) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "set up exposure time");
-					SeekBar exposure_time_seek_bar = ((SeekBar)findViewById(R.id.exposure_time_seekbar));
+					SeekBar exposure_time_seek_bar = findViewById(R.id.exposure_time_seekbar);
 					exposure_time_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 					setProgressSeekbarExponential(exposure_time_seek_bar, preview.getMinimumExposureTime(), preview.getMaximumExposureTime(), preview.getCameraController().getExposureTime());
 					exposure_time_seek_bar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
@@ -2753,7 +2811,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				if( MyDebug.LOG )
 					Log.d(TAG, "set up exposure compensation");
 				final int min_exposure = preview.getMinimumExposure();
-				SeekBar exposure_seek_bar = ((SeekBar)findViewById(R.id.exposure_seekbar));
+				SeekBar exposure_seek_bar = findViewById(R.id.exposure_seekbar);
 				exposure_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 				exposure_seek_bar.setMax( preview.getMaximumExposure() - min_exposure );
 				exposure_seek_bar.setProgress( preview.getCurrentExposure() - min_exposure );
@@ -2774,7 +2832,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					}
 				});
 
-				ZoomControls seek_bar_zoom = (ZoomControls)findViewById(R.id.exposure_seekbar_zoom);
+				ZoomControls seek_bar_zoom = findViewById(R.id.exposure_seekbar_zoom);
 				seek_bar_zoom.setOnZoomInClickListener(new View.OnClickListener(){
 		            public void onClick(View v){
 		            	changeExposure(1);
@@ -2793,7 +2851,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		View exposureButton = findViewById(R.id.exposure);
 	    exposureButton.setVisibility(supportsExposureButton() && !mainUI.inImmersiveMode() ? View.VISIBLE : View.GONE);
 
-	    ImageButton exposureLockButton = (ImageButton) findViewById(R.id.exposure_lock);
+	    ImageButton exposureLockButton = findViewById(R.id.exposure_lock);
 	    exposureLockButton.setVisibility(preview.supportsExposureLock() && !mainUI.inImmersiveMode() ? View.VISIBLE : View.GONE);
 	    if( preview.supportsExposureLock() ) {
 			exposureLockButton.setImageResource(preview.isExposureLocked() ? R.drawable.exposure_locked : R.drawable.exposure_unlocked);
@@ -2824,7 +2882,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		if( preview.getSupportedWhiteBalances() != null && preview.supportsWhiteBalanceTemperature() ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "set up manual white balance");
-			SeekBar white_balance_seek_bar = ((SeekBar)findViewById(R.id.white_balance_seekbar));
+			SeekBar white_balance_seek_bar = findViewById(R.id.white_balance_seekbar);
 			white_balance_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 			final int minimum_temperature = preview.getMinimumWhiteBalanceTemperature();
 			final int maximum_temperature = preview.getMaximumWhiteBalanceTemperature();
@@ -2882,8 +2940,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	}
 
     public boolean supportsNoiseReduction() {
-		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsBurst() && preview.supportsExposureTime() );
-		//return false; // currently blocked for release
+		//return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsBurst() && preview.supportsExposureTime() );
+		return false; // currently blocked for release
 	}
     
     private int maxExpoBracketingNImages() {
@@ -3014,7 +3072,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			else
 				bitrate_string = profile.videoBitRate + "bps";
 
-			toast_string = getResources().getString(R.string.video) + ": " + profile.videoFrameWidth + "x" + profile.videoFrameHeight + ", " + profile.videoCaptureRate + getResources().getString(R.string.fps) + (video_high_speed ? " [" + getResources().getString(R.string.high_speed) + "]" : "") + ", " + bitrate_string;
+			int capture_rate = (int)(profile.videoCaptureRate+0.5);
+			toast_string = getResources().getString(R.string.video) + ": " + profile.videoFrameWidth + "x" + profile.videoFrameHeight + ", " + capture_rate + getResources().getString(R.string.fps) + (video_high_speed ? " [" + getResources().getString(R.string.high_speed) + "]" : "") + ", " + bitrate_string;
 
 			String fps_value = applicationInterface.getVideoFPSPref();
 			if( !fps_value.equals("default") || video_high_speed ) {
@@ -3022,8 +3081,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 
 			float capture_rate_factor = applicationInterface.getVideoCaptureRateFactor();
-			if( capture_rate_factor < 1.0f-1.0e-5f ) {
-				toast_string += "\n" + getResources().getString(R.string.preference_slow_motion) + ": " + capture_rate_factor;
+			if( Math.abs(capture_rate_factor - 1.0f) > 1.0e-5 ) {
+				toast_string += "\n" + getResources().getString(R.string.preference_video_capture_rate) + ": " + capture_rate_factor + "x";
 				simple = false;
 			}
 

@@ -88,8 +88,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 	/** This class keeps track of the images saved in this batch, for use with Pause Preview option, so we can share or trash images.
 	 */
 	private static class LastImage {
-		public final boolean share; // one of the images in the list should have share set to true, to indicate which image to share
-		public final String name;
+		final boolean share; // one of the images in the list should have share set to true, to indicate which image to share
+		final String name;
 		Uri uri;
 
 		LastImage(Uri uri, boolean share) {
@@ -320,6 +320,11 @@ public class MyApplicationInterface implements ApplicationInterface {
 	}
 
 	@Override
+	public String getAntiBandingPref() {
+		return sharedPreferences.getString(PreferenceKeys.AntiBandingPreferenceKey, CameraController.ANTIBANDING_DEFAULT);
+	}
+
+	@Override
 	public String getISOPref() {
     	return sharedPreferences.getString(PreferenceKeys.ISOPreferenceKey, CameraController.ISO_DEFAULT);
     }
@@ -488,12 +493,18 @@ public class MyApplicationInterface implements ApplicationInterface {
     @Override
     public float getVideoCaptureRateFactor() {
 		float capture_rate_factor = sharedPreferences.getFloat(PreferenceKeys.getVideoCaptureRatePreferenceKey(main_activity.getPreview().getCameraId()), 1.0f);
-		if( capture_rate_factor < 1.0f-1.0e-5f ) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "capture_rate_factor: " + capture_rate_factor);
+		if( Math.abs(capture_rate_factor - 1.0f) > 1.0e-5 ) {
 			// check stored capture rate is valid
-			List<Integer> supported_slow_motion = getSupportedSlowMotionRates();
+			if( MyDebug.LOG )
+				Log.d(TAG, "check stored capture rate is valid");
+			List<Float> supported_capture_rates = getSupportedVideoCaptureRates();
+			if( MyDebug.LOG )
+				Log.d(TAG, "supported_capture_rates: " + supported_capture_rates);
 			boolean found = false;
-			for(int slow_motion_rate : supported_slow_motion) {
-				if( Math.abs(capture_rate_factor - 1.0f/slow_motion_rate) < 1.0e-5 ) {
+			for(float this_capture_rate : supported_capture_rates) {
+				if( Math.abs(capture_rate_factor - this_capture_rate) < 1.0e-5 ) {
 					found = true;
 					break;
 				}
@@ -510,28 +521,40 @@ public class MyApplicationInterface implements ApplicationInterface {
 	 *  slow motion should only be considered as supported if at least 2 entries
 	 *  are returned. Entries are returned in increasing order.
 	 */
-	public List<Integer> getSupportedSlowMotionRates() {
-		List<Integer> rates = new ArrayList<>();
-		rates.add(1);
+	public List<Float> getSupportedVideoCaptureRates() {
+		List<Float> rates = new ArrayList<>();
 		if( main_activity.getPreview().supportsVideoHighSpeed() ) {
 			// We consider a slow motion rate supported if we can get at least 30fps in slow motion.
 			// If this code is updated, see if we also need to update how slow motion fps is chosen
 			// in getVideoFPSPref().
 			if( main_activity.getPreview().getVideoQualityHander().videoSupportsFrameRateHighSpeed(240) ||
 					main_activity.getPreview().getVideoQualityHander().videoSupportsFrameRate(240) ) {
-				rates.add(2);
-				rates.add(4);
-				rates.add(8);
+				rates.add(1.0f/8.0f);
+				rates.add(1.0f/4.0f);
+				rates.add(1.0f/2.0f);
 			}
 			else if( main_activity.getPreview().getVideoQualityHander().videoSupportsFrameRateHighSpeed(120) ||
 					main_activity.getPreview().getVideoQualityHander().videoSupportsFrameRate(120) ) {
-				rates.add(2);
-				rates.add(4);
+				rates.add(1.0f/4.0f);
+				rates.add(1.0f/2.0f);
 			}
 			else if( main_activity.getPreview().getVideoQualityHander().videoSupportsFrameRateHighSpeed(60) ||
 					main_activity.getPreview().getVideoQualityHander().videoSupportsFrameRate(60) ) {
-				rates.add(2);
+				rates.add(1.0f/2.0f);
 			}
+		}
+		rates.add(1.0f);
+		if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
+			// add timelapse options
+			// in theory this should work on any Android version, though video fails to record in timelapse mode on Galaxy Nexus...
+			rates.add(2.0f);
+			rates.add(3.0f);
+			rates.add(4.0f);
+			rates.add(5.0f);
+			rates.add(10.0f);
+			rates.add(20.0f);
+			rates.add(30.0f);
+			rates.add(60.0f);
 		}
 		return rates;
 	}
@@ -1203,7 +1226,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			main_activity.lockScreen();
 		}
 		main_activity.stopAudioListeners(); // important otherwise MediaRecorder will fail to start() if we have an audiolistener! Also don't want to have the speech recognizer going off
-		ImageButton view = (ImageButton)main_activity.findViewById(R.id.take_photo);
+		ImageButton view = main_activity.findViewById(R.id.take_photo);
 		view.setImageResource(R.drawable.take_video_recording);
 		view.setContentDescription( getContext().getResources().getString(R.string.stop_video) );
 		view.setTag(R.drawable.take_video_recording); // for testing
@@ -1385,7 +1408,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		if( MyDebug.LOG )
 			Log.d(TAG, "stoppingVideo()");
 		main_activity.unlockScreen();
-		ImageButton view = (ImageButton)main_activity.findViewById(R.id.take_photo);
+		ImageButton view = main_activity.findViewById(R.id.take_photo);
 		view.setImageResource(R.drawable.take_video_selector);
 		view.setContentDescription( getContext().getResources().getString(R.string.start_video) );
 		view.setTag(R.drawable.take_video_selector); // for testing
@@ -1492,7 +1515,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 				}
 			}
 			if( thumbnail != null ) {
-				ImageButton galleryButton = (ImageButton) main_activity.findViewById(R.id.gallery);
+				ImageButton galleryButton = main_activity.findViewById(R.id.gallery);
 				int width = thumbnail.getWidth();
 				int height = thumbnail.getHeight();
 				if( MyDebug.LOG )
@@ -1587,7 +1610,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			error_message = getContext().getResources().getString(R.string.failed_to_record_video);
 		}
 		main_activity.getPreview().showToast(null, error_message);
-		ImageButton view = (ImageButton)main_activity.findViewById(R.id.take_photo);
+		ImageButton view = main_activity.findViewById(R.id.take_photo);
 		view.setImageResource(R.drawable.take_video_selector);
 		view.setContentDescription( getContext().getResources().getString(R.string.start_video) );
 		view.setTag(R.drawable.take_video_selector); // for testing
@@ -1614,7 +1637,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 	@Override
 	public void onFailedCreateVideoFileError() {
 		main_activity.getPreview().showToast(null, R.string.failed_to_save_video);
-		ImageButton view = (ImageButton)main_activity.findViewById(R.id.take_photo);
+		ImageButton view = main_activity.findViewById(R.id.take_photo);
 		view.setImageResource(R.drawable.take_video_selector);
 		view.setContentDescription( getContext().getResources().getString(R.string.start_video) );
 		view.setTag(R.drawable.take_video_selector); // for testing

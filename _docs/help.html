@@ -201,8 +201,10 @@ will be available which instead work by making the screen light up (note, front 
 Settings/"Camera resolution".</li>
 <li><b>Video resolution</b> - Change the photo resolution (also available under Settings/Video
 Settings/"Video resolution".</li>
-<li><b>Slow Motion</b> - Record videos in slow motion (only available if Camera2 API is used). Note
-sound is not recorded if using slow motion.</li>
+<li><b>Speed</b> - This allows you to record video at either a faster rate (time lapse) or slower
+	rate (slow motion). Note that slow motion is only available on some devices, and requires
+	Camera2 API to be enabled. Also note that sound is not recorded in time lapse or slow motion
+    modes.</li>
 <li><b>Timer</b> - Set a timer for taking photos or recording video. Also available under
 Settings/Timer.</li>
 <li><b>Repeat</b> - Take a repeated set of photos when the take photo button is pressed. The time
@@ -707,6 +709,8 @@ rate.</p>
     using.</li>
 	<li>For best results (especially for 120fps or higher), please enable Settings/"Use Camera2 API". Even there, some
 	devices seem to show buggy behaviour, so please test before using.</li>
+	<li>This setting is ignored in slow motion mode, where instead Open Camera will choose an appropriate high speed frame
+	rate.</li>
 </ul>
 
 <p><b>Max duration of video</b> - This option can be used to set a maximum duration of the video. If set, video recording
@@ -793,6 +797,14 @@ Not supported for RAW photos (DNG format) or videos.</p>
 <p><b>Require location data</b> - If "Store location data" is enabled, then also enabling this option means that
 photos and videos can only be taken if location data is present (this can be useful if you need pictures/videos to
 have location data in them).</p>
+
+<p><b>Anti-banding</b> - Some kinds of lighting, such as some fluorescent lights, flicker at the rate of the power supply
+frequency (60Hz or 50Hz, depending on country). While this is typically not noticeable to a person, it can be visible to
+a camera. If a camera sets its exposure time to the wrong value, the flicker may become visible in the viewfinder as flicker
+or in a final captured image, as a set of variable-brightness bands across the image. Therefore, the auto-exposure routines
+of the camera include antibanding routines that ensure that the chosen exposure value will not cause such banding. The choice
+of exposure time depends on the rate of flicker, which the camera can detect automatically, or the expected rate can be
+specified by using this option.</p>
 
 <p><b>Misc:</b></p>
 
@@ -1108,6 +1120,7 @@ miss it, there's only limited number of characters for me to reply, and I don't 
 further replies).</p>
 
 <hr>
+<p><a href="http://opencamera.org.uk/#privacy">Open Camera Privacy Policy.</a></p>
 <p><a href="http://sourceforge.net/p/opencamera/">Open Camera on Sourceforge.</a></p>
 <p><a href="http://mdwh2.users.sourceforge.net/">More of my Free software.</a></p>
 

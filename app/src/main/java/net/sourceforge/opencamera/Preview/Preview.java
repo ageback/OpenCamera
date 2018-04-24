@@ -188,6 +188,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	private List<String> color_effects;
 	private List<String> scene_modes;
 	private List<String> white_balances;
+	private List<String> antibanding;
 	private List<String> isos;
 	private boolean supports_white_balance_temperature;
 	private int min_temperature;
@@ -1258,6 +1259,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		can_disable_shutter_sound = false;
 		color_effects = null;
 		white_balances = null;
+		antibanding = null;
 		isos = null;
 		supports_white_balance_temperature = false;
 		min_temperature = 0;
@@ -1676,14 +1678,6 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		// in video mode; but don't set high speed mode in photo mode just to be safe
 		// Setup for high speed - must be done after setupCameraParameters() and switching to video mode, but before setPreviewSize() and startCameraPreview()
 		camera_controller.setVideoHighSpeed(is_video && video_high_speed);
-		if( this.is_video ) {
-	    	capture_rate_factor = applicationInterface.getVideoCaptureRateFactor();
-	    	has_capture_rate_factor = Math.abs(capture_rate_factor - 1.0f) > 1.0e-5f;
-			if( MyDebug.LOG ) {
-				Log.d(TAG, "has_capture_rate_factor: " + has_capture_rate_factor);
-				Log.d(TAG, "capture_rate_factor: " + capture_rate_factor);
-			}
-		}
 
 		if( do_startup_focus && using_android_l && camera_controller.supportsAutoFocus() ) {
 			// need to switch flash off for autofocus - and for Android L, need to do this before starting preview (otherwise it won't work in time); for old camera API, need to do this after starting preview!
@@ -2151,6 +2145,21 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			Log.d(TAG, "setupCameraParameters: time after white balance: " + (System.currentTimeMillis() - debug_time));
 		}
 		
+		{
+			if( MyDebug.LOG )
+				Log.d(TAG, "set up antibanding");
+			String value = applicationInterface.getAntiBandingPref();
+			if( MyDebug.LOG )
+				Log.d(TAG, "saved antibanding: " + value);
+
+			CameraController.SupportedValues supported_values = camera_controller.setAntiBanding(value);
+            // for anti-banding, if the stored preference wasn't supported, we stick with the device default - but don't
+            // write it back to the user preference
+			if( supported_values != null ) {
+                antibanding = supported_values.values;
+            }
+		}
+
 		// must be done before setting flash modes, as we may remove flash modes if in manual mode
 		if( MyDebug.LOG )
 			Log.d(TAG, "set up iso");
@@ -2399,8 +2408,15 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 
 		if( supports_video ) {
+	    	capture_rate_factor = applicationInterface.getVideoCaptureRateFactor();
+	    	has_capture_rate_factor = Math.abs(capture_rate_factor - 1.0f) > 1.0e-5f;
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "has_capture_rate_factor: " + has_capture_rate_factor);
+				Log.d(TAG, "capture_rate_factor: " + capture_rate_factor);
+			}
+
 			// set up high speed frame rates
-			// should be done after checking the requested video size is available
+			// should be done after checking the requested video size is available, and after reading the requested capture rate
 			video_high_speed = false;
 			if( this.supports_video_high_speed ) {
 				VideoProfile profile = getVideoProfile();
@@ -2780,7 +2796,10 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			CamcorderProfile cam_profile;
 			int cameraId = camera_controller.getCameraId();
 
-			if( force4k ) {
+			// video_high_speed should only be for Camera2, where we don't support force4k option, but
+			// put the check here just in case - don't want to be forcing 4K resolution if high speed
+			// frame rate!
+			if( force4k && !video_high_speed ) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "force 4K UHD video");
 				cam_profile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH);
@@ -2835,11 +2854,37 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 
 		if( has_capture_rate_factor ) {
 			if( MyDebug.LOG )
-				Log.d(TAG, "set video profile frame rate for slow motion or timelapse");
-			// capture rate remains the same, and we adjust the frame rate of video
-			video_profile.videoFrameRate = (int)(video_profile.videoFrameRate * capture_rate_factor + 0.5f);
-			video_profile.videoBitRate = (int)(video_profile.videoBitRate * capture_rate_factor + 0.5f);
-			// audio not recorded with slow motion video
+				Log.d(TAG, "set video profile frame rate for slow motion or timelapse, capture rate: " + capture_rate_factor);
+			if( capture_rate_factor < 1.0 ) {
+				// capture rate remains the same, and we adjust the frame rate of video
+				video_profile.videoFrameRate = (int)(video_profile.videoFrameRate * capture_rate_factor + 0.5f);
+				video_profile.videoBitRate = (int)(video_profile.videoBitRate * capture_rate_factor + 0.5f);
+				if( MyDebug.LOG )
+					Log.d(TAG, "scaled frame rate to: " + video_profile.videoFrameRate);
+		    	if( Math.abs(capture_rate_factor - 0.5f) < 1.0e-5f ) {
+		    		// hack - on Nokia 8 at least, capture_rate_factor of 0.5x still gives a normal speed video, but a
+					// workaround is to increase the capture rate - even increasing by just 1.0e-5 works
+					// unclear if this is needed in general, or is a Nokia specific bug
+					video_profile.videoCaptureRate += 1.0e-3;
+					if( MyDebug.LOG )
+						Log.d(TAG, "fudged videoCaptureRate to: " + video_profile.videoCaptureRate);
+				}
+			}
+			else if( capture_rate_factor > 1.0 ) {
+				// resultant framerate remains the same, instead adjst the capture rate
+				video_profile.videoCaptureRate = video_profile.videoCaptureRate / (double)capture_rate_factor;
+				if( MyDebug.LOG )
+					Log.d(TAG, "scaled capture rate to: " + video_profile.videoCaptureRate);
+		    	if( Math.abs(capture_rate_factor - 2.0f) < 1.0e-5f ) {
+		    		// hack - similar idea to the hack above for 2x slow motion
+					// again, even decreasing by 1.0e-5 works
+					// again, unclear if this is needed in general, or is a Nokia specific bug
+					video_profile.videoCaptureRate -= 1.0e-3f;
+					if( MyDebug.LOG )
+						Log.d(TAG, "fudged videoCaptureRate to: " + video_profile.videoCaptureRate);
+				}
+			}
+			// audio not recorded with slow motion or timelapse video
 			record_audio = false;
 		}
 
@@ -3787,7 +3832,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				Log.d(TAG, "fps_ranges not available");
 			return;
 		}
-		int [] selected_fps;
+		int [] selected_fps = null;
 		if( this.is_video ) {
 			// For Nexus 5 and Nexus 6, we need to set the preview fps using matchPreviewFpsToVideo to avoid problem of dark preview in low light, as described above.
 			// When the video recording starts, the preview automatically adjusts, but still good to avoid too-dark preview before the user starts recording.
@@ -3799,17 +3844,24 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			// but leaving the code as it is, to be safe.
 			// Update for v1.43: implementing setPreviewFpsRange() for CameraController2 caused the dark preview problem on
 			// OnePlus 3T. So enable the preview_too_dark for all devices on Camera2.
+            // Update for v1.43.3: had reports of problems (e.g., setting manual mode with video on camera2) since 1.43. It's unclear
+            // if there is any benefit to setting the preview fps when we aren't requesting a specific fps value, so seems safest to
+            // revert to the old behaviour (where CameraController2.setPreviewFpsRange() did nothing).
 			boolean preview_too_dark = using_android_l || Build.MODEL.equals("Nexus 5") || Build.MODEL.equals("Nexus 6");
 			String fps_value = applicationInterface.getVideoFPSPref();
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "preview_too_dark? " + preview_too_dark);
 				Log.d(TAG, "fps_value: " + fps_value);
 			}
-			if( fps_value.equals("default") && preview_too_dark ) {
+			if( fps_value.equals("default") && using_android_l ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "don't set preview fps for camera2 and default fps video");
+			}
+			else if( fps_value.equals("default") && preview_too_dark ) {
 				selected_fps = chooseBestPreviewFps(fps_ranges);
 			}
 			else {
-				selected_fps = matchPreviewFpsToVideo(fps_ranges, profile.videoCaptureRate*1000);
+				selected_fps = matchPreviewFpsToVideo(fps_ranges, (int)(profile.videoCaptureRate*1000));
 			}
 		}
 		else {
@@ -3818,11 +3870,23 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			// we could hardcode behaviour like we do for video, but this is the same way that Google Camera chooses preview fps for photos
 			// or I could hardcode behaviour for Galaxy Nexus, but since it's an old device (and an obscure bug anyway - most users don't really need continuous focus in photo mode), better to live with the bug rather than complicating the code
 			// Update for v1.29: this doesn't seem to happen on Galaxy Nexus with continuous picture focus mode, which is what we now use
-			// Update for v1.31: we no longer seem to need this - I no longer get a dark preview in photo or video mode if we don't set the fps range;
+			// Update for v1.31: we no longer seem to need this for old API - I no longer get a dark preview in photo or video mode if we don't set the fps range;
 			// but leaving the code as it is, to be safe.
-			selected_fps = chooseBestPreviewFps(fps_ranges);
+            // Update for v1.43.3: as noted above, setPreviewFpsRange() was implemented for CameraController2 in v1.43, but no evidence this
+            // is needed for anything, so thinking about it, best to keep things as they were before for Camera2
+			if( using_android_l ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "don't set preview fps for camera2 and photo");
+			}
+			else {
+                selected_fps = chooseBestPreviewFps(fps_ranges);
+            }
 		}
-        camera_controller.setPreviewFpsRange(selected_fps[0], selected_fps[1]);
+		if( selected_fps != null ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "set preview fps range: " + selected_fps);
+            camera_controller.setPreviewFpsRange(selected_fps[0], selected_fps[1]);
+        }
 	}
 	
 	public void switchVideo(boolean during_startup, boolean change_user_pref) {
@@ -3992,7 +4056,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	}
 	
 	public String getErrorFeatures(VideoProfile profile) {
-		boolean was_4k = false, was_bitrate = false, was_fps = false;
+		boolean was_4k = false, was_bitrate = false, was_fps = false, was_slow_motion = false;
 		if( profile.videoFrameWidth == 3840 && profile.videoFrameHeight == 2160 && applicationInterface.getForce4KPref() ) {
 			was_4k = true;
 		}
@@ -4001,11 +4065,14 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			was_bitrate = true;
 		}
 		String fps_value = applicationInterface.getVideoFPSPref();
-		if( !fps_value.equals("default") ) {
+		if( applicationInterface.getVideoCaptureRateFactor() < 1.0f-1.0e-5f ) {
+			was_slow_motion = true;
+		}
+		else if( !fps_value.equals("default") ) {
 			was_fps = true;
 		}
 		String features = "";
-		if( was_4k || was_bitrate || was_fps ) {
+		if( was_4k || was_bitrate || was_fps || was_slow_motion ) {
 			if( was_4k ) {
 				features = "4K UHD";
 			}
@@ -4020,6 +4087,12 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					features = "Frame rate";
 				else
 					features += "/Frame rate";
+			}
+			if( was_slow_motion ) {
+				if( features.length() == 0 )
+					features = "Slow motion";
+				else
+					features += "/Slow motion";
 			}
 		}
 		return features;
@@ -5879,6 +5952,12 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			Log.d(TAG, "getSupportedWhiteBalances");
 		return this.white_balances;
     }
+
+    public List<String> getSupportedAntiBanding() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getSupportedAntiBanding");
+		return this.antibanding;
+    }
     
     public String getISOKey() {
 		if( MyDebug.LOG )
@@ -6290,7 +6369,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			private final Rect sub_bounds = new Rect();
 			private final RectF rect = new RectF();
 
-			public RotatedTextView(String text, Context context) {
+			RotatedTextView(String text, Context context) {
 				super(context);
 
 				this.lines = text.split("\n");

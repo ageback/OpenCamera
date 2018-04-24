@@ -90,7 +90,7 @@ public class CameraController2 extends CameraController {
 		BURSTTYPE_NONE, // for when enable_burst is false
 		BURSTTYPE_EXPO, // enable expo bracketing mode; see expo_bracketing_n_images, expo_bracketing_stops for further control
 		BURSTTYPE_NORMAL // take a regular burst; see burst_for_noise_reduction, burst_requested_n_images for further control
-	};
+	}
 	private BurstType burst_type = BurstType.BURSTTYPE_NONE;
 	// for BURSTTYPE_EXPO:
 	private final static int max_expo_bracketing_n_images = 5; // could be more, but limit to 5 for now
@@ -194,6 +194,8 @@ public class CameraController2 extends CameraController {
 		private int scene_mode = CameraMetadata.CONTROL_SCENE_MODE_DISABLED;
 		private int color_effect = CameraMetadata.CONTROL_EFFECT_MODE_OFF;
 		private int white_balance = CameraMetadata.CONTROL_AWB_MODE_AUTO;
+		private boolean has_antibanding;
+		private int antibanding = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO;
 		private int white_balance_temperature = 5000; // used for white_balance == CONTROL_AWB_MODE_OFF
 		private String flash_value = "flash_off";
 		private boolean has_iso;
@@ -261,6 +263,7 @@ public class CameraController2 extends CameraController {
 			setSceneMode(builder);
 			setColorEffect(builder);
 			setWhiteBalance(builder);
+			setAntiBanding(builder);
 			setAEMode(builder, is_still);
 			setCropRegion(builder);
 			setExposureCompensation(builder);
@@ -384,6 +387,19 @@ public class CameraController2 extends CameraController {
 			return changed;
 		}
 
+		private boolean setAntiBanding(CaptureRequest.Builder builder) {
+			boolean changed = false;
+			if( has_antibanding ) {
+				if( builder.get(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE) == null || builder.get(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE) != antibanding ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "setting antibanding: " + antibanding);
+					builder.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, antibanding);
+					changed = true;
+				}
+			}
+			return changed;
+		}
+
 		private boolean setAEMode(CaptureRequest.Builder builder, boolean is_still) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "setAEMode");
@@ -432,7 +448,10 @@ public class CameraController2 extends CameraController {
 					Log.d(TAG, "auto mode");
 					Log.d(TAG, "flash_value: " + flash_value);
 				}
-				builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, ae_target_fps_range);
+				if( ae_target_fps_range != null ) {
+					Log.d(TAG, "set ae_target_fps_range: " + ae_target_fps_range);
+					builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, ae_target_fps_range);
+				}
 
 				// prefer to set flash via the ae mode (otherwise get even worse results), except for torch which we can't
 				switch(flash_value) {
@@ -1149,6 +1168,17 @@ public class CameraController2 extends CameraController {
 			e.printStackTrace();
 			throw new CameraControllerException();
 		}
+		catch(ArrayIndexOutOfBoundsException e) {
+			// Have seen this from Google Play - even though the Preview should have checked the
+			// cameraId is within the valid range! Although potentially this could happen if
+			// getCameraIdList() returns an empty list.
+			if( MyDebug.LOG ) {
+				Log.e(TAG, "failed to open camera: ArrayIndexOutOfBoundsException");
+				Log.e(TAG, "message: " + e.getMessage());
+			}
+			e.printStackTrace();
+			throw new CameraControllerException();
+		}
 
 		// set up a timeout - sometimes if the camera has got in a state where it can't be opened until after a reboot, we'll never even get a myStateCallback callback called
 		handler.postDelayed(new Runnable() {
@@ -1339,16 +1369,23 @@ public class CameraController2 extends CameraController {
 			throw new CameraControllerException();*/
 		if( MyDebug.LOG ) {
 			int hardware_level = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-			if( hardware_level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY )
-				Log.d(TAG, "Hardware Level: LEGACY");
-			else if( hardware_level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED )
-				Log.d(TAG, "Hardware Level: LIMITED");
-			else if( hardware_level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL )
-				Log.d(TAG, "Hardware Level: FULL");
-			else if( hardware_level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3 )
-				Log.d(TAG, "Hardware Level: Level 3");
-			else
-				Log.e(TAG, "Unknown Hardware Level: " + hardware_level);
+			switch (hardware_level) {
+				case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY:
+					Log.d(TAG, "Hardware Level: LEGACY");
+					break;
+				case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED:
+					Log.d(TAG, "Hardware Level: LIMITED");
+					break;
+				case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL:
+					Log.d(TAG, "Hardware Level: FULL");
+					break;
+				case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3:
+					Log.d(TAG, "Hardware Level: Level 3");
+					break;
+				default:
+					Log.e(TAG, "Unknown Hardware Level: " + hardware_level);
+					break;
+			}
 
 			int [] nr_modes = characteristics.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES);
 			Log.d(TAG, "nr_modes:");
@@ -1786,22 +1823,24 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setSceneMode: " + value);
 		// we convert to/from strings to be compatible with original Android Camera API
-		String default_value = SCENE_MODE_DEFAULT;
 		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES);
 		boolean has_disabled = false;
 		List<String> values = new ArrayList<>();
-		for(int value2 : values2) {
-			if( value2 == CameraMetadata.CONTROL_SCENE_MODE_DISABLED )
-				has_disabled = true;
-			String this_value = convertSceneMode(value2);
-			if( this_value != null ) {
-				values.add(this_value);
+		if( values2 != null ) {
+			// CONTROL_AVAILABLE_SCENE_MODES is supposed to always be available, but have had some (rare) crashes from Google Play due to being null
+			for(int value2 : values2) {
+				if( value2 == CameraMetadata.CONTROL_SCENE_MODE_DISABLED )
+					has_disabled = true;
+				String this_value = convertSceneMode(value2);
+				if( this_value != null ) {
+					values.add(this_value);
+				}
 			}
 		}
 		if( !has_disabled ) {
 			values.add(0, SCENE_MODE_DEFAULT);
 		}
-		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
+		SupportedValues supported_values = checkModeIsSupported(values, value, SCENE_MODE_DEFAULT);
 		if( supported_values != null ) {
 			int selected_value2 = CameraMetadata.CONTROL_SCENE_MODE_DISABLED;
 			switch(supported_values.selected_value) {
@@ -1936,7 +1975,6 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setColorEffect: " + value);
 		// we convert to/from strings to be compatible with original Android Camera API
-		String default_value = COLOR_EFFECT_DEFAULT;
 		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_EFFECTS);
 		List<String> values = new ArrayList<>();
 		for(int value2 : values2) {
@@ -1945,7 +1983,7 @@ public class CameraController2 extends CameraController {
 				values.add(this_value);
 			}
 		}
-		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
+		SupportedValues supported_values = checkModeIsSupported(values, value, COLOR_EFFECT_DEFAULT);
 		if( supported_values != null ) {
 			int selected_value2 = CameraMetadata.CONTROL_EFFECT_MODE_OFF;
 			switch(supported_values.selected_value) {
@@ -2060,7 +2098,6 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setWhiteBalance: " + value);
 		// we convert to/from strings to be compatible with original Android Camera API
-		String default_value = WHITE_BALANCE_DEFAULT;
 		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES);
 		List<String> values = new ArrayList<>();
 		for(int value2 : values2) {
@@ -2083,7 +2120,7 @@ public class CameraController2 extends CameraController {
 			if( has_auto )
 				values.add(0, WHITE_BALANCE_DEFAULT);
 		}
-		SupportedValues supported_values = checkModeIsSupported(values, value, default_value);
+		SupportedValues supported_values = checkModeIsSupported(values, value, WHITE_BALANCE_DEFAULT);
 		if( supported_values != null ) {
 			int selected_value2 = CameraMetadata.CONTROL_AWB_MODE_AUTO;
 			switch(supported_values.selected_value) {
@@ -2178,6 +2215,96 @@ public class CameraController2 extends CameraController {
 	@Override
 	public int getWhiteBalanceTemperature() {
 		return camera_settings.white_balance_temperature;
+	}
+
+	private String convertAntiBanding(int value2) {
+		String value;
+		switch( value2 ) {
+		case CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO:
+			value = ANTIBANDING_DEFAULT;
+			break;
+		case CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ:
+			value = "50hz";
+			break;
+		case CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ:
+			value = "60hz";
+			break;
+		case CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_OFF:
+			value = "off";
+			break;
+		default:
+			if( MyDebug.LOG )
+				Log.d(TAG, "unknown antibanding: " + value2);
+			value = null;
+			break;
+		}
+		return value;
+	}
+
+	@Override
+	public SupportedValues setAntiBanding(String value) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setAntiBanding: " + value);
+		// we convert to/from strings to be compatible with original Android Camera API
+		int [] values2 = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES );
+		List<String> values = new ArrayList<>();
+		for(int value2 : values2) {
+			String this_value = convertAntiBanding(value2);
+			if( this_value != null ) {
+				values.add(this_value);
+			}
+		}
+		SupportedValues supported_values = checkModeIsSupported(values, value, ANTIBANDING_DEFAULT);
+		if( supported_values != null ) {
+			// for antibanding, if the requested value isn't available, we don't modify it at all
+			// (so we stick with the device's default setting)
+			if( supported_values.selected_value.equals(value) ) {
+				int selected_value2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO;
+				switch(supported_values.selected_value) {
+					case ANTIBANDING_DEFAULT:
+						selected_value2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO;
+						break;
+					case "50hz":
+						selected_value2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ;
+						break;
+					case "60hz":
+						selected_value2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ;
+						break;
+					case "off":
+						selected_value2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_OFF;
+						break;
+					default:
+						if( MyDebug.LOG )
+							Log.d(TAG, "unknown selected_value: " + supported_values.selected_value);
+						break;
+				}
+
+				camera_settings.has_antibanding = true;
+				camera_settings.antibanding = selected_value2;
+				if( camera_settings.setAntiBanding(previewBuilder) ) {
+					try {
+						setRepeatingRequest();
+					}
+					catch(CameraAccessException e) {
+						if( MyDebug.LOG ) {
+							Log.e(TAG, "failed to set antibanding");
+							Log.e(TAG, "reason: " + e.getReason());
+							Log.e(TAG, "message: " + e.getMessage());
+						}
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+		return supported_values;
+	}
+
+	@Override
+	public String getAntiBanding() {
+		if( previewBuilder.get(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE) == null )
+			return null;
+		int value2 = previewBuilder.get(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE);
+		return convertAntiBanding(value2);
 	}
 
 	@Override
@@ -2841,23 +2968,25 @@ public class CameraController2 extends CameraController {
 		if( MyDebug.LOG )
 			Log.d(TAG, "convertFocusModeToValue: " + focus_mode);
 		String focus_value = "";
-		if( focus_mode == CaptureRequest.CONTROL_AF_MODE_AUTO ) {
-    		focus_value = "focus_mode_auto";
-    	}
-		else if( focus_mode == CaptureRequest.CONTROL_AF_MODE_MACRO ) {
-    		focus_value = "focus_mode_macro";
-    	}
-		else if( focus_mode == CaptureRequest.CONTROL_AF_MODE_EDOF ) {
-    		focus_value = "focus_mode_edof";
-    	}
-		else if( focus_mode == CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE ) {
-    		focus_value = "focus_mode_continuous_picture";
-    	}
-		else if( focus_mode == CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO ) {
-    		focus_value = "focus_mode_continuous_video";
-    	}
-		else if( focus_mode == CaptureRequest.CONTROL_AF_MODE_OFF ) {
-    		focus_value = "focus_mode_manual2"; // n.b., could be infinity
+		switch (focus_mode) {
+			case CaptureRequest.CONTROL_AF_MODE_AUTO:
+				focus_value = "focus_mode_auto";
+				break;
+			case CaptureRequest.CONTROL_AF_MODE_MACRO:
+				focus_value = "focus_mode_macro";
+				break;
+			case CaptureRequest.CONTROL_AF_MODE_EDOF:
+				focus_value = "focus_mode_edof";
+				break;
+			case CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE:
+				focus_value = "focus_mode_continuous_picture";
+				break;
+			case CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO:
+				focus_value = "focus_mode_continuous_video";
+				break;
+			case CaptureRequest.CONTROL_AF_MODE_OFF:
+				focus_value = "focus_mode_manual2"; // n.b., could be infinity
+				break;
 		}
     	return focus_value;
 	}
@@ -2932,7 +3061,7 @@ public class CameraController2 extends CameraController {
 			updateUseFakePrecaptureMode(flash_value);
 			
 			if( camera_settings.flash_value.equals("flash_torch") && !flash_value.equals("flash_off") ) {
-				// hack - if switching to something other than flash_off, we first need to turn torch off, otherwise torch remains on (at least on Nexus 6)
+				// hack - if switching to something other than flash_off, we first need to turn torch off, otherwise torch remains on (at least on Nexus 6 and Nokia 8)
 				camera_settings.flash_value = "flash_off";
 				camera_settings.setAEMode(previewBuilder, false);
 				CaptureRequest request = previewBuilder.build();
@@ -3561,10 +3690,23 @@ public class CameraController2 extends CameraController {
 				is_video_high_speed = true;
 			}
 			else {
-				camera.createCaptureSession(surfaces,
-					myStateCallback,
-					handler);
-				is_video_high_speed = false;
+        		try {
+					camera.createCaptureSession(surfaces,
+						myStateCallback,
+						handler);
+					is_video_high_speed = false;
+				}
+				catch(NullPointerException e) {
+					// have had this from some devices on Google Play, from deep within createCaptureSession
+					// note, we put the catch here rather than below, so as to not mask nullpointerexceptions
+					// from my code
+					if( MyDebug.LOG ) {
+						Log.e(TAG, "NullPointerException trying to create capture session");
+						Log.e(TAG, "message: " + e.getMessage());
+					}
+					e.printStackTrace();
+					throw new CameraControllerException();
+				}
 			}
 			if( MyDebug.LOG )
 				Log.d(TAG, "wait until session created...");
@@ -3592,6 +3734,16 @@ public class CameraController2 extends CameraController {
 			if( MyDebug.LOG ) {
 				Log.e(TAG, "CameraAccessException trying to create capture session");
 				Log.e(TAG, "reason: " + e.getReason());
+				Log.e(TAG, "message: " + e.getMessage());
+			}
+			e.printStackTrace();
+			throw new CameraControllerException();
+		}
+		catch(IllegalArgumentException e) {
+			// have had crashes from Google Play, from both createConstrainedHighSpeedCaptureSession and
+			// createCaptureSession
+			if( MyDebug.LOG ) {
+				Log.e(TAG, "IllegalArgumentException trying to create capture session");
 				Log.e(TAG, "message: " + e.getMessage());
 			}
 			e.printStackTrace();
@@ -4843,12 +4995,16 @@ public class CameraController2 extends CameraController {
 	public void initVideoRecorderPostPrepare(MediaRecorder video_recorder) throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "initVideoRecorderPostPrepare");
+		if( camera == null ) {
+			Log.e(TAG, "no camera");
+			throw new CameraControllerException();
+		}
 		try {
 			if( MyDebug.LOG )
 				Log.d(TAG, "obtain video_recorder surface");
+			previewBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
 			if( MyDebug.LOG )
 				Log.d(TAG, "done");
-			previewBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
 			previewIsVideoMode = true;
 			previewBuilder.set(CaptureRequest.CONTROL_CAPTURE_INTENT, CaptureRequest.CONTROL_CAPTURE_INTENT_VIDEO_RECORD);
 			camera_settings.setupBuilder(previewBuilder, false);

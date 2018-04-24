@@ -41,7 +41,24 @@
 <p>&lt; <small><a href="index.html">Main Page.</a></small></p>
 
 <pre>
-Version 1.43 (Work in progress)
+Version 1.43.3 (2018/04/20)
+
+FIXED   Fixed some crashes.
+ADDED   Added video capture rate, capture rate factor and high speed info to About debug dialog.
+UPDATED Fix toast message if slow motion video fails.
+
+Version 1.43.2 (2018/04/13)
+
+FIXED   Fixed some crashes.
+
+Version 1.43.1 (2018/04/12)
+
+FIXED   Crash when selecting antibanding setting on devices with no support for antibanding; this
+        option is now removed on such devices.
+FIXED   Crash when using Storage Access Framework to select "Downloads" on Android 8+.
+FIXED   Fixed some other crashes.
+
+Version 1.43 (2018/04/10)
 
 FIXED   Fixed crash when sharing images (if not using Storage Access Framework) on some Android 7+
         devices.
@@ -60,6 +77,7 @@ FIXED   Bug on some devices (e.g., Nokia 8) where manual sliders (e.g., for manu
 FIXED   Some stored "values" for zh-rCN shouldn't have been translated.
 ADDED   New Fast Burst photo mode (Camera2 API only).
 ADDED   Slow motion video (Camera2 API only).
+ADDED   Time lapse video (requires Android 5).
 ADDED   Torch option for front cameras without flash, which lights up the screen.
 ADDED   Option to save only in RAW/DNG format (requires Android 7).
 ADDED   New options under "Photo settings" to support Artist and/or Copyright Exif tags in images
@@ -1208,6 +1226,7 @@ First release.
 </pre>
 
 <hr>
+<p><a href="http://opencamera.org.uk/#privacy">Open Camera Privacy Policy.</a></p>
 <p><a href="http://sourceforge.net/p/opencamera/">Open Camera on Sourceforge.</a></p>
 <p><a href="http://mdwh2.users.sourceforge.net/">More of my Free software.</a></p>
 

@@ -206,7 +206,7 @@
     <string name="preference_video_bitrate">Video bitrate (approx)</string>
     <string name="preference_video_bitrate_summary">Set the approximate bitrate of videos (higher means better quality, but takes up more disk space; may cause video recording to fail if bitrate not supported)</string>
     <string name="preference_video_fps">Video frame rate (approx)</string>
-    <string name="preference_video_fps_summary">Set the frame rate (FPS) of videos (may be approx, not guaranteed to be achieved, and may cause video recording to fail if frame rate not supported)</string>
+    <string name="preference_video_fps_summary">Set the frame rate (FPS) of videos (may be approx, not guaranteed to be achieved, and may cause video recording to fail if frame rate not supported). Note that this setting is ignored for slow motion videos.</string>
     <string name="preference_video_max_duration">Maximum duration of video</string>
     <string name="preference_video_max_duration_summary">The video recording will stop after the specified duration</string>
     <string name="preference_video_restart">Restart video after max duration</string>
@@ -487,7 +487,10 @@
     <string name="preference_fast_burst_n_images_entries_15">15</string>
     <string name="preference_fast_burst_n_images_entries_20">20</string>
 
-    <string name="preference_slow_motion">Slow Motion</string>
+    <string name="preference_video_capture_rate">Speed</string>
+    <string name="preference_video_capture_rate_normal">Normal</string>
+    <string name="slow_motion_enabled">Slow motion enabled</string>
+    <string name="slow_motion_disabled">Slow motion disabled</string>
 
     <string name="flash_off">Flash Off</string>
     <string name="flash_auto">Flash Auto</string>
@@ -497,6 +500,13 @@
     <string name="flash_frontscreen_auto">Screen Flash Auto</string>
     <string name="flash_frontscreen_on">Screen Flash On</string>
     <string name="flash_frontscreen_torch">Screen Torch</string>
+
+    <string name="preference_antibanding">Anti-banding</string>
+    <string name="preference_antibanding_summary">Algorithms to help with light flickering.\n%s</string>
+    <string name="anti_banding_auto">Auto</string>
+    <string name="anti_banding_50hz">50Hz</string>
+    <string name="anti_banding_60hz">60Hz</string>
+    <string name="anti_banding_off">Off</string>
 
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text"><b>v1.41:</b>\n\n

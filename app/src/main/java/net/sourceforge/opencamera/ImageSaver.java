@@ -63,6 +63,7 @@ public class ImageSaver extends Thread {
 	 * Therefore we should always have n_images_to_save >= queue.size().
 	 * Also note, main_activity.imageQueueChanged() should be called on UI thread after n_images_to_save increases or
 	 * decreases.
+	 * Access to n_images_to_save should always be synchronized to this (i.e., the ImageSaver class)
 	 */
 	private int n_images_to_save = 0;
 	private final int queue_capacity;
@@ -260,7 +261,6 @@ public class ImageSaver extends Thread {
 	/** Computes the cost (in terms of number of slots on the image queue) of a new photo.
 	 * @param has_raw Whether this is RAW+JPEG or RAW only.
 	 * @param n_jpegs If has_raw is false, the number of JPEGs that will be taken.
-	 * @return
 	 */
 	int computePhotoCost(boolean has_raw, int n_jpegs) {
 		if( MyDebug.LOG ) {
@@ -283,7 +283,7 @@ public class ImageSaver extends Thread {
 	/** Whether taking an extra photo would overflow the queue, resulting in the UI hanging.
 	 * @param photo_cost The result returned by computePhotoCost().
 	 */
-	boolean queueWouldBlock(int photo_cost) {
+	synchronized boolean queueWouldBlock(int photo_cost) {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "queueWouldBlock");
 			Log.d(TAG, "photo_cost: " + photo_cost);
@@ -316,7 +316,7 @@ public class ImageSaver extends Thread {
 		return max_dng;
 	}
 
-	int getNImagesToSave() {
+	synchronized int getNImagesToSave() {
 		return n_images_to_save;
 	}
 
@@ -1428,7 +1428,7 @@ public class ImageSaver extends Thread {
 		return bitmap;
 	}
 
-	private class PostProcessBitmapResult {
+	private static class PostProcessBitmapResult {
 		final Bitmap bitmap;
 		final File exifTempFile;
 
@@ -2250,6 +2250,7 @@ public class ImageSaver extends Thread {
 			raw_image = null;
     		output.close();
     		output = null;
+			success = true;
 
     		/*Location location = null;
     		if( main_activity.getApplicationInterface().getGeotaggingPref() ) {
@@ -2263,21 +2264,22 @@ public class ImageSaver extends Thread {
 			// the LastImage's uri from the MediaScannerConnection.scanFile() callback from
 			// StorageUtils.broadcastFile(), which assumes the last image has already been set.
     		MyApplicationInterface applicationInterface = main_activity.getApplicationInterface();
-    		if( success && saveUri == null ) {
-            	applicationInterface.addLastImage(picFile, false);
+			boolean raw_only = applicationInterface.isRawOnly();
+			if( MyDebug.LOG )
+				Log.d(TAG, "raw_only: " + raw_only);
+    		if( saveUri == null ) {
+            	applicationInterface.addLastImage(picFile, raw_only);
             }
-            else if( success && storageUtils.isUsingSAF() ){
-            	applicationInterface.addLastImageSAF(saveUri, false);
+            else if( storageUtils.isUsingSAF() ){
+            	applicationInterface.addLastImageSAF(saveUri, raw_only);
             }
 
     		if( saveUri == null ) {
-    			success = true;
         		//Uri media_uri = storageUtils.broadcastFileRaw(picFile, current_date, location);
     		    //storageUtils.announceUri(media_uri, true, false);    			
             	storageUtils.broadcastFile(picFile, true, false, false);
     		}
     		else {
-    		    success = true;
 	    	    File real_file = storageUtils.getFileFromDocumentUriSAF(saveUri, false);
 				if( MyDebug.LOG )
 					Log.d(TAG, "real_file: " + real_file);

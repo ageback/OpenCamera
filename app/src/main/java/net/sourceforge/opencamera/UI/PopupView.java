@@ -57,7 +57,7 @@ public class PopupView extends LinearLayout {
 	private int picture_size_index = -1;
 	private int burst_n_images_index = -1;
 	private int video_size_index = -1;
-	private int slow_motion_index = -1;
+	private int video_capture_rate_index = -1;
 	private int timer_index = -1;
 	private int repeat_mode_index = -1;
 	private int grid_index = -1;
@@ -107,7 +107,7 @@ public class PopupView extends LinearLayout {
 				}
 				supported_flash_values = filter;
 			}
-			if( supported_flash_values.size() > 1 ) { // no point showing flash options if only one available!
+			if( supported_flash_values != null && supported_flash_values.size() > 1 ) { // no point showing flash options if only one available!
 				addButtonOptionsToPopup(supported_flash_values, R.array.flash_icons, R.array.flash_values, getResources().getString(R.string.flash_mode), preview.getCurrentFlashValue(), "TEST_FLASH", new ButtonOptionsPopupListener() {
 					@Override
 					public void onClick(String option) {
@@ -551,63 +551,90 @@ public class PopupView extends LinearLayout {
 			}
 
 			if( preview.isVideo() ) {
-				List<Integer> slow_motion_rates = main_activity.getApplicationInterface().getSupportedSlowMotionRates();
-				if( slow_motion_rates.size() > 1 ) {
+				final List<Float> capture_rate_values = main_activity.getApplicationInterface().getSupportedVideoCaptureRates();
+				if( capture_rate_values.size() > 1 ) {
 					if( MyDebug.LOG )
-						Log.d(TAG, "add slow motion options");
+						Log.d(TAG, "add slow motion / timelapse video options");
 		    		float capture_rate_value = sharedPreferences.getFloat(PreferenceKeys.getVideoCaptureRatePreferenceKey(preview.getCameraId()), 1.0f);
-					final List<String> slow_motion_str = new ArrayList<>();
-					final List<Float> capture_rate_values = new ArrayList<>();
-					for(int i=0;i<slow_motion_rates.size();i++) {
-						int slow_motion_rate = slow_motion_rates.get(i);
-						float this_capture_rate;
-						if( slow_motion_rate == 1 ) {
-							slow_motion_str.add(getResources().getString(R.string.off));
-							this_capture_rate = 1.0f;
+					final List<String> capture_rate_str = new ArrayList<>();
+					int capture_rate_std_index = -1;
+					for(int i=0;i<capture_rate_values.size();i++) {
+						float this_capture_rate = capture_rate_values.get(i);
+						if( Math.abs(1.0f - this_capture_rate) < 1.0e-5 ) {
+							capture_rate_str.add(getResources().getString(R.string.preference_video_capture_rate_normal));
+							capture_rate_std_index = i;
 						}
 						else {
-							slow_motion_str.add("1/" + slow_motion_rate + "x");
-							this_capture_rate = 1.0f / slow_motion_rate;
+							capture_rate_str.add("" + this_capture_rate + "x");
 						}
-						capture_rate_values.add(this_capture_rate);
 						if( Math.abs(capture_rate_value - this_capture_rate) < 1.0e-5 ) {
-							slow_motion_index = i;
+							video_capture_rate_index = i;
 						}
 					}
-					if( slow_motion_index == -1 ) {
+					if( video_capture_rate_index == -1 ) {
 						if( MyDebug.LOG )
-							Log.d(TAG, "can't find slow_motion_index " + slow_motion_index);
-						slow_motion_index = 0;
+							Log.d(TAG, "can't find video_capture_rate_index");
+						// default to no slow motion or timelapse
+						video_capture_rate_index = capture_rate_std_index;
+						if( video_capture_rate_index == -1 ) {
+							Log.e(TAG, "can't find capture_rate_std_index");
+							video_capture_rate_index = 0;
+						}
 					}
-					addArrayOptionsToPopup(slow_motion_str, getResources().getString(R.string.preference_slow_motion), true, false, slow_motion_index, false, "SLOWMOTION", new ArrayOptionsPopupListener() {
+					addArrayOptionsToPopup(capture_rate_str, getResources().getString(R.string.preference_video_capture_rate), true, false, video_capture_rate_index, false, "VIDEOCAPTURERATE", new ArrayOptionsPopupListener() {
+						private int old_video_capture_rate_index = video_capture_rate_index;
+
 						private void update() {
-							if( slow_motion_index == -1 )
+							if( video_capture_rate_index == -1 )
 								return;
-							float new_capture_rate_value = capture_rate_values.get(slow_motion_index);
+							float new_capture_rate_value = capture_rate_values.get(video_capture_rate_index);
 							SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
 							SharedPreferences.Editor editor = sharedPreferences.edit();
 							editor.putFloat(PreferenceKeys.getVideoCaptureRatePreferenceKey(preview.getCameraId()), new_capture_rate_value);
 							editor.apply();
-							if( MyDebug.LOG )
+							float old_capture_rate_value = capture_rate_values.get(old_video_capture_rate_index);
+							boolean old_slow_motion = (old_capture_rate_value < 1.0f-1.0e-5f);
+							boolean new_slow_motion = (new_capture_rate_value < 1.0f-1.0e-5f);
+							// if changing to/from a slow motion mode, this will in general switch on/off high fps frame
+							// rates, which changes the available video resolutions, so we need to re-open the popup
+    						boolean keep_popup = (old_slow_motion==new_slow_motion);
+							// only display a toast if the popup is closing
+    						//String toast_message = getResources().getString(R.string.preference_video_capture_rate) + ": " + capture_rate_str.get(video_capture_rate_index);
+    						String toast_message = "";
+    						if( !keep_popup ) {
+    						    if( new_slow_motion )
+                                    toast_message = getResources().getString(R.string.slow_motion_enabled) + "\n" + getResources().getString(R.string.preference_video_capture_rate) + ": " + capture_rate_str.get(video_capture_rate_index);
+    						    else
+                                    toast_message = getResources().getString(R.string.slow_motion_disabled);
+                            }
+							if( MyDebug.LOG ) {
 								Log.d(TAG, "update settings due to capture rate change");
-    						String toast_message = getResources().getString(R.string.preference_slow_motion) + ": " + slow_motion_str.get(slow_motion_index);
-							main_activity.updateForSettings(toast_message, false); // close the popuop
+								Log.d(TAG, "old_capture_rate_value: " + old_capture_rate_value);
+								Log.d(TAG, "new_capture_rate_value: " + new_capture_rate_value);
+								Log.d(TAG, "old_slow_motion: " + old_slow_motion);
+								Log.d(TAG, "new_slow_motion: " + new_slow_motion);
+								Log.d(TAG, "keep_popup: " + keep_popup);
+								Log.d(TAG, "toast_message: " + toast_message);
+							}
+							old_video_capture_rate_index = video_capture_rate_index;
+
+							main_activity.updateForSettings(toast_message, keep_popup);
 						}
 						@Override
 						public int onClickPrev() {
-							if( slow_motion_index != -1 && slow_motion_index > 0 ) {
-								slow_motion_index--;
+							if( video_capture_rate_index != -1 && video_capture_rate_index > 0 ) {
+								video_capture_rate_index--;
 								update();
-								return slow_motion_index;
+								return video_capture_rate_index;
 							}
 							return -1;
 						}
 						@Override
 						public int onClickNext() {
-							if( slow_motion_index != -1 && slow_motion_index < capture_rate_values.size()-1 ) {
-								slow_motion_index++;
+							if( video_capture_rate_index != -1 && video_capture_rate_index < capture_rate_values.size()-1 ) {
+								video_capture_rate_index++;
 								update();
-								return slow_motion_index;
+								return video_capture_rate_index;
 							}
 							return -1;
 						}
@@ -1093,7 +1120,7 @@ public class PopupView extends LinearLayout {
 		 *                       by addRadioOptionsToPopup) that corresponds to the selected radio
 		 *                       option.
 		 */
-		public abstract void onClick(String selected_value);
+		protected abstract void onClick(String selected_value);
 	}
 
 	/** Adds a set of radio options to the popup menu.
@@ -1147,7 +1174,7 @@ public class PopupView extends LinearLayout {
 					if( opened ) {
 						//rg.removeAllViews();
 						rg.setVisibility(View.GONE);
-						final ScrollView popup_container = (ScrollView) main_activity.findViewById(R.id.popup_container);
+						final ScrollView popup_container = main_activity.findViewById(R.id.popup_container);
 						// need to invalidate/requestLayout so that the scrollview's scroll positions update - otherwise scrollBy below doesn't work properly, when the user reopens the radio buttons
 						popup_container.invalidate();
 						popup_container.requestLayout();
@@ -1158,7 +1185,7 @@ public class PopupView extends LinearLayout {
 							created = true;
 						}
 						rg.setVisibility(View.VISIBLE);
-						final ScrollView popup_container = (ScrollView) main_activity.findViewById(R.id.popup_container);
+						final ScrollView popup_container = main_activity.findViewById(R.id.popup_container);
 						popup_container.getViewTreeObserver().addOnGlobalLayoutListener(
 								new OnGlobalLayoutListener() {
 									@SuppressWarnings("deprecation")
@@ -1268,8 +1295,8 @@ public class PopupView extends LinearLayout {
 	}
     
     private abstract class ArrayOptionsPopupListener {
-		public abstract int onClickPrev();
-		public abstract int onClickNext();
+		protected abstract int onClickPrev();
+		protected abstract int onClickNext();
     }
 
     private void setArrayOptionsText(List<String> supported_options, String title, TextView textView, boolean title_in_options, boolean title_in_options_first_only, int current_index) {
