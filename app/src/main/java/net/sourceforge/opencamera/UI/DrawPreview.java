@@ -1,5 +1,8 @@
 package net.sourceforge.opencamera.UI;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
 import java.util.Calendar;
@@ -14,6 +17,8 @@ import net.sourceforge.opencamera.Preview.ApplicationInterface;
 import net.sourceforge.opencamera.R;
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.Preview.Preview;
+
+import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -27,8 +32,12 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.media.ExifInterface;
+import android.net.Uri;
 import android.os.BatteryManager;
+import android.os.Build;
 import android.preference.PreferenceManager;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.util.Pair;
 import android.view.Surface;
@@ -70,6 +79,9 @@ public class DrawPreview {
 	private float capture_rate_factor;
 	private boolean auto_stabilise_pref;
 	private String preference_grid_pref;
+	private String ghost_image_pref;
+	private String ghost_selected_image_pref = "";
+	private Bitmap ghost_selected_image_bitmap;
 
 	// avoid doing things that allocate memory every frame!
 	private final Paint p = new Paint();
@@ -133,11 +145,14 @@ public class DrawPreview {
 	private final RectF thumbnail_anim_src_rect = new RectF();
 	private final RectF thumbnail_anim_dst_rect = new RectF();
 	private final Matrix thumbnail_anim_matrix = new Matrix();
+	private int last_thumbnail_ui_rotation; // Preview.getUIRotation() value when thumbnail was set
+	private boolean last_thumbnail_is_video; // whether thumbnail is for video
 
-	private boolean show_last_image;
+	private boolean show_last_image; // whether to show the last image as part of "pause preview"
 	private final RectF last_image_src_rect = new RectF();
 	private final RectF last_image_dst_rect = new RectF();
 	private final Matrix last_image_matrix = new Matrix();
+	private boolean allow_ghost_last_image; // whether to allow ghosting the last image
 
 	private long ae_started_scanning_ms = -1; // time when ae started scanning
 
@@ -257,13 +272,19 @@ public class DrawPreview {
 			time_lapse_bitmap.recycle();
 			time_lapse_bitmap = null;
 		}
+
+		if( ghost_selected_image_bitmap != null ) {
+			ghost_selected_image_bitmap.recycle();
+			ghost_selected_image_bitmap = null;
+		}
+		ghost_selected_image_pref = "";
 	}
 
 	private Context getContext() {
     	return main_activity;
     }
 	
-	public void updateThumbnail(Bitmap thumbnail) {
+	public void updateThumbnail(Bitmap thumbnail, boolean is_video) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "updateThumbnail");
 		if( applicationInterface.getThumbnailAnimationPref() ) {
@@ -274,6 +295,9 @@ public class DrawPreview {
 		}
     	Bitmap old_thumbnail = this.last_thumbnail;
     	this.last_thumbnail = thumbnail;
+    	this.last_thumbnail_ui_rotation = main_activity.getPreview().getUIRotation();
+    	this.last_thumbnail_is_video = is_video;
+    	this.allow_ghost_last_image = true;
     	if( old_thumbnail != null ) {
     		// only recycle after we've set the new thumbnail
     		old_thumbnail.recycle();
@@ -296,6 +320,12 @@ public class DrawPreview {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clearLastImage");
 		this.show_last_image = false;
+	}
+
+	public void clearGhostImage() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clearGhostImage");
+		this.allow_ghost_last_image = false;
 	}
 
 	public void cameraInOperation(boolean in_operation) {
@@ -403,8 +433,128 @@ public class DrawPreview {
 
 		preference_grid_pref = sharedPreferences.getString(PreferenceKeys.ShowGridPreferenceKey, "preference_grid_none");
 
+		ghost_image_pref = sharedPreferences.getString(PreferenceKeys.GhostImagePreferenceKey, "preference_ghost_image_off");
+		if( ghost_image_pref.equals("preference_ghost_image_selected") ) {
+			String new_ghost_selected_image_pref = sharedPreferences.getString(PreferenceKeys.GhostSelectedImageSAFPreferenceKey, "");
+			if( MyDebug.LOG )
+				Log.d(TAG, "new_ghost_selected_image_pref: " + new_ghost_selected_image_pref);
+
+			KeyguardManager keyguard_manager = (KeyguardManager)main_activity.getSystemService(Context.KEYGUARD_SERVICE);
+			boolean is_locked = keyguard_manager != null && keyguard_manager.inKeyguardRestrictedInputMode();
+			if( MyDebug.LOG )
+				Log.d(TAG, "is_locked?: " + is_locked);
+
+			if( is_locked ) {
+				// don't show selected image when device locked, as this could be a security flaw
+				if( ghost_selected_image_bitmap != null ) {
+					ghost_selected_image_bitmap.recycle();
+					ghost_selected_image_bitmap = null;
+					ghost_selected_image_pref = ""; // so we'll load the bitmap again when unlocked
+				}
+			}
+			else if( !new_ghost_selected_image_pref.equals(ghost_selected_image_pref) ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "ghost_selected_image_pref has changed");
+				ghost_selected_image_pref = new_ghost_selected_image_pref;
+				if( ghost_selected_image_bitmap != null ) {
+					ghost_selected_image_bitmap.recycle();
+					ghost_selected_image_bitmap = null;
+				}
+				Uri uri = Uri.parse(ghost_selected_image_pref);
+				try {
+		            File file = main_activity.getStorageUtils().getFileFromDocumentUriSAF(uri, false);
+					ghost_selected_image_bitmap = loadBitmap(uri, file);
+				}
+				catch(IOException e) {
+					Log.e(TAG, "failed to load ghost_selected_image uri: " + uri);
+					e.printStackTrace();
+					ghost_selected_image_bitmap = null;
+					// don't set ghost_selected_image_pref to null, as we don't want to repeatedly try loading the invalid uri
+				}
+			}
+		}
+		else {
+			if( ghost_selected_image_bitmap != null ) {
+				ghost_selected_image_bitmap.recycle();
+				ghost_selected_image_bitmap = null;
+			}
+			ghost_selected_image_pref = "";
+		}
+
 		has_settings = true;
 	}
+
+    /** Loads the bitmap from the uri. File is optional, and is used on pre-Android 7 devices to
+     *  read the exif orientation.
+     */
+    private Bitmap loadBitmap(Uri uri, File file) throws IOException {
+        if( MyDebug.LOG )
+            Log.d(TAG, "loadBitmap: " + uri);
+        Bitmap bitmap = MediaStore.Images.Media.getBitmap(main_activity.getContentResolver(), uri);
+        if( bitmap == null ) {
+            // just in case!
+            Log.e(TAG, "MediaStore.Images.Media.getBitmap returned null");
+            throw new IOException();
+        }
+
+        // now need to take exif orientation into account, as some devices or camera apps store the orientation in the exif tag,
+        // which getBitmap() doesn't account for
+        ExifInterface exif = null;
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ) {
+            // better to use the Uri from Android 7, so this works when images are shared to Vibrance
+            try( InputStream inputStream = main_activity.getContentResolver().openInputStream(uri) ) {
+                exif = new ExifInterface(inputStream);
+            }
+        }
+        else {
+            if( file != null ) {
+                exif = new ExifInterface(file.getAbsolutePath());
+            }
+        }
+        if( exif != null ) {
+            int exif_orientation_s = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
+    		boolean needs_tf = false;
+			int exif_orientation = 0;
+			// from http://jpegclub.org/exif_orientation.html
+			// and http://stackoverflow.com/questions/20478765/how-to-get-the-correct-orientation-of-the-image-selected-from-the-default-image
+			if( exif_orientation_s == ExifInterface.ORIENTATION_UNDEFINED || exif_orientation_s == ExifInterface.ORIENTATION_NORMAL ) {
+				// leave unchanged
+			}
+			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_180 ) {
+				needs_tf = true;
+				exif_orientation = 180;
+			}
+			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_90 ) {
+				needs_tf = true;
+				exif_orientation = 90;
+			}
+			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_270 ) {
+				needs_tf = true;
+				exif_orientation = 270;
+			}
+			else {
+				// just leave unchanged for now
+	    		if( MyDebug.LOG )
+	    			Log.e(TAG, "    unsupported exif orientation: " + exif_orientation_s);
+			}
+    		if( MyDebug.LOG )
+    			Log.d(TAG, "    exif orientation: " + exif_orientation);
+
+			if( needs_tf ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "    need to rotate bitmap due to exif orientation tag");
+				Matrix m = new Matrix();
+				m.setRotate(exif_orientation, bitmap.getWidth() * 0.5f, bitmap.getHeight() * 0.5f);
+				Bitmap rotated_bitmap = Bitmap.createBitmap(bitmap, 0, 0,bitmap.getWidth(), bitmap.getHeight(), m, true);
+				if( rotated_bitmap != bitmap ) {
+					bitmap.recycle();
+					bitmap = rotated_bitmap;
+				}
+			}
+        }
+
+        return bitmap;
+    }
 
     private String getTimeStringFromSeconds(long time) {
     	int secs = (int)(time % 60);
@@ -1019,7 +1169,9 @@ public class DrawPreview {
 			String flash_value = preview.getCurrentFlashValue();
 			// note, flash_frontscreen_auto not yet support for the flash symbol (as camera_controller.needsFlash() only returns info on the built-in actual flash, not frontscreen flash)
 			if( flash_value != null &&
-					( flash_value.equals("flash_on") || flash_value.equals("flash_red_eye") || ( flash_value.equals("flash_auto") && camera_controller.needsFlash() ) ) &&
+					( flash_value.equals("flash_on") || flash_value.equals("flash_red_eye")
+							|| ( flash_value.equals("flash_auto") && camera_controller.needsFlash() )
+							|| camera_controller.needsFrontScreenFlash() ) &&
 					!applicationInterface.isVideoPref() ) { // flash-indicator not supported for photos taken in video mode
 				if( needs_flash_time != -1 ) {
 					final long fade_ms = 500;
@@ -1746,38 +1898,30 @@ public class DrawPreview {
 
 		drawCropGuides(canvas);
 
-		if( show_last_image && last_thumbnail != null ) {
+		if( last_thumbnail != null && !last_thumbnail_is_video && camera_controller != null && ( show_last_image || ( allow_ghost_last_image && ghost_image_pref.equals("preference_ghost_image_last") ) ) ) {
 			// If changing this code, ensure that pause preview still works when:
 			// - Taking a photo in portrait or landscape - and check rotating the device while preview paused
 			// - Taking a photo with lock to portrait/landscape options still shows the thumbnail with aspect ratio preserved
-			p.setColor(Color.rgb(0, 0, 0)); // in case image doesn't cover the canvas (due to different aspect ratios)
-			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p); // in case
-			last_image_src_rect.left = 0;
-			last_image_src_rect.top = 0;
-			last_image_src_rect.right = last_thumbnail.getWidth();
-			last_image_src_rect.bottom = last_thumbnail.getHeight();
-			if( ui_rotation == 90 || ui_rotation == 270 ) {
-				last_image_src_rect.right = last_thumbnail.getHeight();
-				last_image_src_rect.bottom = last_thumbnail.getWidth();
+			// Also check ghost last image works okay!
+			if( show_last_image ) {
+				p.setColor(Color.rgb(0, 0, 0)); // in case image doesn't cover the canvas (due to different aspect ratios)
+				canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p); // in case
 			}
-			last_image_dst_rect.left = 0;
-			last_image_dst_rect.top = 0;
-			last_image_dst_rect.right = canvas.getWidth();
-			last_image_dst_rect.bottom = canvas.getHeight();
-			/*if( MyDebug.LOG ) {
-				Log.d(TAG, "thumbnail: " + last_thumbnail.getWidth() + " x " + last_thumbnail.getHeight());
-				Log.d(TAG, "canvas: " + canvas.getWidth() + " x " + canvas.getHeight());
-			}*/
-			last_image_matrix.setRectToRect(last_image_src_rect, last_image_dst_rect, Matrix.ScaleToFit.CENTER); // use CENTER to preserve aspect ratio
-			if( ui_rotation == 90 || ui_rotation == 270 ) {
-				// the rotation maps (0, 0) to (tw/2 - th/2, th/2 - tw/2), so we translate to undo this
-				float diff = last_thumbnail.getHeight() - last_thumbnail.getWidth();
-				last_image_matrix.preTranslate(diff/2.0f, -diff/2.0f);
-			}
-			last_image_matrix.preRotate(ui_rotation, last_thumbnail.getWidth()/2.0f, last_thumbnail.getHeight()/2.0f);
+			int this_ui_rotation = show_last_image ? ui_rotation : last_thumbnail_ui_rotation;
+			setLastImageMatrix(canvas, last_thumbnail, this_ui_rotation, !show_last_image);
+			if( !show_last_image )
+				p.setAlpha(127);
 			canvas.drawBitmap(last_thumbnail, last_image_matrix, p);
+			if( !show_last_image )
+				p.setAlpha(255);
 		}
-		
+		else if( camera_controller != null && ghost_selected_image_bitmap != null ) {
+			setLastImageMatrix(canvas, ghost_selected_image_bitmap, ui_rotation, true);
+			p.setAlpha(127);
+			canvas.drawBitmap(ghost_selected_image_bitmap, last_image_matrix, p);
+			p.setAlpha(255);
+		}
+
 		doThumbnailAnimation(canvas, time_ms);
 
 		drawUI(canvas, time_ms);
@@ -1825,6 +1969,40 @@ public class DrawPreview {
 			}
 		}
     }
+
+    private void setLastImageMatrix(Canvas canvas, Bitmap bitmap, int this_ui_rotation, boolean flip_front) {
+		Preview preview = main_activity.getPreview();
+		CameraController camera_controller = preview.getCameraController();
+		last_image_src_rect.left = 0;
+		last_image_src_rect.top = 0;
+		last_image_src_rect.right = bitmap.getWidth();
+		last_image_src_rect.bottom = bitmap.getHeight();
+		if( this_ui_rotation == 90 || this_ui_rotation == 270 ) {
+			last_image_src_rect.right = bitmap.getHeight();
+			last_image_src_rect.bottom = bitmap.getWidth();
+		}
+		last_image_dst_rect.left = 0;
+		last_image_dst_rect.top = 0;
+		last_image_dst_rect.right = canvas.getWidth();
+		last_image_dst_rect.bottom = canvas.getHeight();
+		/*if( MyDebug.LOG ) {
+			Log.d(TAG, "thumbnail: " + bitmap.getWidth() + " x " + bitmap.getHeight());
+			Log.d(TAG, "canvas: " + canvas.getWidth() + " x " + canvas.getHeight());
+		}*/
+		last_image_matrix.setRectToRect(last_image_src_rect, last_image_dst_rect, Matrix.ScaleToFit.CENTER); // use CENTER to preserve aspect ratio
+		if( this_ui_rotation == 90 || this_ui_rotation == 270 ) {
+			// the rotation maps (0, 0) to (tw/2 - th/2, th/2 - tw/2), so we translate to undo this
+			float diff = bitmap.getHeight() - bitmap.getWidth();
+			last_image_matrix.preTranslate(diff/2.0f, -diff/2.0f);
+		}
+		last_image_matrix.preRotate(this_ui_rotation, bitmap.getWidth()/2.0f, bitmap.getHeight()/2.0f);
+		if( flip_front ) {
+			boolean is_front_facing = camera_controller != null && camera_controller.isFrontFacing();
+			if( is_front_facing && !sharedPreferences.getString(PreferenceKeys.FrontCameraMirrorKey, "preference_front_camera_mirror_no").equals("preference_front_camera_mirror_photo") ) {
+				last_image_matrix.preScale(-1.0f, 1.0f, bitmap.getWidth()/2, 0.0f);
+			}
+		}
+	}
 
     private void drawGyroSpot(Canvas canvas, float distance_x, float distance_y) {
 		p.setAlpha(64);

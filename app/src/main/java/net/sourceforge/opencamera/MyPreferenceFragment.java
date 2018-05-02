@@ -486,10 +486,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 	if( pref.getKey().equals("preference_use_camera2") ) {
                 		if( MyDebug.LOG )
                 			Log.d(TAG, "user clicked camera2 API - need to restart");
-                		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
-                		Intent i = getActivity().getBaseContext().getPackageManager().getLaunchIntentForPackage( getActivity().getBaseContext().getPackageName() );
-	                	i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-	                	startActivity(i);
+                		restartOpenCamera();
 	                	return false;
                 	}
                 	return false;
@@ -515,6 +512,29 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 		return false;
                 	}
                 	return false;
+                }
+            });
+        }
+
+        {
+        	ListPreference pref = (ListPreference)findPreference("preference_ghost_image");
+
+	        if( Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP ) {
+	        	// require Storage Access Framework to select a ghost image
+	        	pref.setEntries(R.array.preference_ghost_image_entries_preandroid5);
+	        	pref.setEntryValues(R.array.preference_ghost_image_values_preandroid5);
+			}
+
+        	pref.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+        		@Override
+                public boolean onPreferenceChange(Preference arg0, Object newValue) {
+            		if( MyDebug.LOG )
+            			Log.d(TAG, "clicked ghost image: " + newValue);
+            		if( newValue.equals("preference_ghost_image_selected") ) {
+						MainActivity main_activity = (MainActivity) MyPreferenceFragment.this.getActivity();
+						main_activity.openGhostImageChooserDialogSAF(true);
+					}
+            		return true;
                 }
             });
         }
@@ -1068,10 +1088,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 								main_activity.setDeviceDefaults();
 		                		if( MyDebug.LOG )
 		                			Log.d(TAG, "user clicked reset - need to restart");
-		                		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
-		                		Intent i = getActivity().getBaseContext().getPackageManager().getLaunchIntentForPackage( getActivity().getBaseContext().getPackageName() );
-			                	i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-			                	startActivity(i);
+		                		restartOpenCamera();
 					        }
 			        	});
 			        	alertDialog.setNegativeButton(android.R.string.no, null);
@@ -1092,6 +1109,17 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 }
             });
         }
+	}
+
+	private void restartOpenCamera() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "restartOpenCamera");
+		MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
+		main_activity.waitUntilImageQueueEmpty();
+		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
+		Intent i = getActivity().getBaseContext().getPackageManager().getLaunchIntentForPackage( getActivity().getBaseContext().getPackageName() );
+		i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+		startActivity(i);
 	}
 
 	public static class SaveFolderChooserDialog extends FolderChooserDialog {
@@ -1197,10 +1225,14 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		if( MyDebug.LOG )
 			Log.d(TAG, "onSharedPreferenceChanged");
 	    Preference pref = findPreference(key);
-	    if( pref instanceof TwoStatePreference ){
+	    if( pref instanceof TwoStatePreference ) {
 	    	TwoStatePreference twoStatePref = (TwoStatePreference)pref;
 	    	twoStatePref.setChecked(prefs.getBoolean(key, true));
 	    }
+	    else if( pref instanceof  ListPreference ) {
+	    	ListPreference listPref = (ListPreference)pref;
+	    	listPref.setValue(prefs.getString(key, ""));
+		}
 	    setSummary(key);
 	}
 

@@ -137,6 +137,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	static private final String ACTION_SHORTCUT_GALLERY = "net.sourceforge.opencamera.SHORTCUT_GALLERY";
 	static private final String ACTION_SHORTCUT_SETTINGS = "net.sourceforge.opencamera.SHORTCUT_SETTINGS";
 
+    private static final int CHOOSE_SAVE_FOLDER_SAF_CODE = 42;
+    private static final int CHOOSE_GHOST_IMAGE_SAF_CODE = 43;
+
 	// for testing; must be volatile for test project reading the state
 	public boolean is_test; // whether called from OpenCamera.test testing
 	public volatile Bitmap gallery_bitmap;
@@ -943,6 +946,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		applicationInterface.getGyroSensor().stopRecording();
 		releaseSound();
 		applicationInterface.clearLastImages(); // this should happen when pausing the preview, but call explicitly just to be safe
+		applicationInterface.getDrawPreview().clearGhostImage();
 		preview.onPause();
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "onPause: total time to pause: " + (System.currentTimeMillis() - debug_time));
@@ -1089,6 +1093,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 
 		mainUI.setTakePhotoIcon();
 	    mainUI.setPopupIcon(); // needed as turning to video mode or back can turn flash mode off or back on
+		applicationInterface.getDrawPreview().clearGhostImage();
 		if( !block_startup_toast ) {
 			this.showPhotoVideoToast(true);
 		}
@@ -1220,6 +1225,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			switch( key ) {
 				// we whitelist preferences where we're sure that we don't need to call updateForSettings() if they've changed
 				case "preference_timer":
+				case "preference_burst_mode":
+				case "preference_burst_interval":
+				case "preference_ghost_image":
 				case "preference_touch_capture":
 				case "preference_pause_preview":
 				case "preference_shutter_sound":
@@ -1287,7 +1295,6 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     public void openSettings() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "openSettings");
-		waitUntilImageQueueEmpty(); // in theory not needed as we could continue running in the background, but best to be safe
 		closePopup();
 		preview.cancelTimer(); // best to cancel any timer, in case we take a photo while settings window is open, or when changing settings
 		preview.cancelRepeat(); // similarly cancel the auto-repeat mode!
@@ -2117,7 +2124,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		}
     }
 
-    /** Opens the Storage Access Framework dialog to select a folder.
+    /** Opens the Storage Access Framework dialog to select a folder for save location.
      * @param from_preferences Whether called from the Preferences
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -2128,7 +2135,29 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
 		//Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
 		//intent.addCategory(Intent.CATEGORY_OPENABLE);
-		startActivityForResult(intent, 42);
+		startActivityForResult(intent, CHOOSE_SAVE_FOLDER_SAF_CODE);
+    }
+
+    /** Opens the Storage Access Framework dialog to select a file for ghost image.
+     * @param from_preferences Whether called from the Preferences
+     */
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    void openGhostImageChooserDialogSAF(boolean from_preferences) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "openGhostImageChooserDialogSAF: " + from_preferences);
+		this.saf_dialog_from_preferences = from_preferences;
+		Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        try {
+			startActivityForResult(intent, CHOOSE_GHOST_IMAGE_SAF_CODE);
+        }
+        catch(ActivityNotFoundException e) {
+            // see https://stackoverflow.com/questions/34021039/action-open-document-not-working-on-miui/34045627
+			preview.showToast(null, R.string.open_files_saf_exception_ghost);
+            Log.e(TAG, "ActivityNotFoundException from startActivityForResult");
+            e.printStackTrace();
+        }
     }
 
     /** Call when the SAF save history has been updated.
@@ -2151,7 +2180,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "onActivityResult: " + requestCode);
-        if( requestCode == 42 ) {
+        switch( requestCode ) {
+		case CHOOSE_SAVE_FOLDER_SAF_CODE:
             if( resultCode == RESULT_OK && resultData != null ) {
 	            Uri treeUri = resultData.getData();
 	    		if( MyDebug.LOG )
@@ -2183,6 +2213,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				catch(SecurityException e) {
 					Log.e(TAG, "SecurityException failed to take permission");
 					e.printStackTrace();
+					preview.showToast(null, R.string.saf_permission_failed);
 					// failed - if the user had yet to set a save location, make sure we switch SAF back off
 					SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 					String uri = sharedPreferences.getString(PreferenceKeys.getSaveLocationSAFPreferenceKey(), "");
@@ -2192,7 +2223,6 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 						SharedPreferences.Editor editor = sharedPreferences.edit();
 						editor.putBoolean(PreferenceKeys.getUsingSAFPreferenceKey(), false);
 						editor.apply();
-						preview.showToast(null, R.string.saf_permission_failed);
 					}
 				}
 	        }
@@ -2216,7 +2246,64 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				setWindowFlagsForCamera();
 				showPreview(true);
             }
-        }
+			break;
+		case CHOOSE_GHOST_IMAGE_SAF_CODE:
+            if( resultCode == RESULT_OK && resultData != null ) {
+	            Uri fileUri = resultData.getData();
+				if( MyDebug.LOG )
+					Log.d(TAG, "returned single fileUri: " + fileUri);
+				// persist permission just in case?
+	    		final int takeFlags = resultData.getFlags()
+	    	            & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+	    	            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+				try {
+					/*if( true )
+						throw new SecurityException(); // test*/
+					// Check for the freshest data.
+					getContentResolver().takePersistableUriPermission(fileUri, takeFlags);
+
+					SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+					SharedPreferences.Editor editor = sharedPreferences.edit();
+					editor.putString(PreferenceKeys.GhostSelectedImageSAFPreferenceKey, fileUri.toString());
+					editor.apply();
+				}
+				catch(SecurityException e) {
+					Log.e(TAG, "SecurityException failed to take permission");
+					e.printStackTrace();
+					preview.showToast(null, R.string.saf_permission_failed_open_image);
+					// failed - if the user had yet to set a ghost image
+					SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+					String uri = sharedPreferences.getString(PreferenceKeys.GhostSelectedImageSAFPreferenceKey, "");
+					if( uri.length() == 0 ) {
+						if( MyDebug.LOG )
+							Log.d(TAG, "no SAF ghost image was set");
+						SharedPreferences.Editor editor = sharedPreferences.edit();
+						editor.putString(PreferenceKeys.GhostImagePreferenceKey, "preference_ghost_image_off");
+						editor.apply();
+					}
+				}
+			}
+	        else {
+	    		if( MyDebug.LOG )
+	    			Log.d(TAG, "SAF dialog cancelled");
+	        	// cancelled - if the user had yet to set a ghost image, make sure we switch the option back off
+				SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+	    		String uri = sharedPreferences.getString(PreferenceKeys.GhostSelectedImageSAFPreferenceKey, "");
+	    		if( uri.length() == 0 ) {
+	        		if( MyDebug.LOG )
+	        			Log.d(TAG, "no SAF ghost image was set");
+	    			SharedPreferences.Editor editor = sharedPreferences.edit();
+					editor.putString(PreferenceKeys.GhostImagePreferenceKey, "preference_ghost_image_off");
+	    			editor.apply();
+	    		}
+	        }
+
+            if( !saf_dialog_from_preferences ) {
+				setWindowFlagsForCamera();
+				showPreview(true);
+            }
+			break;
+		}
     }
 
 	void updateSaveFolder(String new_save_location) {
