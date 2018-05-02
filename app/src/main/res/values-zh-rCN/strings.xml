@@ -483,5 +483,12 @@
     <string name="anti_banding_off">关闭</string>
     <string name="preference_antibanding">抗条纹</string>
     <string name="preference_antibanding_summary">算法来帮助灯光闪烁。%s</string>
+    <string name="preference_ghost_image">幽灵图像</string>
+    <string name="preference_ghost_image_off">关闭</string>
+    <string name="preference_ghost_image_summary">覆盖图像，以帮助对齐。%s</string>
+    <string name="preference_ghost_image_last">上次拍摄的照片</string>
+    <string name="preference_ghost_image_selected">选中的图像</string>
+    <string name="saf_permission_failed_open_image">无法打开此图像</string>
+    <string name="open_files_saf_exception_ghost">该设备上找不到文件对话框，幽灵图像选项不被支持</string>
 
 </resources>
