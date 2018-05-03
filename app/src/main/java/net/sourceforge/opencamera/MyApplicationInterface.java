@@ -413,7 +413,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 	}
 
 	@Override
-    public int getImageQualityPref(){
+    public int getImageQualityPref() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "getImageQualityPref");
 		// see documentation for getSaveImageQualityPref(): in DRO mode we want to take the photo
@@ -421,6 +421,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 		// setting
 		PhotoMode photo_mode = getPhotoMode();
 		if( photo_mode == PhotoMode.DRO )
+			return 100;
+		else if( photo_mode == PhotoMode.HDR )
 			return 100;
 		else if( photo_mode == PhotoMode.NoiseReduction )
 			return 100;
