@@ -1355,7 +1355,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 
 		//final boolean use_background_thread = false;
 		//final boolean use_background_thread = true;
-		final boolean use_background_thread = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
+		final boolean use_background_thread = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
 		/* Opening camera on background thread is important so that we don't block the UI thread:
 		 *   - For old Camera API, this is recommended behaviour by Google for Camera.open().
 		     - For Camera2, the manager.openCamera() call is asynchronous, but CameraController2
@@ -1364,6 +1364,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		 * with tests testTakePhotoAutoLevel(), testTakePhotoAutoLevelAngles() (various camera
 		 * errors/exceptions, failing to taking photos). Since this is a significant change, this is
 		 * for now limited to modern devices.
+		 * Initially this was Android 7, but for 1.44, I enabled for Android 6.
 		 */
 		if( use_background_thread ) {
 			final int cameraId_f = cameraId;
@@ -3138,6 +3139,15 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         {
             Display display = activity.getWindowManager().getDefaultDisplay();
             display.getSize(display_size);
+            // getSize() is adjusted based on the current rotation, so should already be landscape format, but:
+			// (a) it would be good to not assume Open Camera runs in landscape mode (if we ever ran in portrait mode,
+			// we'd still want display_size.x > display_size.y as preview resolutions also have width > height,
+			// (b) on some devices (e.g., Nokia 8), when coming back from the Settings when device is held in Preview,
+			// display size is returned in portrait format! (To reproduce, enable "Maximise preview size"; or if that's
+			// already enabled, change the setting off and on.)
+			if( display_size.x < display_size.y ) {
+				display_size.set(display_size.y, display_size.x);
+			}
     		if( MyDebug.LOG )
     			Log.d(TAG, "display_size: " + display_size.x + " x " + display_size.y);
         }
@@ -4838,7 +4848,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				if( MyDebug.LOG )
 					Log.d(TAG, "about to prepare video recorder");
 				local_video_recorder.prepare();
-				camera_controller.initVideoRecorderPostPrepare(local_video_recorder);
+				boolean want_photo_video_recording = supportsPhotoVideoRecording() && applicationInterface.usePhotoVideoRecording();
+				camera_controller.initVideoRecorderPostPrepare(local_video_recorder, want_photo_video_recording);
 				if( MyDebug.LOG )
 					Log.d(TAG, "about to start video recorder");
 

@@ -1698,6 +1698,12 @@ public class CameraController2 extends CameraController {
         {
             Display display = activity.getWindowManager().getDefaultDisplay();
             display.getRealSize(display_size);
+            // getRealSize() is adjusted based on the current rotation, so should already be landscape format, but it
+			// would be good to not assume Open Camera runs in landscape mode (if we ever ran in portrait mode,
+			// we'd still want display_size.x > display_size.y as preview resolutions also have width > height)
+			if( display_size.x < display_size.y ) {
+				display_size.set(display_size.y, display_size.x);
+			}
     		if( MyDebug.LOG )
     			Log.d(TAG, "display_size: " + display_size.x + " x " + display_size.y);
         }
@@ -3562,7 +3568,7 @@ public class CameraController2 extends CameraController {
 		return surface_texture;
 	}
 
-	private void createCaptureSession(final MediaRecorder video_recorder) throws CameraControllerException {
+	private void createCaptureSession(final MediaRecorder video_recorder, boolean want_photo_video_recording) throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "create capture session");
 		
@@ -3587,7 +3593,7 @@ public class CameraController2 extends CameraController {
 
 		try {
 			if( video_recorder != null ) {
-				if( supports_photo_video_recording && !want_video_high_speed ) {
+				if( supports_photo_video_recording && !want_video_high_speed && want_photo_video_recording ) {
 					createPictureImageReader();
 				}
 				else {
@@ -3727,7 +3733,7 @@ public class CameraController2 extends CameraController {
         	Surface preview_surface = getPreviewSurface();
         	List<Surface> surfaces;
         	if( video_recorder != null ) {
-				if( supports_photo_video_recording && !want_video_high_speed ) {
+				if( supports_photo_video_recording && !want_video_high_speed && want_photo_video_recording ) {
 					surfaces = Arrays.asList(preview_surface, video_recorder_surface, imageReader.getSurface());
 				}
 				else {
@@ -3847,7 +3853,7 @@ public class CameraController2 extends CameraController {
 			} 
 			return;
 		}
-		createCaptureSession(null);
+		createCaptureSession(null, false);
 	}
 
 	@Override
@@ -5072,7 +5078,7 @@ public class CameraController2 extends CameraController {
 	}
 
 	@Override
-	public void initVideoRecorderPostPrepare(MediaRecorder video_recorder) throws CameraControllerException {
+	public void initVideoRecorderPostPrepare(MediaRecorder video_recorder, boolean want_photo_video_recording) throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "initVideoRecorderPostPrepare");
 		if( camera == null ) {
@@ -5088,7 +5094,7 @@ public class CameraController2 extends CameraController {
 			previewIsVideoMode = true;
 			previewBuilder.set(CaptureRequest.CONTROL_CAPTURE_INTENT, CaptureRequest.CONTROL_CAPTURE_INTENT_VIDEO_RECORD);
 			camera_settings.setupBuilder(previewBuilder, false);
-			createCaptureSession(video_recorder);
+			createCaptureSession(video_recorder, want_photo_video_recording);
 		}
 		catch(CameraAccessException e) {
 			if( MyDebug.LOG ) {
@@ -5109,7 +5115,7 @@ public class CameraController2 extends CameraController {
 		if( sounds_enabled )
 			media_action_sound.play(MediaActionSound.STOP_VIDEO_RECORDING);
 		createPreviewRequest();
-		createCaptureSession(null);
+		createCaptureSession(null, false);
 		/*if( MyDebug.LOG )
 			Log.d(TAG, "add preview surface to previewBuilder");
     	Surface surface = getPreviewSurface();

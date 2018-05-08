@@ -53,11 +53,19 @@ Version 1.44 (Work in progress)
 FIXED   Crash if activity is destroyed as photo is taken.
 FIXED   Fixed some crashes for old camera API.
 FIXED   In Camera2 API mode, wasn't checking to see if video stabilization option is supported.
+FIXED   Preview size/"Maximise preview size" option didn't always work correctly on some devices
+        (e.g., Nokia 8).
 ADDED   New option "Ghost image", to overlay either last photo taken, or a selected image on your
         device.
 ADDED   On-screen flash icon (to show whether flash will fire or not) now supported for front screen
         flash.
+ADDED   New Camera2 API debug option under Settings/"Photo settings" to disable taking photos whilst
+        recording video feature (if your device has problems recording videos with Camera2 API
+        enabled, try disabling this).
 UPDATED No longer wait for image queue to be saved to go to settings, or background.
+UPDATED Made on-screen level lines clearer.
+UPDATED Camera opening on background thread (for smoother operation) now enabled for Android 6
+        devices (was already supported for Android 7+).
 
 Version 1.43.3 (2018/04/20)
 
