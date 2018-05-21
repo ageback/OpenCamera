@@ -810,6 +810,10 @@ public class CameraController1 extends CameraController {
         return parameters.getVideoStabilization();
 	}
 
+	public void setLogProfile(boolean use_log_profile, float log_profile_strength) {
+		// not supported for CameraController1!
+	}
+
 	public int getJpegQuality() {
 	    Camera.Parameters parameters = this.getParameters();
 	    return parameters.getJpegQuality();
@@ -1352,9 +1356,12 @@ public class CameraController1 extends CameraController {
 	
 	@Override
 	public void stopPreview() {
-		camera.stopPreview();
+		if( camera != null ) {
+			// have had crashes when this is called from Preview/CloseCameraTask.
+			camera.stopPreview();
+		}
 	}
-	
+
 	// returns false if RuntimeException thrown (may include if face-detection already started)
 	public boolean startFaceDetection() {
 	    try {

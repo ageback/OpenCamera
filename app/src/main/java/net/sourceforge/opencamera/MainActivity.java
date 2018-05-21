@@ -527,6 +527,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				Log.d(TAG, "restoring from saved state");
 			return;
 		}
+		boolean done_facing = false;
         String action = this.getIntent().getAction();
         if( MediaStore.INTENT_ACTION_VIDEO_CAMERA.equals(action) || MediaStore.ACTION_VIDEO_CAPTURE.equals(action) ) {
     		if( MyDebug.LOG )
@@ -551,15 +552,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		else if( (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && MyTileServiceFrontCamera.TILE_ID.equals(action)) || ACTION_SHORTCUT_SELFIE.equals(action) ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "launching from quick settings tile or application shortcut for Open Camera: selfie mode");
-			int n_cameras = preview.getCameraControllerManager().getNumberOfCameras();
-			for(int i=0;i<n_cameras;i++) {
-				if( preview.getCameraControllerManager().isFrontFacing(i) ) {
-					if (MyDebug.LOG)
-						Log.d(TAG, "found front camera: " + i);
-					applicationInterface.setCameraIdPref(i);
-					break;
-				}
-			}
+			done_facing = true;
+			switchToCamera(true);
 		}
 		else if( ACTION_SHORTCUT_GALLERY.equals(action) ) {
 			if( MyDebug.LOG )
@@ -570,6 +564,62 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			if( MyDebug.LOG )
 				Log.d(TAG, "launching from application shortcut for Open Camera: settings");
 			openSettings();
+		}
+
+		Bundle extras = this.getIntent().getExtras();
+        if( extras != null ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "handle intent extra information");
+			if( !done_facing ) {
+				int camera_facing = extras.getInt("android.intent.extras.CAMERA_FACING", -1);
+				if( camera_facing == 0 || camera_facing == 1 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "found android.intent.extras.CAMERA_FACING: " + camera_facing);
+					switchToCamera(camera_facing==1);
+					done_facing = true;
+				}
+			}
+			if( !done_facing ) {
+				if( extras.getInt("android.intent.extras.LENS_FACING_FRONT", -1) == 1 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "found android.intent.extras.LENS_FACING_FRONT");
+					switchToCamera(true);
+					done_facing = true;
+				}
+			}
+			if( !done_facing ) {
+				if( extras.getInt("android.intent.extras.LENS_FACING_BACK", -1) == 1 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "found android.intent.extras.LENS_FACING_BACK");
+					switchToCamera(false);
+					done_facing = true;
+				}
+			}
+			if( !done_facing ) {
+				if( extras.getBoolean("android.intent.extra.USE_FRONT_CAMERA", false) ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "found android.intent.extra.USE_FRONT_CAMERA");
+					switchToCamera(true);
+					done_facing = true;
+				}
+			}
+		}
+	}
+
+	/** Switch to the first available camera that is front or back facing as desired.
+ 	 * @param front_facing Whether to switch to a front or back facing camera.
+	 */
+	private void switchToCamera(boolean front_facing) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "switchToCamera: " + front_facing);
+		int n_cameras = preview.getCameraControllerManager().getNumberOfCameras();
+		for(int i=0;i<n_cameras;i++) {
+			if( preview.getCameraControllerManager().isFrontFacing(i) == front_facing ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "found desired camera: " + i);
+				applicationInterface.setCameraIdPref(i);
+				break;
+			}
 		}
 	}
 
@@ -3021,10 +3071,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	}
 
     public boolean supportsHDR() {
-    	// we also require the device have sufficient memory to do the processing, simplest to use the same test as we do for auto-stabilise...
-		// (note we don't call supportsAutoStabilise(), as that does other checks specifically for auto-stabilise, e.g., calling applicationInterface.isRawOnly() - which would get an infinite loop if called from here!)
+    	// we also require the device have sufficient memory to do the processing
 		// also require at least Android 5, for the Renderscript support in HDRProcessor
-		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && this.supports_auto_stabilise && preview.supportsExpoBracketing() );
+		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && large_heap_memory >= 128 && preview.supportsExpoBracketing() );
     }
     
     public boolean supportsExpoBracketing() {
@@ -3038,7 +3087,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	}
 
     public boolean supportsNoiseReduction() {
-		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsBurst() && preview.supportsExposureTime() );
+		// require at least Android 5, for the Renderscript support in HDRProcessor, but we require
+		// Android 7 to limit to more modern devices (for performance reasons)
+		return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsBurst() && preview.supportsExposureTime() );
 		//return false; // currently blocked for release
 	}
     
@@ -3182,6 +3233,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			if( Math.abs(capture_rate_factor - 1.0f) > 1.0e-5 ) {
 				toast_string += "\n" + getResources().getString(R.string.preference_video_capture_rate) + ": " + capture_rate_factor + "x";
 				simple = false;
+			}
+
+			if( applicationInterface.useVideoLogProfile() ) {
+				simple = false;
+				toast_string += "\n" + getResources().getString(R.string.video_log);
 			}
 
 			boolean record_audio = applicationInterface.getRecordAudioPref();
