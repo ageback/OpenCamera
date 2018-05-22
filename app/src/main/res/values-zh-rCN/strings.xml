@@ -492,5 +492,13 @@
     <string name="open_files_saf_exception_ghost">该设备上找不到文件对话框，幽灵图像选项不被支持</string>
     <string name="preference_camera2_photo_video_recording">在录制视频时允许照片</string>
     <string name="preference_camera2_photo_video_recording_summary">允许拍摄照片，同时录制视频。 如果在您的设备上启用了Camera2 API进行视频录制时出现问题，请将其禁用。</string>
+    <string name="preference_video_log_off">关闭</string>
+    <string name="preference_video_log_low">低</string>
+    <string name="preference_video_log_medium">中</string>
+    <string name="preference_video_log_strong">强</string>
+    <string name="preference_video_log_extra_strong">超强</string>
+    <string name="video_log">日志配置文件</string>
+    <string name="preference_video_log">视频平坦（日志）配置文件</string>
+    <string name="preference_video_log_summary">为视频模式 %s 启用平坦（日志）配置文件</string>
 
 </resources>
