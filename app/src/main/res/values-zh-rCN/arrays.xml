@@ -362,7 +362,7 @@
         <item>100Mbps</item>
     </string-array>
     <string-array name="preference_video_bitrate_values">
-        <item>default</item>
+        <item>默认</item>
         <item>100000</item>
         <item>200000</item>
         <item>500000</item>
