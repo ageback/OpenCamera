@@ -71,6 +71,7 @@
         <item>120</item>
         <item>300</item>
     </string-array>
+    <!-- note, actually refers to the auto-repeat mode, not the newer fast burst mode -->
     <string-array name="preference_burst_mode_entries">
         <item>关闭</item>
         <item>2x</item>
@@ -89,6 +90,7 @@
         <item>10</item>
         <item>unlimited</item>
     </string-array>
+    <!-- note, actually refers to the auto-repeat mode, not the newer fast burst mode -->
     <string-array name="preference_burst_interval_entries">
         <item>无延迟</item>
         <item>1秒</item>
@@ -104,9 +106,9 @@
         <item>5分</item>
         <item>10分</item>
         <item>20分</item>
-		<item>30分</item>
-		<item>1小时</item>
-		<item>2小时</item>
+	<item>30分</item>
+	<item>1小时</item>
+	<item>2小时</item>
     </string-array>
     <string-array name="preference_burst_interval_values">
         <item>0</item>
@@ -146,7 +148,7 @@
         <item>双击</item>
     </string-array>
     <string-array name="preference_volume_keys_entries">
-        <item>对焦 (或开始/停止录像)</item>
+        <item>拍照 (或开始/停止录像)</item>
         <item>对焦</item>
         <item>放大/缩小</item>
         <item>更改曝光水平</item>
@@ -261,14 +263,6 @@
         <item>crop_guide_2.35</item>
         <item>crop_guide_2.4</item>
     </string-array>
-    <string-array name="preference_raw_entries">
-        <item>仅 JPEG</item>
-        <item>JPEG 和 DNG (RAW)</item>
-    </string-array>
-    <string-array name="preference_raw_values">
-        <item>preference_raw_no</item>
-        <item>preference_raw_yes</item>
-    </string-array>
     <string-array name="preference_stamp_entries">
         <item>不戳记</item>
         <item>戳记照片</item>
@@ -335,59 +329,7 @@
         <item>preference_stamp_style_shadowed</item>
         <item>preference_stamp_style_plain</item>
     </string-array>
-    <string-array name="preference_video_bitrate_entries">
-        <item>默认</item>
-        <item>100kbps</item>
-        <item>200kbps</item>
-        <item>500kbps</item>
-        <item>1Mbps</item>
-        <item>2Mbps</item>
-        <item>3Mbps</item>
-        <item>4Mbps</item>
-        <item>5Mbps</item>
-        <item>6Mbps</item>
-        <item>7Mbps</item>
-        <item>8Mbps</item>
-        <item>9Mbps</item>
-        <item>10Mbps</item>
-        <item>15Mbps</item>
-        <item>20Mbps</item>
-        <item>30Mbps</item>
-        <item>40Mbps</item>
-        <item>50Mbps</item>
-        <item>60Mbps</item>
-        <item>70Mbps</item>
-        <item>80Mbps</item>
-        <item>90Mbps</item>
-        <item>100Mbps</item>
-    </string-array>
-    <string-array name="preference_video_bitrate_values">
-        <item>默认</item>
-        <item>100000</item>
-        <item>200000</item>
-        <item>500000</item>
-        <item>1000000</item>
-        <item>2000000</item>
-        <item>3000000</item>
-        <item>4000000</item>
-        <item>5000000</item>
-        <item>6000000</item>
-        <item>7000000</item>
-        <item>8000000</item>
-        <item>9000000</item>
-        <item>10000000</item>
-        <item>15000000</item>
-        <item>20000000</item>
-        <item>30000000</item>
-        <item>40000000</item>
-        <item>50000000</item>
-        <item>60000000</item>
-        <item>70000000</item>
-        <item>80000000</item>
-        <item>90000000</item>
-        <item>100000000</item>
-    </string-array>
-    <string-array name="preference_video_restart_entries">
+        <string-array name="preference_video_restart_entries">
         <item>不重复</item>
         <item>重复 1 次</item>
         <item>重复 2 次</item>
@@ -413,24 +355,12 @@
         <item>9</item>
         <item>10</item>
     </string-array>
-    <string-array name="preference_record_audio_src_entries">
-        <item>摄像机</item>
-        <item>外部麦克风（如果存在）</item>
-        <item>默认的音频源</item>
-        <item>优化语音</item>
-    </string-array>
-    <string-array name="preference_record_audio_src_values">
-        <item>audio_src_camcorder</item>
-        <item>audio_src_mic</item>
-        <item>audio_src_default</item>
-        <item>audio_src_voice_communication</item>
-    </string-array>
     <string-array name="preference_record_audio_channels_entries">
         <item>默认</item>
         <item>单声道</item>
         <item>立体声 (仅部分设备支持)</item>
     </string-array>
-    <string-array name="preference_record_audio_channels_values">
+   <string-array name="preference_record_audio_channels_values">
         <item>audio_default</item>
         <item>audio_mono</item>
         <item>audio_stereo</item>
@@ -520,5 +450,285 @@
     <string-array name="preference_video_subtitle_values">
         <item>preference_video_subtitle_no</item>
         <item>preference_video_subtitle_yes</item>
+    </string-array>
+
+    <!-- The following arrays no longer need to have translated versions, as we read directly from strings.
+         That is, they should *not* be included in the language-specific arrays.xml files.
+         This means we can edit the translations via the strings.xml files in Android Studio's Translation Editor
+         (see https://code.google.com/p/android/issues/detail?id=75303 ).
+         A side-benefit is that we don't have to worry about a translated array missing an entry (which could
+         mean anything from a crash or undefined behaviour if the _entries and _values arrays are different lengths,
+         to that option being unavailable on a particular translation). With this method, the worst that happens is
+         that a new entry is available, but untranslated (same as any other new string we add, that isn't translated
+         yet).
+         This also means it's quick to add an existing new entry to an existing array, without having to update every
+         other arrays.xml file.
+    -->
+
+    <string-array name="preference_video_max_duration_entries">
+        <item>@string/duration_unlimited</item>
+        <item>@string/duration_3s</item>
+        <item>@string/duration_5s</item>
+        <item>@string/duration_10s</item>
+        <item>@string/duration_15s</item>
+        <item>@string/duration_30s</item>
+        <item>@string/duration_1m</item>
+        <item>@string/duration_2m</item>
+        <item>@string/duration_3m</item>
+        <item>@string/duration_4m</item>
+        <item>@string/duration_5m</item>
+        <item>@string/duration_6m</item>
+        <item>@string/duration_7m</item>
+        <item>@string/duration_8m</item>
+        <item>@string/duration_9m</item>
+        <item>@string/duration_10m</item>
+        <item>@string/duration_11m</item>
+        <item>@string/duration_12m</item>
+        <item>@string/duration_15m</item>
+        <item>@string/duration_20m</item>
+        <item>@string/duration_25m</item>
+        <item>@string/duration_30m</item>
+        <item>@string/duration_45m</item>
+        <item>@string/duration_1h</item>
+    </string-array>
+    <string-array name="preference_video_max_duration_values">
+        <item>0</item>
+        <item>3</item>
+        <item>5</item>
+        <item>10</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+        <item>120</item>
+        <item>180</item>
+        <item>240</item>
+        <item>300</item>
+        <item>360</item>
+        <item>420</item>
+        <item>480</item>
+        <item>540</item>
+        <item>600</item>
+        <item>660</item>
+        <item>720</item>
+        <item>900</item>
+        <item>1200</item>
+        <item>1500</item>
+        <item>1800</item>
+        <item>2700</item>
+        <item>3600</item>
+    </string-array>
+    <string-array name="preference_nr_save_entries">
+        <item>@string/preference_nr_save_no</item>
+        <item>@string/preference_nr_save_single</item>
+        <item>@string/preference_nr_save_all</item>
+    </string-array>
+    <string-array name="preference_nr_save_values">
+        <item>preference_nr_save_no</item>
+        <item>preference_nr_save_single</item>
+        <item>preference_nr_save_all</item>
+    </string-array>
+    <string-array name="preference_raw_entries">
+        <item>@string/preference_raw_no</item>
+        <item>@string/preference_raw_yes</item>
+        <item>@string/preference_raw_only</item>
+    </string-array>
+    <string-array name="preference_raw_values">
+        <item>preference_raw_no</item>
+        <item>preference_raw_yes</item>
+        <item>preference_raw_only</item>
+    </string-array>
+    <string-array name="preference_raw_entries_preandroid7">
+        <item>@string/preference_raw_no</item>
+        <item>@string/preference_raw_yes</item>
+    </string-array>
+    <string-array name="preference_raw_values_preandroid7">
+        <item>preference_raw_no</item>
+        <item>preference_raw_yes</item>
+    </string-array>
+    <string-array name="preference_stamp_dateformat_entries">
+        <item>@string/preference_stamp_dateformat_default</item>
+        <item>@string/preference_stamp_dateformat_yyyymmdd</item>
+        <item>@string/preference_stamp_dateformat_ddmmyyyy</item>
+        <item>@string/preference_stamp_dateformat_mmddyyyy</item>
+        <item>@string/preference_stamp_dateformat_none</item>
+    </string-array>
+    <string-array name="preference_stamp_dateformat_values">
+        <item>preference_stamp_dateformat_default</item>
+        <item>preference_stamp_dateformat_yyyymmdd</item>
+        <item>preference_stamp_dateformat_ddmmyyyy</item>
+        <item>preference_stamp_dateformat_mmddyyyy</item>
+        <item>preference_stamp_dateformat_none</item>
+    </string-array>
+    <string-array name="preference_fast_burst_n_images_entries">
+        <item>@string/preference_fast_burst_n_images_entries_2</item>
+        <item>@string/preference_fast_burst_n_images_entries_3</item>
+        <item>@string/preference_fast_burst_n_images_entries_4</item>
+        <item>@string/preference_fast_burst_n_images_entries_5</item>
+        <item>@string/preference_fast_burst_n_images_entries_6</item>
+        <item>@string/preference_fast_burst_n_images_entries_8</item>
+        <item>@string/preference_fast_burst_n_images_entries_10</item>
+        <item>@string/preference_fast_burst_n_images_entries_12</item>
+        <item>@string/preference_fast_burst_n_images_entries_15</item>
+        <item>@string/preference_fast_burst_n_images_entries_20</item>
+    </string-array>
+    <string-array name="preference_fast_burst_n_images_values">
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>8</item>
+        <item>10</item>
+        <item>12</item>
+        <item>15</item>
+        <item>20</item>
+    </string-array>
+    <string-array name="flash_icons">
+        <item>drawable/flash_off</item>
+        <item>drawable/flash_auto</item>
+        <item>drawable/flash_on</item>
+        <item>drawable/flash_torch</item>
+        <item>drawable/flash_red_eye</item>
+        <item>drawable/flash_auto</item>
+        <item>drawable/flash_on</item>
+        <item>drawable/flash_torch</item>
+    </string-array>
+    <string-array name="flash_entries">
+        <item>@string/flash_off</item>
+        <item>@string/flash_auto</item>
+        <item>@string/flash_on</item>
+        <item>@string/flash_torch</item>
+        <item>@string/flash_red_eye</item>
+        <item>@string/flash_frontscreen_auto</item>
+        <item>@string/flash_frontscreen_on</item>
+        <item>@string/flash_frontscreen_torch</item>
+    </string-array>
+    <string-array name="flash_values">
+        <item>flash_off</item>
+        <item>flash_auto</item>
+        <item>flash_on</item>
+        <item>flash_torch</item>
+        <item>flash_red_eye</item>
+        <item>flash_frontscreen_auto</item>
+        <item>flash_frontscreen_on</item>
+        <item>flash_frontscreen_torch</item>
+    </string-array>
+    <string-array name="preference_ghost_image_entries">
+        <item>@string/preference_ghost_image_off</item>
+        <item>@string/preference_ghost_image_last</item>
+        <item>@string/preference_ghost_image_selected</item>
+    </string-array>
+    <string-array name="preference_ghost_image_values">
+        <item>preference_ghost_image_off</item>
+        <item>preference_ghost_image_last</item>
+        <item>preference_ghost_image_selected</item>
+    </string-array>
+    <string-array name="preference_ghost_image_entries_preandroid5">
+        <item>@string/preference_ghost_image_off</item>
+        <item>@string/preference_ghost_image_last</item>
+    </string-array>
+    <string-array name="preference_ghost_image_values_preandroid5">
+        <item>preference_ghost_image_off</item>
+        <item>preference_ghost_image_last</item>
+    </string-array>
+    <string-array name="preference_video_log_entries">
+        <item>@string/preference_video_log_off</item>
+        <item>@string/preference_video_log_low</item>
+        <item>@string/preference_video_log_medium</item>
+        <item>@string/preference_video_log_strong</item>
+        <item>@string/preference_video_log_extra_strong</item>
+    </string-array>
+    <string-array name="preference_video_log_values">
+        <item>off</item>
+        <item>low</item>
+        <item>medium</item>
+        <item>strong</item>
+        <item>extra_strong</item>
+    </string-array>
+    <string-array name="preference_record_audio_src_entries">
+        <item>@string/preference_record_audio_src_camcorder</item>
+        <item>@string/preference_record_audio_src_mic</item>
+        <item>@string/preference_record_audio_src_default</item>
+        <item>@string/preference_record_audio_src_voice_communication</item>
+        <item>@string/preference_record_audio_src_voice_recognition</item>
+        <item>@string/preference_record_audio_src_unprocessed</item>
+    </string-array>
+    <string-array name="preference_record_audio_src_values">
+        <item>audio_src_camcorder</item>
+        <item>audio_src_mic</item>
+        <item>audio_src_default</item>
+        <item>audio_src_voice_communication</item>
+        <item>audio_src_voice_recognition</item>
+        <item>audio_src_unprocessed</item>
+    </string-array>
+    <string-array name="preference_record_audio_src_entries_preandroid7">
+        <item>@string/preference_record_audio_src_camcorder</item>
+        <item>@string/preference_record_audio_src_mic</item>
+        <item>@string/preference_record_audio_src_default</item>
+        <item>@string/preference_record_audio_src_voice_communication</item>
+        <item>@string/preference_record_audio_src_voice_recognition</item>
+    </string-array>
+    <string-array name="preference_record_audio_src_values_preandroid7">
+        <item>audio_src_camcorder</item>
+        <item>audio_src_mic</item>
+        <item>audio_src_default</item>
+        <item>audio_src_voice_communication</item>
+        <item>audio_src_voice_recognition</item>
+    </string-array>
+    <string-array name="preference_video_bitrate_entries">
+        <item>@string/preference_video_bitrate_default</item>
+        <item>@string/preference_video_bitrate_100000</item>
+        <item>@string/preference_video_bitrate_200000</item>
+        <item>@string/preference_video_bitrate_500000</item>
+        <item>@string/preference_video_bitrate_1000000</item>
+        <item>@string/preference_video_bitrate_2000000</item>
+        <item>@string/preference_video_bitrate_3000000</item>
+        <item>@string/preference_video_bitrate_4000000</item>
+        <item>@string/preference_video_bitrate_5000000</item>
+        <item>@string/preference_video_bitrate_6000000</item>
+        <item>@string/preference_video_bitrate_7000000</item>
+        <item>@string/preference_video_bitrate_8000000</item>
+        <item>@string/preference_video_bitrate_9000000</item>
+        <item>@string/preference_video_bitrate_10000000</item>
+        <item>@string/preference_video_bitrate_15000000</item>
+        <item>@string/preference_video_bitrate_20000000</item>
+        <item>@string/preference_video_bitrate_30000000</item>
+        <item>@string/preference_video_bitrate_40000000</item>
+        <item>@string/preference_video_bitrate_50000000</item>
+        <item>@string/preference_video_bitrate_60000000</item>
+        <item>@string/preference_video_bitrate_70000000</item>
+        <item>@string/preference_video_bitrate_80000000</item>
+        <item>@string/preference_video_bitrate_90000000</item>
+        <item>@string/preference_video_bitrate_100000000</item>
+        <item>@string/preference_video_bitrate_150000000</item>
+        <item>@string/preference_video_bitrate_200000000</item>
+    </string-array>
+    <string-array name="preference_video_bitrate_values">
+        <item>default</item>
+        <item>100000</item>
+        <item>200000</item>
+        <item>500000</item>
+        <item>1000000</item>
+        <item>2000000</item>
+        <item>3000000</item>
+        <item>4000000</item>
+        <item>5000000</item>
+        <item>6000000</item>
+        <item>7000000</item>
+        <item>8000000</item>
+        <item>9000000</item>
+        <item>10000000</item>
+        <item>15000000</item>
+        <item>20000000</item>
+        <item>30000000</item>
+        <item>40000000</item>
+        <item>50000000</item>
+        <item>60000000</item>
+        <item>70000000</item>
+        <item>80000000</item>
+        <item>90000000</item>
+        <item>100000000</item>
+        <item>150000000</item>
+        <item>200000000</item>
     </string-array>
 </resources>

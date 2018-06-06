@@ -428,7 +428,7 @@
     <string name="preference_exif_artist_summary">要保存到图像元数据的艺术家标签的文本。（留空不保存）</string>
     <string name="preference_exif_copyright">版权</string>
     <string name="preference_exif_copyright_summary">要保存到图像元数据的版权标签的文本。（留空不保存）</string>
-    <string name="whats_new_text"><b>v1.41:</b>\n\n\n        <ul>\n             <li>改进用户界面：切换照片/视频模式以及切换相机的图标\n                 在快门按钮旁边以更方便单手使用; ISO控件现在整个被移动\n                 到暴光图标。\n</li>\n             <li>在录制视频时拍摄照片（在支持的设备上）。\n</li>\n             <li> HDR改进（鬼影移除，以及太暗图像的增亮）。\n</li>\n             <li>性能改进和错误修复。\n</li>\n        </ul></string>
+
     <string name="processing">正在处理…</string>
     <string name="preference_raw_no">仅 JPEG</string>
     <string name="preference_raw_yes">JPEG 和 DNG (RAW)</string>
@@ -500,5 +500,48 @@
     <string name="video_log">日志配置文件</string>
     <string name="preference_video_log">视频平坦（日志）配置文件</string>
     <string name="preference_video_log_summary">为视频模式 %s 启用平坦（日志）配置文件</string>
+    <string name="preference_record_audio_src_camcorder">摄像机</string>
+    <string name="preference_record_audio_src_mic">外部麦克风（如果有的话）</string>
+    <string name="preference_record_audio_src_default">默认音频源</string>
+    <string name="preference_record_audio_src_voice_communication">优化语音通话</string>
+    <string name="preference_record_audio_src_voice_recognition">针对语音识别进行了优化</string>
+    <string name="preference_record_audio_src_unprocessed">未处理的</string>
+    <string name="preference_video_bitrate_default">默认</string>
+    <string name="preference_video_bitrate_100000">100kbps</string>
+    <string name="preference_video_bitrate_200000">200kbps</string>
+    <string name="preference_video_bitrate_500000">500kbps</string>
+    <string name="preference_video_bitrate_1000000">1Mbps</string>
+    <string name="preference_video_bitrate_2000000">2Mbps</string>
+    <string name="preference_video_bitrate_3000000">3Mbps</string>
+    <string name="preference_video_bitrate_4000000">4Mbps</string>
+    <string name="preference_video_bitrate_5000000">5Mbps</string>
+    <string name="preference_video_bitrate_6000000">6Mbps</string>
+    <string name="preference_video_bitrate_7000000">7Mbps</string>
+    <string name="preference_video_bitrate_8000000">8Mbps</string>
+    <string name="preference_video_bitrate_9000000">9Mbps</string>
+    <string name="preference_video_bitrate_10000000">10Mbps</string>
+    <string name="preference_video_bitrate_15000000">15Mbps</string>
+    <string name="preference_video_bitrate_20000000">20Mbps</string>
+    <string name="preference_video_bitrate_30000000">30Mbps</string>
+    <string name="preference_video_bitrate_40000000">40Mbps</string>
+    <string name="preference_video_bitrate_50000000">50Mbps</string>
+    <string name="preference_video_bitrate_60000000">60Mbps</string>
+    <string name="preference_video_bitrate_70000000">70Mbps</string>
+    <string name="preference_video_bitrate_80000000">80Mbps</string>
+    <string name="preference_video_bitrate_90000000">90Mbps</string>
+    <string name="preference_video_bitrate_100000000">100Mbps</string>
+    <string name="preference_video_bitrate_150000000">150Mbps</string>
+    <string name="preference_video_bitrate_200000000">200Mbps</string>
 
+    <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
+    <string name="whats_new_text"><b>v1.41:</b>\n\n
+        <ul>
+            <li>User interface improvements: icons to switch photo/video mode, and switch camera, are
+                next to the shutter button for easier one-handed use; ISO controls are now moved
+                entirely to the exposure icon.\n</li>
+            <li>Take photos while recording video (on supported devices).\n</li>
+            <li>HDR improvements (ghost removal, and brightening of too dark images).\n</li>
+            <li>Performance improvements and bug fixes.\n</li>
+        </ul>
+    </string>
 </resources>
