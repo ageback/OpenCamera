@@ -56,6 +56,7 @@ FIXED   In Camera2 API mode, wasn't checking to see if video stabilization optio
 FIXED   Preview size/"Maximise preview size" option didn't always work correctly on some devices
         (e.g., Nokia 8).
 FIXED   Fixed a crash related to failing to save with storage access framework.
+FIXED   Norwegian strings for video bitrate preferences were incorrect.
 ADDED   New option "Ghost image", to overlay either last photo taken, or a selected image on your
         device.
 ADDED   On-screen flash icon (to show whether flash will fire or not) now supported for front screen
@@ -66,8 +67,11 @@ ADDED   New Camera2 API debug option under Settings/"Photo settings" to disable 
 ADDED   Launching from intent now recognises request for front or back camera
         (android.intent.extras.CAMERA_FACING, android.intent.extras.LENS_FACING_FRONT,
         android.intent.extras.LENS_FACING_BACK, android.intent.extra.USE_FRONT_CAMERA).
+ADDED   Video bitrate options for 150Mbps and 200Mbps (may not work on all devices).
+ADDED   New video audio source options: UNPROCESSED (requires Android 7) and VOICE_RECOGNITION.
 UPDATED No longer wait for image queue to be saved to go to settings, or background.
 UPDATED Made on-screen level lines clearer.
+UPDATED Show video bitrate on info toast if not set to default.
 UPDATED Camera opening on background thread (for smoother operation) now enabled for Android 6
         devices (was already supported for Android 7+).
 
