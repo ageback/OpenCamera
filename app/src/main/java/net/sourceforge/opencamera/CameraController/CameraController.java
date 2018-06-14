@@ -75,6 +75,8 @@ public abstract class CameraController {
 		public int max_exposure;
 		public float exposure_step;
 		public boolean can_disable_shutter_sound;
+		public int tonemap_max_curve_points;
+		public boolean supports_tonemap_curve;
 		public boolean supports_expo_bracketing;
 		public int max_expo_bracketing_n_images;
 		public boolean supports_raw;
@@ -381,6 +383,7 @@ public abstract class CameraController {
 	public abstract void setVideoStabilization(boolean enabled);
 	public abstract boolean getVideoStabilization();
 	public abstract void setLogProfile(boolean use_log_profile, float log_profile_strength);
+	public abstract boolean isLogProfile();
 	public abstract int getJpegQuality();
 	public abstract void setJpegQuality(int quality);
 	public abstract int getZoom();
