@@ -923,10 +923,49 @@ public class ImageSaver extends Thread {
 			Bitmap nr_bitmap;
 			if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
 				try {
+					long time_s = System.currentTimeMillis();
 					// initialise allocation from first two bitmaps
 					int inSampleSize = hdrProcessor.getAvgSampleSize();
-					Bitmap bitmap0 = loadBitmap(request.jpeg_images.get(0), false, inSampleSize);
-					Bitmap bitmap1 = loadBitmap(request.jpeg_images.get(1), false, inSampleSize);
+					//final boolean use_smp = false;
+					final boolean use_smp = true;
+					// n_smp_images is how many bitmaps to decompress at once if use_smp==true. Beware of setting too high -
+					// e.g., storing 4 16MP bitmaps takes 256MB of heap (NR requires at least 512MB large heap); also need to make
+					// sure there isn't a knock on effect on performance
+					//final int n_smp_images = 2;
+					final int n_smp_images = 4;
+					long this_time_s = System.currentTimeMillis();
+					List<Bitmap> bitmaps = null;
+					Bitmap bitmap0, bitmap1;
+					if( use_smp ) {
+						/*List<byte []> sub_jpeg_list = new ArrayList<>();
+						sub_jpeg_list.add(request.jpeg_images.get(0));
+						sub_jpeg_list.add(request.jpeg_images.get(1));
+						bitmaps = loadBitmaps(sub_jpeg_list, -1, inSampleSize);
+						bitmap0 = bitmaps.get(0);
+						bitmap1 = bitmaps.get(1);*/
+						int n_remaining = request.jpeg_images.size();
+						int n_load = Math.min(n_smp_images, n_remaining);
+						if( MyDebug.LOG ) {
+							Log.d(TAG, "n_remaining: " + n_remaining);
+							Log.d(TAG, "n_load: " + n_load);
+						}
+						List<byte []> sub_jpeg_list = new ArrayList<>();
+						for(int j=0;j<n_load;j++) {
+							sub_jpeg_list.add(request.jpeg_images.get(j));
+						}
+						bitmaps = loadBitmaps(sub_jpeg_list, -1, inSampleSize);
+						if( MyDebug.LOG )
+							Log.d(TAG, "length of bitmaps list is now: " + bitmaps.size());
+						bitmap0 = bitmaps.get(0);
+						bitmap1 = bitmaps.get(1);
+					}
+					else {
+						bitmap0 = loadBitmap(request.jpeg_images.get(0), false, inSampleSize);
+						bitmap1 = loadBitmap(request.jpeg_images.get(1), false, inSampleSize);
+					}
+					if( MyDebug.LOG ) {
+						Log.d(TAG, "*** time for loading first bitmaps: " + (System.currentTimeMillis() - this_time_s));
+					}
 					int width = bitmap0.getWidth();
 					int height = bitmap0.getHeight();
 					float avg_factor = 1.0f;
@@ -938,22 +977,79 @@ public class ImageSaver extends Thread {
 								Log.d(TAG, "iso: " + iso);
 						}
 					}
+					this_time_s = System.currentTimeMillis();
 					HDRProcessor.AvgData avg_data = hdrProcessor.processAvg(bitmap0, bitmap1, avg_factor, iso);
+					if( bitmaps != null ) {
+						bitmaps.set(0, null);
+						bitmaps.set(1, null);
+					}
+					if( MyDebug.LOG ) {
+						Log.d(TAG, "*** time for processing first two bitmaps: " + (System.currentTimeMillis() - this_time_s));
+					}
 					Allocation allocation = avg_data.allocation_out;
 
 					for(int i=2;i<request.jpeg_images.size();i++) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "processAvg for image: " + i);
 
-						Bitmap new_bitmap = loadBitmap(request.jpeg_images.get(i), false, inSampleSize);
+						this_time_s = System.currentTimeMillis();
+						Bitmap new_bitmap;
+						if( use_smp ) {
+							// check if we already loaded the bitmap
+							if( MyDebug.LOG )
+								Log.d(TAG, "length of bitmaps list: " + bitmaps.size());
+							if( i < bitmaps.size() ) {
+								if( MyDebug.LOG ) {
+									Log.d(TAG, "already loaded bitmap from previous iteration with SMP");
+								}
+								new_bitmap = bitmaps.get(i);
+							}
+							else {
+								int n_remaining = request.jpeg_images.size() - i;
+								int n_load = Math.min(n_smp_images, n_remaining);
+								if( MyDebug.LOG ) {
+									Log.d(TAG, "n_remaining: " + n_remaining);
+									Log.d(TAG, "n_load: " + n_load);
+								}
+								List<byte []> sub_jpeg_list = new ArrayList<>();
+								for(int j=i;j<i+n_load;j++) {
+									sub_jpeg_list.add(request.jpeg_images.get(j));
+								}
+								List<Bitmap> new_bitmaps = loadBitmaps(sub_jpeg_list, -1, inSampleSize);
+								bitmaps.addAll(new_bitmaps);
+								if( MyDebug.LOG )
+									Log.d(TAG, "length of bitmaps list is now: " + bitmaps.size());
+								new_bitmap = bitmaps.get(i);
+							}
+						}
+						else {
+							new_bitmap = loadBitmap(request.jpeg_images.get(i), false, inSampleSize);
+						}
+						if( MyDebug.LOG ) {
+							Log.d(TAG, "*** time for loading extra bitmap: " + (System.currentTimeMillis() - this_time_s));
+						}
 						avg_factor = (float)i;
+						this_time_s = System.currentTimeMillis();
 						hdrProcessor.updateAvg(avg_data, width, height, new_bitmap, avg_factor, iso);
 						// updateAvg recycles new_bitmap
+						if( bitmaps != null ) {
+							bitmaps.set(i, null);
+						}
+						if( MyDebug.LOG ) {
+							Log.d(TAG, "*** time for updating extra bitmap: " + (System.currentTimeMillis() - this_time_s));
+						}
 					}
 
+					this_time_s = System.currentTimeMillis();
 					nr_bitmap = hdrProcessor.avgBrighten(allocation, width, height, iso);
+					if( MyDebug.LOG ) {
+						Log.d(TAG, "*** time for brighten: " + (System.currentTimeMillis() - this_time_s));
+					}
 					avg_data.destroy();
 					avg_data = null;
+					if( MyDebug.LOG ) {
+						Log.d(TAG, "*** total time for saving NR image: " + (System.currentTimeMillis() - time_s));
+					}
 				}
 				catch(HDRProcessorException e) {
 					e.printStackTrace();

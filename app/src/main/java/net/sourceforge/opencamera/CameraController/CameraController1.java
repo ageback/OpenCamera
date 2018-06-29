@@ -327,6 +327,8 @@ public class CameraController1 extends CameraController {
 		camera_features.picture_sizes = new ArrayList<>();
 		//camera_features.picture_sizes.add(new CameraController.Size(1920, 1080)); // test
 		for(Camera.Size camera_size : camera_picture_sizes) {
+			// we leave supports_burst as true - strictly speaking it should be false, but we'll never use a fast burst mode
+			// with CameraController1 anyway
 			camera_features.picture_sizes.add(new CameraController.Size(camera_size.width, camera_size.height));
 		}
 
@@ -781,6 +783,12 @@ public class CameraController1 extends CameraController {
 	@Override
 	public void setUseExpoFastBurst(boolean use_expo_fast_burst) {
 		// not supported for CameraController1
+	}
+
+	@Override
+	public boolean isBurstOrExpo() {
+		// not supported for CameraController1
+		return false;
 	}
 
 	@Override

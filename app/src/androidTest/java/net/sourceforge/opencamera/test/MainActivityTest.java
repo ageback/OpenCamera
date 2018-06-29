@@ -751,7 +751,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 	private void checkOptimalVideoPictureSize(double targetRatio) {
         // even the picture resolution should have same aspect ratio for video - otherwise have problems on Nexus 7 with Android 4.4.3
 		Log.d(TAG, "video picture size: " + mPreview.getCameraController().getPictureSize().width + ", " + mPreview.getCameraController().getPictureSize().height);
-        List<CameraController.Size> sizes = mPreview.getSupportedPictureSizes();
+        List<CameraController.Size> sizes = mPreview.getSupportedPictureSizes(false);
     	CameraController.Size best_size = mPreview.getOptimalVideoPictureSize(sizes, targetRatio);
 		Log.d(TAG, "best size: " + best_size.width + ", " + best_size.height);
     	assertTrue( best_size.width == mPreview.getCameraController().getPictureSize().width );
@@ -6832,10 +6832,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			return;
 		}
 
-	    List<CameraController.Size> preview_sizes = mPreview.getSupportedPictureSizes();
+	    List<CameraController.Size> picture_sizes = mPreview.getSupportedPictureSizes(true);
 
 	    // change back camera to the last size
-		CameraController.Size size = preview_sizes.get(preview_sizes.size()-1);
+		CameraController.Size size = picture_sizes.get(picture_sizes.size()-1);
 	    {
 		    Log.d(TAG, "set size to " + size.width + " x " + size.height);
 		    SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
@@ -6858,10 +6858,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		int new_cameraId = mPreview.getCameraId();
 		assertTrue(cameraId != new_cameraId);
 
-	    List<CameraController.Size> front_preview_sizes = mPreview.getSupportedPictureSizes();
+	    List<CameraController.Size> front_picture_sizes = mPreview.getSupportedPictureSizes(true);
 
 	    // change front camera to the last size
-		CameraController.Size front_size = front_preview_sizes.get(front_preview_sizes.size()-1);
+		CameraController.Size front_size = front_picture_sizes.get(front_picture_sizes.size()-1);
 	    {
 		    Log.d(TAG, "set front_size to " + front_size.width + " x " + front_size.height);
 		    SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
@@ -6880,7 +6880,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 	    assertTrue(front_size.equals(front_new_size));
 
 	    // change front camera to the first size
-		front_size = front_preview_sizes.get(0);
+		front_size = front_picture_sizes.get(0);
 	    {
 		    Log.d(TAG, "set front_size to " + front_size.width + " x " + front_size.height);
 		    SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
@@ -10625,8 +10625,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, 0, 0};
 					//int [] exp_offsets_x = {0, 8, 0};
 					//int [] exp_offsets_y = {0, 1, 0};
-					int [] exp_offsets_x = {0, 7, 0};
-					int [] exp_offsets_y = {0, -1, 0};
+					//int [] exp_offsets_x = {0, 7, 0};
+					//int [] exp_offsets_y = {0, -1, 0};
+					int [] exp_offsets_x = {0, 8, 0};
+					int [] exp_offsets_y = {0, -4, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 				}
 				else {
@@ -11014,7 +11016,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, 6, 0};
 					//int [] exp_offsets_x = {0, -6, 0};
 					//int [] exp_offsets_y = {0, 2, 0};
-					int [] exp_offsets_x = {0, -4, 0};
+					//int [] exp_offsets_x = {0, -4, 0};
+					//int [] exp_offsets_y = {0, 0, 0};
+					int [] exp_offsets_x = {0, 0, 0};
 					int [] exp_offsets_y = {0, 0, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 					assertTrue(mActivity.getApplicationInterface().getHDRProcessor().sharp_index == 0);
@@ -11578,7 +11582,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
 	}
 
-	/** Tests Avg algorithm on test samples "testAvg22".
+	/** Tests Avg algorithm on test samples "testAvg23".
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
@@ -11598,7 +11602,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_6.jpg");
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_7.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg23_output.jpg", 100, new TestAvgCallback() {
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg23_output.jpg", 1044, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11640,6 +11644,124 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 				else {
 					assertTrue(false);
 				}
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg24".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg24() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg24");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg24/input0.jpg");
+		inputs.add(avg_images_path + "testAvg24/input1.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg24_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg25".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg25() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg25");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg25/input0.jpg");
+		inputs.add(avg_images_path + "testAvg25/input1.jpg");
+		inputs.add(avg_images_path + "testAvg25/input2.jpg");
+		inputs.add(avg_images_path + "testAvg25/input3.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg25_output.jpg", 512, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg26".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg26() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg26");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg26/input0.jpg");
+		inputs.add(avg_images_path + "testAvg26/input1.jpg");
+		inputs.add(avg_images_path + "testAvg26/input2.jpg");
+		inputs.add(avg_images_path + "testAvg26/input3.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg26_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+				if( index == 1 ) {
+					int [] exp_offsets_x = {0, 0, 0};
+					int [] exp_offsets_y = {0, 0, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else if( index == 2 ) {
+					int [] exp_offsets_x = {0, 0, 0};
+					int [] exp_offsets_y = {0, 0, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else if( index == 3 ) {
+					int [] exp_offsets_x = {0, 0, 0};
+					int [] exp_offsets_y = {0, -4, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else {
+					assertTrue(false);
+				}
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg27".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg27() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg27");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg27/IMG_20180610_205929_0.jpg");
+		inputs.add(avg_images_path + "testAvg27/IMG_20180610_205929_1.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg27_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
 			}
 		});
 
