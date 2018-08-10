@@ -703,7 +703,7 @@ public class MyApplicationInterface implements ApplicationInterface {
         		if( available_memory > min_free_filesize ) {
         			if( video_max_filesize.max_filesize == 0 || video_max_filesize.max_filesize > available_memory ) {
         				video_max_filesize.max_filesize = available_memory;
-        				// still leave auto_restart set to true - because even if we set a max filesize for running out of storage, the video may still hit a maximum limit before hand, if there's a device max limit set (typically ~2GB)
+        				// still leave auto_restart set to true - because even if we set a max filesize for running out of storage, the video may still hit a maximum limit beforehand, if there's a device max limit set (typically ~2GB)
         				if( MyDebug.LOG )
         					Log.d(TAG, "set video_max_filesize to avoid running out of space: " + video_max_filesize);
         			}
@@ -947,38 +947,58 @@ public class MyApplicationInterface implements ApplicationInterface {
 		}
 
 		int photo_cost = imageSaver.computePhotoCost(n_raw > 0, n_jpegs);
-    	if( imageSaver.queueWouldBlock(photo_cost) )
-    		return false;
+    	if( imageSaver.queueWouldBlock(photo_cost) ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "canTakeNewPhoto: no, as queue would block");
+			return false;
+		}
 
     	// even if the queue isn't full, we may apply additional limits
+		int n_images_to_save = imageSaver.getNImagesToSave();
 		PhotoMode photo_mode = getPhotoMode();
 		if( photo_mode == PhotoMode.FastBurst ) {
 			// only allow one fast burst at a time, so require queue to be empty
-			if( imageSaver.getNImagesToSave() > 0 ) {
+			if( n_images_to_save > 0 ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "canTakeNewPhoto: no, as too many for fast burst");
 				return false;
 			}
 		}
 		if( photo_mode == PhotoMode.NoiseReduction ) {
 			// allow a max of 2 photos in memory when at max of 8 images
-			if( imageSaver.getNImagesToSave() >= 2*photo_cost ) {
+			if( n_images_to_save >= 2*photo_cost ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "canTakeNewPhoto: no, as too many for nr");
 				return false;
 			}
 		}
 		if( n_jpegs > 1 ) {
 			// if in any other kind of burst mode (e.g., expo burst, HDR), allow a max of 3 photos in memory
-			if( imageSaver.getNImagesToSave() >= 3*photo_cost ) {
+			if( n_images_to_save >= 3*photo_cost ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "canTakeNewPhoto: no, as too many for burst");
 				return false;
 			}
 		}
 		if( n_raw > 0 ) {
 			// if RAW mode, allow a max of 3 photos
-			if( imageSaver.getNImagesToSave() >= 3*photo_cost ) {
+			if( n_images_to_save >= 3*photo_cost ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "canTakeNewPhoto: no, as too many for raw");
 				return false;
 			}
 		}
 		// otherwise, still have a max limit of 5 photos
-		if( imageSaver.getNImagesToSave() >= 5*photo_cost ) {
-			return false;
+		if( n_images_to_save >= 5*photo_cost ) {
+			if( main_activity.supportsNoiseReduction() && n_images_to_save <= 8 ) {
+				// if we take a photo in NR mode, then switch to std mode, it doesn't make sense to suddenly block!
+				// so need to at least allow a new photo, if the number of photos is less than 1 NR photo
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.d(TAG, "canTakeNewPhoto: no, as too many for regular");
+				return false;
+			}
 		}
 
     	return true;
@@ -1599,18 +1619,24 @@ public class MyApplicationInterface implements ApplicationInterface {
 	@Override
 	public void onVideoInfo(int what, int extra) {
 		// we don't show a toast for MEDIA_RECORDER_INFO_MAX_DURATION_REACHED - conflicts with "n repeats to go" toast from Preview
-		if( what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED ) {
+		if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && what == MediaRecorder.MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "next output file started");
+			int message_id = R.string.video_max_filesize;
+			main_activity.getPreview().showToast(null, message_id);
+		}
+		else if( what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "max filesize reached");
 			int message_id = R.string.video_max_filesize;
 			main_activity.getPreview().showToast(null, message_id);
-			// in versions 1.24 and 1.24, there was a bug where we had "info_" for onVideoError and "error_" for onVideoInfo!
-			// fixed in 1.25; also was correct for 1.23 and earlier
-			String debug_value = "info_" + what + "_" + extra;
-			SharedPreferences.Editor editor = sharedPreferences.edit();
-			editor.putString("last_video_error", debug_value);
-			editor.apply();
 		}
+		// in versions 1.24 and 1.24, there was a bug where we had "info_" for onVideoError and "error_" for onVideoInfo!
+		// fixed in 1.25; also was correct for 1.23 and earlier
+		String debug_value = "info_" + what + "_" + extra;
+		SharedPreferences.Editor editor = sharedPreferences.edit();
+		editor.putString("last_video_error", debug_value);
+		editor.apply();
 	}
 
 	@Override
@@ -2157,6 +2183,15 @@ public class MyApplicationInterface implements ApplicationInterface {
 		String custom_tag_artist = sharedPreferences.getString(PreferenceKeys.ExifArtistPreferenceKey, "");
 		String custom_tag_copyright = sharedPreferences.getString(PreferenceKeys.ExifCopyrightPreferenceKey, "");
 
+		int iso = 800; // default value if we can't get ISO
+		if( main_activity.getPreview().getCameraController() != null ) {
+			if( main_activity.getPreview().getCameraController().captureResultHasIso() ) {
+				iso = main_activity.getPreview().getCameraController().captureResultIso();
+				if( MyDebug.LOG )
+					Log.d(TAG, "iso: " + iso);
+			}
+		}
+
 		boolean has_thumbnail_animation = getThumbnailAnimationPref();
         
 		boolean do_in_background = saveInBackground(image_capture_intent);
@@ -2206,6 +2241,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					is_front_facing,
 					mirror,
 					current_date,
+					iso,
 					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
@@ -2226,6 +2262,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					is_front_facing,
 					mirror,
 					current_date,
+					iso,
 					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,

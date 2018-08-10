@@ -56,22 +56,30 @@ FIXED   In Camera2 API mode, wasn't checking to see if video stabilization optio
 FIXED   Preview size/"Maximise preview size" option didn't always work correctly on some devices
         (e.g., Nokia 8).
 FIXED   Fixed a crash related to failing to save with storage access framework.
+FIXED   Switching from slow motion back to regular speed wouldn't reset exposure level on some
+        devices.
 FIXED   Norwegian strings for video bitrate preferences were incorrect.
 ADDED   New option "Ghost image", to overlay either last photo taken, or a selected image on your
         device.
+ADDED   New option On screen GUI/"Show audio level meter", to display on-screen audio level when
+        recording video.
+ADDED   New option to record video with a flat (log) profile. (Camera2 API only.)
 ADDED   On-screen flash icon (to show whether flash will fire or not) now supported for front screen
         flash.
 ADDED   New Camera2 API debug option under Settings/"Photo settings" to disable taking photos whilst
         recording video feature (if your device has problems recording videos with Camera2 API
         enabled, try disabling this).
 ADDED   Camera2 support for high resolution photo resolutions (required for supporting highest
-        resolutions on some devices, e.g., Nokia 6, Samsung 6).
+        resolutions on some devices, e.g., Nokia 6, Samsung Galaxy S6).
 ADDED   Launching from intent now recognises request for front or back camera
         (android.intent.extras.CAMERA_FACING, android.intent.extras.LENS_FACING_FRONT,
         android.intent.extras.LENS_FACING_BACK, android.intent.extra.USE_FRONT_CAMERA).
 ADDED   Video bitrate options for 150Mbps and 200Mbps (may not work on all devices).
 ADDED   New video audio source options: UNPROCESSED (requires Android 7) and VOICE_RECOGNITION.
 UPDATED No longer wait for image queue to be saved to go to settings, or background.
+UPDATED On Android 8 when restarting video due to hitting maximum filesize, transition to new file
+        is now seamless.
+UPDATED Show FPS on-screen when recording video (Camera2 API only).
 UPDATED Made on-screen level lines clearer.
 UPDATED Show video bitrate on info toast if not set to default.
 UPDATED More preferences in settings now show the currently selected value.

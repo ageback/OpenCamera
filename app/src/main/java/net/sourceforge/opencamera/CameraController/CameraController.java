@@ -45,6 +45,7 @@ public abstract class CameraController {
 	public volatile int test_fake_flash_precapture; // for Camera2 API, records torch turning on for fake flash during precapture
 	public volatile int test_fake_flash_photo; // for Camera2 API, records torch turning on for fake flash for photo capture
 	public volatile int test_af_state_null_focus; // for Camera2 API, records af_state being null even when we've requested autofocus
+	public volatile boolean test_used_tonemap_curve;
 
 	public static class CameraFeatures {
 		public boolean is_zoom_supported;
@@ -332,20 +333,31 @@ public abstract class CameraController {
     public abstract void setPictureSize(int width, int height);
     public abstract CameraController.Size getPreviewSize();
     public abstract void setPreviewSize(int width, int height);
-	public abstract void setWantBurst(boolean want_burst);
-	/** Only relevant if setWantBurst() is also called with want_burst==true. Sets the number of
+
+	// whether to take a burst of images, and if so, what type
+	public enum BurstType {
+		BURSTTYPE_NONE, // no burst
+		BURSTTYPE_EXPO, // enable expo bracketing mode
+		BURSTTYPE_FOCUS, // enable focus bracketing mode;
+		BURSTTYPE_NORMAL // take a regular burst
+	}
+	public abstract void setBurstType(BurstType new_burst_type);
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_NORMAL. Sets the number of
 	 *  images to take in the burst.
 	 */
 	public abstract void setBurstNImages(int burst_requested_n_images);
-	/** Only relevant if setWantBurst() is also called with want_burst==true. If this method is
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_NORMAL. If this method is
 	 *  called with burst_for_noise_reduction, then the number of burst images, and other settings,
 	 *  will be set for noise reduction mode (and setBurstNImages() is ignored).
 	 */
 	public abstract void setBurstForNoiseReduction(boolean burst_for_noise_reduction);
-	public abstract void setExpoBracketing(boolean want_expo_bracketing);
-	/** n_images must be an odd number greater than 1.
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_EXPO. Sets the number of
+	 *  images to take in the expo burst.
+	 * @param n_images Must be an odd number greater than 1.
 	 */
 	public abstract void setExpoBracketingNImages(int n_images);
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_EXPO.
+	 */
 	public abstract void setExpoBracketingStops(double stops);
 	public abstract void setUseExpoFastBurst(boolean use_expo_fast_burst);
 	public abstract boolean isBurstOrExpo();
@@ -394,6 +406,7 @@ public abstract class CameraController {
 	public abstract int getExposureCompensation();
 	public abstract boolean setExposureCompensation(int new_exposure);
 	public abstract void setPreviewFpsRange(int min, int max);
+	public abstract void clearPreviewFpsRange();
 	public abstract List<int []> getSupportedPreviewFpsRange(); // result depends on setting of setVideoHighSpeed()
 
 	public abstract void setFocusValue(String focus_value);
@@ -488,12 +501,12 @@ public abstract class CameraController {
 	public long captureResultExposureTime() {
 		return 0;
 	}
-	/*public boolean captureResultHasFrameDuration() {
+	public boolean captureResultHasFrameDuration() {
 		return false;
-	}*/
-	/*public long captureResultFrameDuration() {
+	}
+	public long captureResultFrameDuration() {
 		return 0;
-	}*/
+	}
 	/*public boolean captureResultHasFocusDistance() {
 		return false;
 	}*/

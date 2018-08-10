@@ -2826,6 +2826,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		boolean has_audio_control_button = !sharedPreferences.getString(PreferenceKeys.AudioControlPreferenceKey, "none").equals("none");
 		boolean is_dro = mActivity.supportsDRO() && sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std").equals("preference_photo_mode_dro");
 		boolean is_hdr = mActivity.supportsHDR() && sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std").equals("preference_photo_mode_hdr");
+		boolean is_nr = mActivity.supportsNoiseReduction() && sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std").equals("preference_photo_mode_noise_reduction");
 		boolean is_expo = mActivity.supportsExpoBracketing() && sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std").equals("preference_photo_mode_expo_bracketing");
 		boolean is_fast_burst = mActivity.supportsFastBurst() && sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std").equals("preference_photo_mode_fast_burst");
 		String n_expo_images_s = sharedPreferences.getString(PreferenceKeys.ExpoBracketingNImagesPreferenceKey, "3");
@@ -2913,6 +2914,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		else if( is_hdr ) {
 			suffix = "_HDR";
 		}
+		else if( is_nr ) {
+			suffix = "_NR";
+		}
 		else if( is_expo ) {
 			//suffix = "_EXP" + (n_expo_images-1);
 			suffix = "_" + (n_expo_images-1);
@@ -2935,7 +2939,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 				Log.d(TAG, "waiting for thumbnail animation");
 				Thread.sleep(10);
 				int allowed_time_ms = 8000;
-				if( !mPreview.usingCamera2API() && ( is_hdr || is_expo ) ) {
+				if( !mPreview.usingCamera2API() && ( is_hdr || is_nr || is_expo ) ) {
 					// some devices need longer time
 					allowed_time_ms = 10000;
 				}
@@ -4537,11 +4541,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		int doTest(); // return expected number of new files (or -1 to indicate not to check this)
 	}
 
-	private void subTestTakeVideo(boolean test_exposure_lock, boolean test_focus_area, boolean allow_failure, boolean immersive_mode, VideoTestCallback test_cb, long time_ms, boolean max_filesize, boolean subtitles) throws InterruptedException {
+	/**
+	 * @return The number of resultant video files
+	 * @throws InterruptedException
+	 */
+	private int subTestTakeVideo(boolean test_exposure_lock, boolean test_focus_area, boolean allow_failure, boolean immersive_mode, VideoTestCallback test_cb, long time_ms, boolean max_filesize, boolean subtitles) throws InterruptedException {
 		assertTrue(mPreview.isPreviewStarted());
 
 		if( test_exposure_lock && !mPreview.supportsExposureLock() ) {
-			return;
+			return 0;
 		}
 
 		View takePhotoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.take_photo);
@@ -4740,7 +4748,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		else {
 			Log.d(TAG, "exp_n_new_files: " + exp_n_new_files);
 			if( exp_n_new_files >= 0 ) {
-				assertEquals(n_new_files, exp_n_new_files);
+				assertEquals(exp_n_new_files, n_new_files);
 			}
 		}
 
@@ -4768,6 +4776,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		Log.d(TAG, "pauseVideoButton.getVisibility(): " + pauseVideoButton.getVisibility());
 		assertTrue( pauseVideoButton.getVisibility() == View.GONE );
 		assertTrue( takePhotoVideoButton.getVisibility() == View.GONE );
+
+		return n_new_files;
 	}
 
 	public void testTakeVideo() throws InterruptedException {
@@ -5207,7 +5217,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 	}
 
 	/** Set available memory to make sure that we stop before running out of memory.
-	 *  This test is fine-tuned to Nexus 6 and OnePlus 3T, as we measure hitting max filesize based on time.
+	 *  This test is fine-tuned to Nexus 6, OnePlus 3T and Nokia 8, as we measure hitting max filesize based on time.
 	 */
 	public void testTakeVideoAvailableMemory() throws InterruptedException {
 		Log.d(TAG, "testTakeVideoAvailableMemory");
@@ -5220,6 +5230,18 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		mActivity.getApplicationInterface().test_set_available_memory = true;
 		mActivity.getApplicationInterface().test_available_memory = 50000000;
+		boolean is_nokia = Build.MANUFACTURER.toLowerCase(Locale.US).contains("hmd global");
+		if( is_nokia )
+		{
+			// Nokia 8 has much smaller video sizes, at least when recording with phone face down, so we both set
+			// 4K, and lower test_available_memory.
+			mActivity.getApplicationInterface().test_available_memory = 21000000; // must be at least MyApplicationInterface.getVideoMaxFileSizePref().min_free_filesize
+            SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+            SharedPreferences.Editor editor = settings.edit();
+            editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6 or OnePlus 3T)
+            editor.apply();
+            updateForSettings();
+        }
 
 		subTestTakeVideo(false, false, false, false, new VideoTestCallback() {
 			@Override
@@ -5275,7 +5297,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 	/** Set maximum filesize so that we get approx 3s of video time. Check that recording stops and restarts within 10s.
 	 *  Then check recording stops again within 10s.
-	 *  This test is fine-tuned to Nexus 6 and OnePlus 3T, as we measure hitting max filesize based on time.
+	 *  On Android 8+, we use MediaRecorder.setNextOutputFile() (see Preview.onVideoInfo()), so instead we just wait 5s and
+	 *  check video is still recording, then expect at least 2 resultant video files.
+	 *  This test is fine-tuned to Nexus 6, OnePlus 3T and Nokia 8, as we measure hitting max filesize based on time.
 	 */
 	public void testTakeVideoMaxFileSize1() throws InterruptedException {
 		Log.d(TAG, "testTakeVideoMaxFileSize1");
@@ -5287,15 +5311,40 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		setToDefault();
 		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
 		SharedPreferences.Editor editor = settings.edit();
-		//editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId()), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
-		//editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "15728640"); // approx 3-4s on Nexus 6 at 4K
-		editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "9437184"); // approx 3-4s on Nexus 6 at 4K
+		boolean is_nokia = Build.MANUFACTURER.toLowerCase(Locale.US).contains("hmd global");
+		if( is_nokia ) {
+			// Nokia 8 has much smaller video sizes, at least when recording with phone face down, so we also set 4K
+			editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
+			editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "2000000"); // approx 3s on Nokia 8 at 4K
+		}
+		else {
+			//editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId()), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
+			//editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "15728640"); // approx 3-4s on Nexus 6 at 4K
+			editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "9437184"); // approx 3-4s on Nexus 6 at FullHD
+		}
 		editor.apply();
 		updateForSettings();
 
-		subTestTakeVideo(false, false, false, false, new VideoTestCallback() {
+		int n_new_files = subTestTakeVideo(false, false, false, false, new VideoTestCallback() {
 			@Override
 			public int doTest() {
+				if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+					assertTrue(mPreview.isVideoRecording());
+					Log.d(TAG, "wait");
+					try {
+						Thread.sleep(5000);
+					}
+					catch(InterruptedException e) {
+						e.printStackTrace();
+						assertTrue(false);
+					}
+					Log.d(TAG, "check still recording");
+					assertTrue(mPreview.isVideoRecording());
+					return -1; // the number of videos recorded can vary, as the max duration corresponding to max filesize can vary widly
+				}
+
+				// pre-Android 8 code:
+
 		    	// wait until automatically stops
 				Log.d(TAG, "wait until video recording stops");
 				long time_s = System.currentTimeMillis();
@@ -5375,6 +5424,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 				return -1; // the number of videos recorded can vary, as the max duration corresponding to max filesize can vary widly
 			}
 		}, 5000, true, false);
+
+		if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+			assertTrue( n_new_files >= 2 );
+		}
 	}
 
 	/** Max filesize is for ~4.5s, and max duration is 5s, check we only get 1 video.
@@ -5905,6 +5958,29 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		}
 	}
 
+	/* Test recording video with a flat (log) profile.
+	 */
+	public void testVideoLogProfile() throws InterruptedException {
+		Log.d(TAG, "testVideoLogProfile");
+
+		setToDefault();
+
+		if( !mPreview.usingCamera2API() ) {
+			Log.d(TAG, "test requires camera2 api");
+			return;
+		}
+
+		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+		SharedPreferences.Editor editor = settings.edit();
+		editor.putString(PreferenceKeys.VideoLogPreferenceKey, "strong");
+		editor.apply();
+		updateForSettings();
+
+		subTestTakeVideo(false, false, true, false, null, 5000, false, false);
+
+		assertTrue( mPreview.getCameraController().test_used_tonemap_curve );
+	}
+
 	private void subTestTakeVideoMaxDuration(boolean restart, boolean interrupt) throws InterruptedException {
 		{
 			SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
@@ -5955,6 +6031,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 	    assertTrue(popupButton.getVisibility() == View.VISIBLE);
 	    assertTrue(trashButton.getVisibility() == View.GONE);
 	    assertTrue(shareButton.getVisibility() == View.GONE);
+
+	    // workaround for Android 7.1 bug at https://stackoverflow.com/questions/47548317/what-belong-is-badtokenexception-at-classes-of-project
+		// without this, we get a crash due to that problem on Nexus (old API at least) in testTakeVideoMaxDuration
+	    Thread.sleep(1000);
 
 	    View takePhotoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.take_photo);
 		Log.d(TAG, "about to click take video");
@@ -8480,6 +8560,59 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		}
 	}
 
+	/** Tests NR photo mode.
+	 */
+	public void testTakePhotoNR() throws InterruptedException {
+		Log.d(TAG, "testTakePhotoNR");
+
+		setToDefault();
+
+		if( !mActivity.supportsNoiseReduction() ) {
+			return;
+		}
+
+		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+		SharedPreferences.Editor editor = settings.edit();
+		editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_noise_reduction");
+		editor.apply();
+		updateForSettings();
+
+		final int n_back_photos = 3;
+		subTestTakePhoto(false, false, true, true, false, false, false, false);
+		Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+		assertTrue(mPreview.getCameraController().test_capture_results == 1);
+
+		// then try again without waiting
+		for(int i=1;i<n_back_photos;i++) {
+			subTestTakePhoto(false, false, true, false, false, false, false, false);
+			Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+			assertTrue(mPreview.getCameraController().test_capture_results == i+1);
+		}
+
+		// then try front camera
+
+		if( mPreview.getCameraControllerManager().getNumberOfCameras() <= 1 ) {
+			return;
+		}
+
+		int cameraId = mPreview.getCameraId();
+
+		View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
+		clickView(switchCameraButton);
+		waitUntilCameraOpened();
+
+		int new_cameraId = mPreview.getCameraId();
+
+		Log.d(TAG, "cameraId: " + cameraId);
+		Log.d(TAG, "new_cameraId: " + new_cameraId);
+
+		assertTrue(cameraId != new_cameraId);
+
+		subTestTakePhoto(false, false, true, true, false, false, false, false);
+		Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+		assertTrue(mPreview.getCameraController().test_capture_results == 1);
+	}
+
 	/** Tests fast burst with 20 images.
      */
 	public void testTakePhotoFastBurst() throws InterruptedException {
@@ -10604,7 +10737,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg1/input1.jpg");
 		inputs.add(avg_images_path + "testAvg1/input2.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg1_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg1_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -10655,7 +10790,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg2/input1.jpg");
 		inputs.add(avg_images_path + "testAvg2/input2.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg2_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg2_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -10706,7 +10843,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg3/input3.jpg");
 		inputs.add(avg_images_path + "testAvg3/input4.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg3_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg3_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -10795,7 +10934,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg4/input3.jpg");
 		inputs.add(avg_images_path + "testAvg4/input4.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg4_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg4_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -10860,7 +11001,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg5/input3.jpg");
 		inputs.add(avg_images_path + "testAvg5/input4.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg5_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg5_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -10930,7 +11073,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg6/input6.jpg");
 		inputs.add(avg_images_path + "testAvg6/input7.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg6_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg6_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -10982,7 +11127,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		//checkHistogramDetails(hdrHistogramDetails, 18, 51, 201);
+		//checkHistogramDetails(hdrHistogramDetails, 14, 38, 200);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 9, 193);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 9, 199);
+		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 202);
+		checkHistogramDetails(hdrHistogramDetails, 12, 46, 205);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg7".
@@ -11005,7 +11155,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg7/input6.jpg");
 		inputs.add(avg_images_path + "testAvg7/input7.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg7_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg7_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11049,7 +11201,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg8/input6.jpg");
 		inputs.add(avg_images_path + "testAvg8/input7.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg8_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg8_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11059,7 +11213,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		//checkHistogramDetails(hdrHistogramDetails, 4, 26, 92);
+		//checkHistogramDetails(hdrHistogramDetails, 3, 19, 68);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 10, 60);
+		checkHistogramDetails(hdrHistogramDetails, 1, 8, 72);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg9".
@@ -11098,7 +11255,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		String out_filename = use_auto_photos ? "testAvg9_auto_output.jpg" : "testAvg9_output.jpg";
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, out_filename, 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, out_filename, 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11147,7 +11306,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		String out_filename = use_auto_photos ? "testAvg10_auto_output.jpg" : "testAvg10_output.jpg";
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, out_filename, 800, new TestAvgCallback() {
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, out_filename, 1196, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11171,6 +11330,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		// list assets
 		List<String> inputs = new ArrayList<>();
+		// note, we don't actually use 8 images for a bright scene like this, but it serves as a good test for
+		// misalignment/ghosting anyway
 		inputs.add(avg_images_path + "testAvg11/input0.jpg");
 		inputs.add(avg_images_path + "testAvg11/input1.jpg");
 		inputs.add(avg_images_path + "testAvg11/input2.jpg");
@@ -11293,7 +11454,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 30, 254);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 27, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 20, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg13".
@@ -11343,7 +11506,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg14/input6.jpg");
 		inputs.add(avg_images_path + "testAvg14/input7.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg14_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg14_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11430,7 +11595,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg17/input6.jpg");
 		inputs.add(avg_images_path + "testAvg17/input7.jpg");
 
-		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg17_output.jpg", 800, new TestAvgCallback() {
+		// the input images record ISO=800, but they were taken with OnePlus 3T which has bug where ISO is reported as max
+		// of 800; in reality for a scene this dark, it was probably more like ISO 1600
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg17_output.jpg", 1600, new TestAvgCallback() {
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
@@ -11440,7 +11607,11 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 100, 233);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 100, 236);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 92, 234);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 102, 241);
+		checkHistogramDetails(hdrHistogramDetails, 0, 102, 238);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg18".
@@ -11495,7 +11666,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 88, 252);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 77, 252);
+		checkHistogramDetails(hdrHistogramDetails, 0, 87, 252);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg20".
@@ -11597,10 +11770,11 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_1.jpg");
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_2.jpg");
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_3.jpg");
-		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_4.jpg");
+		// only test 4 images, to reflect latest behaviour that we take 4 images for this ISO
+		/*inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_4.jpg");
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_5.jpg");
 		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_6.jpg");
-		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_7.jpg");
+		inputs.add(avg_images_path + "testAvg23/IMG_20180520_111250_7.jpg");*/
 
 		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg23_output.jpg", 1044, new TestAvgCallback() {
 			@Override
@@ -11647,7 +11821,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 81, 251);
+		checkHistogramDetails(hdrHistogramDetails, 0, 80, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg24".
@@ -11671,7 +11846,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+        //checkHistogramDetails(hdrHistogramDetails, 0, 77, 250);
+        //checkHistogramDetails(hdrHistogramDetails, 0, 74, 250);
+        //checkHistogramDetails(hdrHistogramDetails, 0, 86, 250);
+        checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg25".
@@ -11711,6 +11889,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		// list assets
 		List<String> inputs = new ArrayList<>();
+		// note we now take only 3 images for bright scenes, but still test with 4 images as this serves as a good test
+		// against ghosting
 		inputs.add(avg_images_path + "testAvg26/input0.jpg");
 		inputs.add(avg_images_path + "testAvg26/input1.jpg");
 		inputs.add(avg_images_path + "testAvg26/input2.jpg");
@@ -11768,9 +11948,449 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
 	}
 
-	/** Tests Avg algorithm on test samples "testHDRtemp".
-	 *  Used for one-off testing, or to recreate HDR images from the base exposures to test an updated alorithm.
-	 *  The test images should be copied to the test device into DCIM/testOpenCamera/testdata/hdrsamples/testHDRtemp/ .
+	/** Tests Avg algorithm on test samples "testAvg28".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg28() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg28");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg28/input001.jpg");
+		inputs.add(avg_images_path + "testAvg28/input002.jpg");
+		inputs.add(avg_images_path + "testAvg28/input003.jpg");
+		inputs.add(avg_images_path + "testAvg28/input004.jpg");
+		inputs.add(avg_images_path + "testAvg28/input005.jpg");
+		inputs.add(avg_images_path + "testAvg28/input006.jpg");
+		inputs.add(avg_images_path + "testAvg28/input007.jpg");
+		inputs.add(avg_images_path + "testAvg28/input008.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg28_output.jpg", 811, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		checkHistogramDetails(hdrHistogramDetails, 0, 21, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 18, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg29".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg29() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg29");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg29/input001.jpg");
+		inputs.add(avg_images_path + "testAvg29/input002.jpg");
+		inputs.add(avg_images_path + "testAvg29/input003.jpg");
+		inputs.add(avg_images_path + "testAvg29/input004.jpg");
+		inputs.add(avg_images_path + "testAvg29/input005.jpg");
+		inputs.add(avg_images_path + "testAvg29/input006.jpg");
+		inputs.add(avg_images_path + "testAvg29/input007.jpg");
+		inputs.add(avg_images_path + "testAvg29/input008.jpg");
+		inputs.add(avg_images_path + "testAvg29/input009.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg29_output.jpg", 40, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg30".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg30() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg30");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg30/input001.jpg");
+		inputs.add(avg_images_path + "testAvg30/input002.jpg");
+		inputs.add(avg_images_path + "testAvg30/input003.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg30_output.jpg", 60, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg31".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg31() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg31");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg31/input001.jpg");
+		inputs.add(avg_images_path + "testAvg31/input002.jpg");
+		inputs.add(avg_images_path + "testAvg31/input003.jpg");
+		inputs.add(avg_images_path + "testAvg31/input004.jpg");
+		inputs.add(avg_images_path + "testAvg31/input005.jpg");
+		inputs.add(avg_images_path + "testAvg31/input006.jpg");
+		inputs.add(avg_images_path + "testAvg31/input007.jpg");
+		inputs.add(avg_images_path + "testAvg31/input008.jpg");
+		inputs.add(avg_images_path + "testAvg31/input009.jpg");
+		inputs.add(avg_images_path + "testAvg31/input010.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg31_output.jpg", 609, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg32".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg32() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg32");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg32/input001.jpg");
+		inputs.add(avg_images_path + "testAvg32/input002.jpg");
+		inputs.add(avg_images_path + "testAvg32/input003.jpg");
+		inputs.add(avg_images_path + "testAvg32/input004.jpg");
+		inputs.add(avg_images_path + "testAvg32/input005.jpg");
+		inputs.add(avg_images_path + "testAvg32/input006.jpg");
+		inputs.add(avg_images_path + "testAvg32/input007.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg32_output.jpg", 335, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg33".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg33() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg33");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg33/input001.jpg");
+		inputs.add(avg_images_path + "testAvg33/input002.jpg");
+		inputs.add(avg_images_path + "testAvg33/input003.jpg");
+		inputs.add(avg_images_path + "testAvg33/input004.jpg");
+		inputs.add(avg_images_path + "testAvg33/input005.jpg");
+		inputs.add(avg_images_path + "testAvg33/input006.jpg");
+		inputs.add(avg_images_path + "testAvg33/input007.jpg");
+		inputs.add(avg_images_path + "testAvg33/input008.jpg");
+		inputs.add(avg_images_path + "testAvg33/input009.jpg");
+		inputs.add(avg_images_path + "testAvg33/input010.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg33_output.jpg", 948, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg34".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg34() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg34");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg34/IMG_20180627_121959_0.jpg");
+		inputs.add(avg_images_path + "testAvg34/IMG_20180627_121959_1.jpg");
+		inputs.add(avg_images_path + "testAvg34/IMG_20180627_121959_2.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg34_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 108, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg35".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg35() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg35");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg35/IMG_20180711_144453_0.jpg");
+		inputs.add(avg_images_path + "testAvg35/IMG_20180711_144453_1.jpg");
+		inputs.add(avg_images_path + "testAvg35/IMG_20180711_144453_2.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg35_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		checkHistogramDetails(hdrHistogramDetails, 0, 165, 247);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg36".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg36() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg36");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_0.jpg");
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_1.jpg");
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_2.jpg");
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_3.jpg");
+		// only test 4 images, to reflect latest behaviour that we take 4 images for this ISO
+		/*inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_4.jpg");
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_5.jpg");
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_6.jpg");
+		inputs.add(avg_images_path + "testAvg36/IMG_20180709_114831_7.jpg");*/
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg36_output.jpg", 752, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg37".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg37() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg37");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg37/IMG_20180715_173155_0.jpg");
+		inputs.add(avg_images_path + "testAvg37/IMG_20180715_173155_1.jpg");
+		inputs.add(avg_images_path + "testAvg37/IMG_20180715_173155_2.jpg");
+		inputs.add(avg_images_path + "testAvg37/IMG_20180715_173155_3.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg37_output.jpg", 131, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 12, 109, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 3, 99, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 99, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg38".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg38() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg38");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_0.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_1.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_2.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_3.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_4.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_5.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_6.jpg");
+		inputs.add(avg_images_path + "testAvg38/IMG_20180716_232102_7.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg38_output.jpg", 1505, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg39".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg39() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg39");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg39/input001.jpg");
+		inputs.add(avg_images_path + "testAvg39/input002.jpg");
+		inputs.add(avg_images_path + "testAvg39/input003.jpg");
+		inputs.add(avg_images_path + "testAvg39/input004.jpg");
+		inputs.add(avg_images_path + "testAvg39/input005.jpg");
+		inputs.add(avg_images_path + "testAvg39/input006.jpg");
+		inputs.add(avg_images_path + "testAvg39/input007.jpg");
+		inputs.add(avg_images_path + "testAvg39/input008.jpg");
+		inputs.add(avg_images_path + "testAvg39/input009.jpg");
+		inputs.add(avg_images_path + "testAvg39/input010.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg39_output.jpg", 521, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg40".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg40() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg40");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg40/input001.jpg");
+		inputs.add(avg_images_path + "testAvg40/input002.jpg");
+		inputs.add(avg_images_path + "testAvg40/input003.jpg");
+		inputs.add(avg_images_path + "testAvg40/input004.jpg");
+		inputs.add(avg_images_path + "testAvg40/input005.jpg");
+		inputs.add(avg_images_path + "testAvg40/input006.jpg");
+		inputs.add(avg_images_path + "testAvg40/input007.jpg");
+		inputs.add(avg_images_path + "testAvg40/input008.jpg");
+		inputs.add(avg_images_path + "testAvg40/input009.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg40_output.jpg", 199, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg41".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg41() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg41");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		// example from Google HDR+ dataset
+		// note, the number of input images doesn't necessarily match what we'd take for this scene, but we want to compare
+		// to the Google HDR+ result
+		inputs.add(avg_images_path + "testAvg41/input001.jpg");
+		inputs.add(avg_images_path + "testAvg41/input002.jpg");
+		inputs.add(avg_images_path + "testAvg41/input003.jpg");
+		inputs.add(avg_images_path + "testAvg41/input004.jpg");
+		inputs.add(avg_images_path + "testAvg41/input005.jpg");
+		inputs.add(avg_images_path + "testAvg41/input006.jpg");
+		inputs.add(avg_images_path + "testAvg41/input007.jpg");
+		inputs.add(avg_images_path + "testAvg41/input008.jpg");
+		inputs.add(avg_images_path + "testAvg41/input009.jpg");
+		inputs.add(avg_images_path + "testAvg41/input010.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg41_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvgtemp".
+	 *  Used for one-off testing, or to recreate NR images from the base exposures to test an updated alorithm.
+	 *  The test images should be copied to the test device into DCIM/testOpenCamera/testdata/hdrsamples/testAvgtemp/ .
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */

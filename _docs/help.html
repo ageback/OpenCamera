@@ -568,6 +568,8 @@ API is used). The text will be shown in red when the auto-exposure routine is sc
 also indicate when flash will fire. Note that this is not an absolute guarantee - when you take a photo, the camera will make an
 updated decision on whether to fire the flash, which in some cases may disagree with whether the flash symbol was displayed.</p>
 
+<p><b>Show audio level meter</b> - If selected, when recording video an on-screen meter will display the current audio level.</p>
+
 <p><b>Show a grid</b> - Whether to display one of a choice of grids on the camera preview. Grids are useful in photography to help
 compose your image. Options are:</p>
 <ul>
@@ -735,6 +737,12 @@ rate.</p>
 	rate.</li>
 </ul>
 
+<p><b>Video flat (log) profile</b> - Enables a "flat" or "log" color profile for recording video. Only available if Camera2
+    API is used. This is intended to create videos for further editing in post production. Note that it may be necessary to
+    increase the video bitrate when shooting with a log profile. This feature is currently experimental,
+    please test if it fits your need before shooting your masterpiece!
+</p>
+
 <p><b>Max duration of video</b> - This option can be used to set a maximum duration of the video. If set, video recording
 will stop after the specified time (unless already stopped earlier).</p>
 
@@ -755,9 +763,9 @@ restarting, even if you've set "Restart video after max duration".</p>
 
 <p><b>Restart on maximum file size</b> - Whether to automatically restart if the maximum file size is met. As noted above, almost all
 Android devices have a maximum file size for videos, even if you don't explicitly set one. So it's advisable to keep this option to true,
-so that Open Camera will restart as soon as possible if you're recording video, and hit this limit. Note that there will still be a loss
-of a few seconds while the video stops and restarts - but this at least is better than stopping altogether (and is especially useful if
-you want to leave Open Camera recording without you keeping watch).</p>
+so that Open Camera will restart as soon as possible if you're recording video, and hit this limit. Note that on devices that
+are not running Android 8 or later, there will still be a loss of a few seconds while the video stops and restarts. On Android 8
+or later, the resume should be seamless.</p>
 
 <p><b>Record audio</b> - Whether to record audio when recording a video.</p>
 

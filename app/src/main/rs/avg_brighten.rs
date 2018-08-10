@@ -13,7 +13,11 @@ void setBlackLevel(float value) {
 }
 
 float gain;
+float gain_A, gain_B; // see comments below
 float gamma;
+float low_x;
+float mid_x;
+float max_x;
 
 //float tonemap_scale;
 //float linear_scale;
@@ -29,21 +33,6 @@ uchar4 __attribute__((kernel)) avg_brighten_gain(uchar4 in) {
     return out;
 }
 
-/*static void sort(float *comp, int n_pixels_c) {
-   for(int i=1;i<n_pixels_c;i++) {
-       int key = comp[i];
-       int j = i-1;
-
-       // move elements of comp[0,...,i-1], that are greater than key, to one position ahead of
-       // their current position
-       while(j >= 0 && comp[j] > key) {
-           comp[j+1] = comp[j];
-           j--;
-       }
-       comp[j+1] = key;
-   }
-}*/
-
 uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y) {
     /*{
     	uchar4 out;
@@ -51,116 +40,81 @@ uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y
         out.a = 255;
         return out;
     }*/
-    /*if( false )
+    int width = rsAllocationGetDimX(bitmap);
+    int height = rsAllocationGetDimY(bitmap);
+    //if( false )
+    if( x > 0 && x < width-1 && y > 0 && y < height-1 )
     {
         // median filter for noise reduction
-        int width = rsAllocationGetDimX(bitmap);
-        int height = rsAllocationGetDimY(bitmap);
-        int x_l = x, x_r = x, y_l = y, y_r = y;
-        if( x > 0 ) {
-            x_l--;
+        // performs better than spatial filter; reduces black/white speckles in: testAvg23,
+        // testAvg28, testAvg31, testAvg33
+        // note that one has to typically zoom to 400% to see the improvement
+        float4 p0 = rsGetElementAt_float4(bitmap, x, y-1);
+        float4 p1 = rsGetElementAt_float4(bitmap, x-1, y);
+        float4 p2 = 0.0;
+        p2.rgb = rgb;
+        float4 p3 = rsGetElementAt_float4(bitmap, x+1, y);
+        float4 p4 = rsGetElementAt_float4(bitmap, x, y+1);
+
+        // use alpha channel to store luminance
+        p0.a = max(max(p0.r, p0.g), p0.b);
+        p1.a = max(max(p1.r, p1.g), p1.b);
+        p2.a = max(max(p2.r, p2.g), p2.b);
+        p3.a = max(max(p3.r, p3.g), p3.b);
+        p4.a = max(max(p4.r, p4.g), p4.b);
+
+        // if changing this code, see if the test code in UnitTest.findMedian() should be updated
+        if( p0.a > p1.a ) {
+            float4 temp_p = p0;
+            p0 = p1;
+            p1 = temp_p;
         }
-        if( x < width-1 ) {
-            x_r++;
+        if( p0.a > p2.a ) {
+            float4 temp_p = p0;
+            p0 = p2;
+            p2 = temp_p;
         }
-        if( y > 0 ) {
-            y_l--;
+        if( p0.a > p3.a ) {
+            float4 temp_p = p0;
+            p0 = p3;
+            p3 = temp_p;
         }
-        if( y < height-1 ) {
-            y_r++;
+        if( p0.a > p4.a ) {
+            float4 temp_p = p0;
+            p0 = p4;
+            p4 = temp_p;
         }
-        float value = fmax(rgb.r, rgb.g);
-        value = fmax(value, rgb.b);
-
-        //const int n_pixels_c = 9;
-        //float3 pixels[n_pixels_c];
-        //pixels[0] = rsGetElementAt_float3(bitmap, x_l, y_l);
-        //pixels[1] = rsGetElementAt_float3(bitmap, x, y_l);
-        //pixels[2] = rsGetElementAt_float3(bitmap, x_r, y_l);
-        //pixels[3] = rsGetElementAt_float3(bitmap, x_l, y);
-        //pixels[4] = rgb;
-        //pixels[5] = rsGetElementAt_float3(bitmap, x_r, y);
-        //pixels[6] = rsGetElementAt_float3(bitmap, x_l, y_r);
-        //pixels[7] = rsGetElementAt_float3(bitmap, x, y_r);
-        //pixels[8] = rsGetElementAt_float3(bitmap, x_r, y_r);
-        const int n_pixels_c = 5;
-        const int mid_pixel_c = (n_pixels_c-1)/2;
-        float3 pixels[n_pixels_c];
-        pixels[0] = rsGetElementAt_float3(bitmap, x, y_l);
-        pixels[1] = rsGetElementAt_float3(bitmap, x_l, y);
-        pixels[2] = rgb;
-        pixels[3] = rsGetElementAt_float3(bitmap, x_r, y);
-        pixels[4] = rsGetElementAt_float3(bitmap, x, y_r);
-
-        float comp[n_pixels_c];
-        // red
-        for(int i=0;i<n_pixels_c;i++)
-            comp[i] = pixels[i].r;
-        sort(comp, n_pixels_c);
-        rgb.r = comp[mid_pixel_c];
-
-        // green
-        for(int i=0;i<n_pixels_c;i++)
-            comp[i] = pixels[i].g;
-        sort(comp, n_pixels_c);
-        rgb.g = comp[mid_pixel_c];
-
-        // blue
-        for(int i=0;i<n_pixels_c;i++)
-            comp[i] = pixels[i].b;
-        sort(comp, n_pixels_c);
-        rgb.b = comp[mid_pixel_c];
-
-        // convert from RGB to YUV
-        if( false ) {
-            for(int i=0;i<n_pixels_c;i++) {
-                float Y = 0.299 * pixels[i].r + 0.587 * pixels[i].g + 0.114 * pixels[i].b;
-                float U = -0.147 * pixels[i].r - 0.289 * pixels[i].g + 0.436 * pixels[i].b;
-                float V = 0.615 * pixels[i].r - 0.515 * pixels[i].g - 0.100 * pixels[i].b;
-                pixels[i].x = Y;
-                pixels[i].y = U;
-                pixels[i].z = V;
-            }
-
-            // Y
-            //for(int i=0;i<n_pixels_c;i++)
-            //    comp[i] = 0.299 * pixels[i].r + 0.587 * pixels[i].g + 0.114 * pixels[i].b;
-            //sort(comp, n_pixels_c);
-            //rgb.x = comp[mid_pixel_c];
-            rgb.x = 0.299 * pixels[mid_pixel_c].r + 0.587 * pixels[mid_pixel_c].g + 0.114 * pixels[mid_pixel_c].b;
-
-            // U
-            for(int i=0;i<n_pixels_c;i++)
-                comp[i] = -0.147 * pixels[i].r - 0.289 * pixels[i].g + 0.436 * pixels[i].b;
-            sort(comp, n_pixels_c);
-            rgb.y = comp[mid_pixel_c];
-
-            // V
-            for(int i=0;i<n_pixels_c;i++)
-                comp[i] = 0.615 * pixels[i].r - 0.515 * pixels[i].g - 0.100 * pixels[i].b;
-            sort(comp, n_pixels_c);
-            rgb.z = comp[mid_pixel_c];
-
-            // convert back from YUV to RGB
-            //rgb = rsYuvToRGBA_float4((uchar)(255.0f*rgb.x), (uchar)(255.0f*rgb.y), (uchar)(255.0f*rgb.z)).rgb;
-            float r = rgb.x + 1.140f * rgb.z;
-            float g = rgb.x - 0.395f * rgb.y - 0.581f * rgb.z;
-            float b = rgb.x + 2.032f * rgb.y;
-            rgb.r = r;
-            rgb.g = g;
-            rgb.b = b;
-            rgb = clamp(rgb, 0.0f, 255.0f);
+        //
+        if( p1.a > p2.a ) {
+            float4 temp_p = p1;
+            p1 = p2;
+            p2 = temp_p;
         }
-
-        float new_value = fmax(rgb.r, rgb.g);
-        new_value = fmax(new_value, rgb.b);
-        float diff = value - new_value;
-        rgb.r += diff;
-        rgb.g += diff;
-        rgb.b += diff;
-        rgb = clamp(rgb, 0.0f, 255.0f);
-    }*/
-    //if( false )
+        if( p1.a > p3.a ) {
+            float4 temp_p = p1;
+            p1 = p3;
+            p3 = temp_p;
+        }
+        if( p1.a > p4.a ) {
+            float4 temp_p = p1;
+            p1 = p4;
+            p4 = temp_p;
+        }
+        //
+        if( p2.a > p3.a ) {
+            float4 temp_p = p2;
+            p2 = p3;
+            p3 = temp_p;
+        }
+        if( p2.a > p4.a ) {
+            float4 temp_p = p2;
+            p2 = p4;
+            p4 = temp_p;
+        }
+        // don't care about sorting p3 and p4
+        rgb = p2.rgb;
+    }
+    if( false )
     {
         // spatial noise reduction filter
         // if making canges to this (especially radius, C), run AvgTests - in particular, pay close
@@ -179,23 +133,31 @@ uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y
         // if changing the radius, may also want to change the value returned by HDRProcessor.getAvgSampleSize()
         //int radius = 16;
         //int radius = 4;
+        //int radius = 3;
         //int radius = 2;
         int radius = 1;
-        int width = rsAllocationGetDimX(bitmap);
-        int height = rsAllocationGetDimY(bitmap);
         int count = 0;
         //float C = 0.1f*rgb.g*rgb.g;
-        for(int cy=y-radius;cy<=y+radius;cy++) {
-            for(int cx=x-radius;cx<=x+radius;cx++) {
-                if( cx >= 0 && cx < width && cy >= 0 && y < height ) {
+        int sx = (x >= radius) ? x-radius : 0;
+        int ex = (x < width-radius) ? x+radius : width-1;
+        int sy = (y >= radius) ? y-radius : 0;
+        int ey = (y < height-radius) ? y+radius : height-1;
+        for(int cy=sy;cy<=ey;cy++) {
+            for(int cx=sx;cx<=ex;cx++) {
+                //if( cx >= 0 && cx < width && cy >= 0 && cy < height )
+                {
                     float3 this_pixel = rsGetElementAt_float3(bitmap, cx, cy);
                     //colour_sum += this_pixel;
                     {
                         /*float this_value = fmax(this_pixel.r, this_pixel.g);
-                        this_value = fmax(this_value, this_pixel.b);*/
+                        this_value = fmax(this_value, this_pixel.b);
+                        if( this_value > 0.5f )
+                            this_pixel *= old_value/this_value;*/
                         // use a wiener filter, so that more similar pixels have greater contribution
                         // smaller value of C means stronger filter (i.e., less averaging)
                         // see note above for details on the choice of this value
+                        // if changing this, consider if we also want to change the value for the
+                        // colour only spatial filtering, below
                         //const float C = 64.0f*64.0f;
                         //const float C = 32.0f*32.0f;
                         const float C = 64.0f*64.0f/8.0f;
@@ -238,6 +200,93 @@ uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y
         //rgb += old_value - new_value;
         //rgb = clamp(rgb, 0.0f, 255.0f);
         */
+    }
+    //if( false )
+    {
+        // spatial noise reduction filter, colour only
+        // if changing this, see list of tests under standard spatial noise reduction above
+        float old_value = fmax(rgb.r, rgb.g);
+        old_value = fmax(old_value, rgb.b);
+        float3 sum = 0.0;
+        int radius = 3;
+        int count = 0;
+        int sx = (x >= radius) ? x-radius : 0;
+        int ex = (x < width-radius) ? x+radius : width-1;
+        int sy = (y >= radius) ? y-radius : 0;
+        int ey = (y < height-radius) ? y+radius : height-1;
+        for(int cy=sy;cy<=ey;cy++) {
+            for(int cx=sx;cx<=ex;cx++) {
+                //if( cx >= 0 && cx < width && cy >= 0 && cy < height )
+                {
+                    float3 this_pixel = rsGetElementAt_float3(bitmap, cx, cy);
+                    {
+                        float this_value = fmax(this_pixel.r, this_pixel.g);
+                        this_value = fmax(this_value, this_pixel.b);
+                        if( this_value > 0.5f )
+                            this_pixel *= old_value/this_value;
+                        // use a wiener filter, so that more similar pixels have greater contribution
+                        // smaller value of C means stronger filter (i.e., less averaging)
+                        // for now set at same value as standard spatial filter above
+                        const float C = 64.0f*64.0f/8.0f;
+                        float3 diff = rgb - this_pixel;
+                        float L = dot(diff, diff);
+                        //L = 0.0f; // test no wiener filter
+                        float weight = L/(L+C);
+
+                        /*{
+                            int ix = (int)x;
+                            int iy = (int)y;
+                            int dx = cx - ix;
+                            int dy = cy - iy;
+                            // also take distance into account
+                            float factor_c = 32.0;
+                            float dist2 = dx*dx + dy*dy;
+                            dist2 = 32.0;
+                            float radius_weight = exp(-dist2/factor_c);
+                            weight = 1.0 - weight;
+                            weight *= radius_weight;
+                            weight = 1.0 - weight;
+                        }*/
+
+                        this_pixel = weight * rgb + (1.0-weight) * this_pixel;
+                    }
+                    sum += this_pixel;
+                    count++;
+                }
+            }
+        }
+
+        rgb = sum / count;
+    }
+
+    {
+        // sharpen
+        // helps: testAvg12, testAvg16, testAvg23, testAvg30, testAvg32
+        if( x >= 1 && x < width-1 && y >= 1 && y < height-1 ) {
+            float3 p00 = rsGetElementAt_float3(bitmap, x-1, y-1);
+            float3 p10 = rsGetElementAt_float3(bitmap, x, y-1);
+            float3 p20 = rsGetElementAt_float3(bitmap, x+1, y-1);
+
+            float3 p01 = rsGetElementAt_float3(bitmap, x-1, y);
+            float3 p21 = rsGetElementAt_float3(bitmap, x+1, y);
+
+            float3 p02 = rsGetElementAt_float3(bitmap, x-1, y+1);
+            float3 p12 = rsGetElementAt_float3(bitmap, x, y+1);
+            float3 p22 = rsGetElementAt_float3(bitmap, x+1, y+1);
+
+            float3 blurred = (p00 + p10 + p20 + p01 + 8.0f*rgb + p21 + p02 + p12 + p22)/16.0f;
+            float3 shift = 1.5f * (rgb-blurred);
+            const float threshold2 = 8*8;
+            if( dot(shift, shift) > threshold2 )
+            {
+                rgb += shift;
+            }
+
+            //float3 smooth = p00 + 2.0f*p10 + p20 + 2.0f*p01 + 4.0f*rgb + 2.0f*p21 + p02 + 2.0f*p12 + p22;
+            //rgb += 1.0f * ( rgb - smooth/16.0f );
+
+            rgb = clamp(rgb, 0.0f, 255.0f);
+        }
     }
 
     rgb = rgb - black_level;
@@ -287,6 +336,8 @@ uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y
     out.rgb = convert_uchar3(clamp(hdr+0.5f, 0.f, 255.f));
     out.a = 255;*/
 
+    // apply combination of gain and gamma
+    /*
     rgb *= gain;
     float3 hdr = rgb;
     float value = fmax(hdr.r, hdr.g);
@@ -296,6 +347,36 @@ uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y
         float gamma_scale = new_value / value;
         hdr *= gamma_scale;
     }
+    */
+
+    // apply piecewise function of gain vs gamma
+    float3 hdr = rgb;
+    float value = fmax(hdr.r, hdr.g);
+    value = fmax(value, hdr.b);
+    if( value <= low_x ) {
+        // don't scale
+    }
+    else if( value <= mid_x ) {
+        //float alpha = (value-low_x)/(mid_x-low_x);
+        //float new_value = (1.0-alpha)*low_x + alpha*gain*mid_x;
+        // gain_A and gain_B should be set so that new_value meets the commented out code above
+        // This code is critical for performance!
+        //float new_value = gain_A * value + gain_B;
+        //hdr *= new_value/value;
+        hdr *= (gain_A + gain_B/value);
+    }
+    /*if( value <= mid_x ) {
+        hdr *= gain;
+    }*/
+    else {
+        float new_value = powr(value/max_x, gamma) * 255.0f;
+        float gamma_scale = new_value / value;
+        hdr *= gamma_scale;
+    }
+
+    // apply gamma correction
+    //hdr = powr(hdr/255.0f, 0.454545454545f) * 255.0f;
+
 	uchar4 out;
     out.rgb = convert_uchar3(clamp(hdr+0.5f, 0.f, 255.f));
     out.a = 255;
