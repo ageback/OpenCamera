@@ -544,4 +544,7 @@
             <li>Performance improvements and bug fixes.\n</li>
         </ul>
     </string>
+    <string name="no_burst">无连拍</string>
+    <string name="preference_show_video_max_amp">显示音频电平表</string>
+    <string name="preference_show_video_max_amp_summary">是否在录制视频时显示屏幕音频电平</string>
 </resources>
