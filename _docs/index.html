@@ -19,13 +19,19 @@
 <!-- EU cookie law, needed for analytics and adsense -->
 <!-- Begin Cookie Consent plugin by Silktide - http://silktide.com/cookieconsent -->
 <script type="text/javascript">
-    window.cookieconsent_options = {"message":"This website uses cookies to ensure you get the best experience on our website","dismiss":"Got it!","learnMore":"More info","link":null,"theme":"dark-bottom"};
+    window.cookieconsent_options = {
+        "message":"This website uses cookies, including for Google Analytics and to display ads",
+        "dismiss":"Got it!",
+        "learnMore":"More info",
+        "link":"http://opencamera.org.uk/#privacy",
+        "theme":"dark-bottom"};
 </script>
 
 <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/cookieconsent2/1.0.9/cookieconsent.min.js"></script>
 <!-- End Cookie Consent plugin -->
 
 <!-- Google Analytics -->
+<!-- anonymizeIp is set: unclear if this is needed for EU GDPR, but just in case -->
 <script>
   (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
   (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -33,7 +39,17 @@
   })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
   ga('create', 'UA-38364448-5', 'auto');
+  ga('set', 'anonymizeIp', true);
   ga('send', 'pageview');
+</script>
+
+<!-- Google adsense auto ads -->
+<script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({
+          google_ad_client: "ca-pub-1960368062214160",
+          enable_page_level_ads: true
+     });
 </script>
 
 </head>
@@ -88,8 +104,8 @@ browsers -->
 <p>Open Camera is an Open Source Camera app for Android phones and tablets. Features:</p>
 <ul style="font-size:small">
 <li>Option to <a href="help.html#auto_stabilise">auto-level</a> so your pictures are perfectly level no matter what.</li>
-<li>Expose your camera's functionality: support for focus modes, scene modes, color effects, white balance, ISO, exposure compensation/lock, face detection, torch.</li>
-<li>Video recording (including HD, and taking photos while recording video).</li>
+<li>Expose your camera's functionality: support for focus modes, scene modes, color effects, white balance, ISO, exposure compensation/lock, face detection, torch, antibanding.</li>
+<li>Video recording (including HD, taking photos while recording video, time lapse).</li>
 <li>Handy remote controls: timer (with optional voice countdown), auto-repeat mode (with configurable delay).</li>
 <li>Option to take photo remotely by making a noise (e.g., voice, whistle), or by voice command "cheese".</li>
 <li>Configurable volume keys.</li>
@@ -105,8 +121,9 @@ browsers -->
 <li>Support for (some) external microphones.</li>
 <li>Widget to automatically take a photo after launching.</li>
 <li>Support for <a href="help.html#hdr">HDR</a> (with auto-alignment and ghost removal) and Exposure Bracketing.</li>
-<li>Support for Camera2 API: manual focus distance; manual ISO; manual exposure time; manual white balance temperature; RAW (DNG) files.</li>
+<li>Support for Camera2 API: manual focus distance; manual ISO; manual exposure time; manual white balance temperature; burst mode; RAW (DNG) files; slow motion video.</li>
 <li>Dynamic range optimisation mode for better quality photos.</li>
+<li>Support for <a href="https://play.google.com/store/apps/details?id=com.miband2.mibandselfie">Mi Band 2 &amp; Amazfit Selfie</a>.</li>
 <li>Small file size.</li>
 <li>Completely free, and no ads in the app. Open Source.</li>
 </ul>
@@ -141,7 +158,7 @@ You can also donate through Paypal:</p>
 <p><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=2WCE756ZME9JG&lc=GB&item_name=Open%20Camera%20donation&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHostedGuest"><img src="https://www.paypalobjects.com/en_US/GB/i/btn/btn_donateCC_LG.gif" title="Donate to Open Camera development"></a></p>
 
 <p>(Paypal account not required, supports debit or credit card), or Bitcoin <b>1KZm8bKwTY8kSpqEmHZ2pBWeC6aFCs7zxG</b>.
-Thanks! Donations can be used for: purchasing hardware for porting/testing; app store fees; beer money :)</p>
+Thanks!</p>
 
 <hr>
 <p>
@@ -192,6 +209,7 @@ your wedding etc :)</p>
 <p>Open Camera is written by Mark Harman. Additional credits:</p>
 <ul>
 <li>App icon and take_photo.png, take_photo_pressed.png by <a href="http://www.yeti-designs.com">Adam Lapinski</a>.</li>
+<li>Improvements/help for video frame rates (including high speed) by George Joseph.</li>
 <li>Improved selfie stick button support by Lau Keat Hwa.</li>
 <li>Option for filenames to be based on UTC (Zulu) time by <a href="https://www.cathedralcanyon.net">David Pletcher</a> ( lpm_sourceforge AT cathedralcanyon DOT net ).</li>
 <li>Support for manual ISO for old camera API on Asus Zenphone 2 Z00A and Z008 by Fl&aacute;vio Keglevich ( fkeglevich AT gmail DOT com ).</li>
@@ -224,6 +242,9 @@ your wedding etc :)</p>
 <p>Google Play requires me to disclose that Open Camera will record camera sensor and microphone data, which is used for the purpose
 of taking photos and recording videos.</p>
 
+<p>Open Camera requires permission to "access photos, media and files on your devices", as this permission is required for Android to
+save resultant photos and videos to your device.</p>
+
 <p>Location permission is required for geotagging of photos, but this is disabled by default. If enabled, your location is encoded
 in the saved image and video files (and it is only used for this purpose).</p>
 
@@ -236,6 +257,9 @@ advertising by visiting <a href="https://www.google.co.uk/settings/ads">Google's
 <p>This website also uses <a href="https://analytics.google.com">Google Analytics</a> which uses cookies, please see their
 <a href="https://support.google.com/analytics/answer/6004245">Privacy Policy</a> for more details.</p>
 
+<p>Also see <a href="https://www.google.com/policies/technologies/partner-sites/">"How Google uses information from sites or apps
+that use our services"</a>.</p>
+
 <p><a name="licence"></a><b>Licence</b></p>
 
 <p>Open Camera is released under the <a href="http://www.gnu.org/copyleft/gpl.html">GPL v3 or later</a>. The source code is
@@ -243,6 +267,7 @@ available from
 <!-- use &#8203; to limit widths on continuous text to 30 characters, to avoid messing up view on mobile devices -->
 <a href="https://sourceforge.net/projects/opencamera/files/">https://sourceforge.net/&#8203;projects/opencamera/files/</a> .
 <!--The file exposure.png is also dual licensed under GPL v3 or later, and <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> or later (attribute to Mark Harman and please link to http://opencamera.sourceforge.net/ ).-->
+Also see <i>"Can I use the Open Camera source code in my app?"</i> under the <a href="help.html#faq">FAQ</a>.
 </p>
 
 <p>The following files are used in Open Camera:</p>
@@ -267,7 +292,7 @@ available from
 <!--<li>App icon/logo, take_photo.png, take_photo_pressed.png from <a href="https://www.iconfinder.com/icons/81087/mb_photo_icon#size=128">https://www.iconfinder.com/&#8203;icons/81087/&#8203;mb_photo_icon#size=128</a> , by Yankoa - http://yankoa.deviantart.com/ , under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</li>-->
 <li>take_video.png, take_video_pressed.png from <a href="https://www.iconfinder.com/icons/81197/mb_rec_video_icon#size=128">https://www.iconfinder.com/&#8203;icons/81197/&#8203;mb_rec_video_icon#size=128</a> , by Yankoa - http://yankoa.deviantart.com/ , under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</li>
 <!--<li>trash.png from <a href="https://www.iconfinder.com/icons/115789/trash_icon#size=128">https://www.iconfinder.com/&#8203;icons/115789/&#8203;trash_icon#size=128</a> , by Designmodo, under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</li>-->
-<li>flash_auto.png, flash_off.png, flash_on.png, ic_burst_mode_white_48dp.png, ic_exposure_white_48dp.png, ic_face_white_48dp.png, ic_gps_fixed_white_48dp.png, ic_gps_off_white_48dp.png, ic_hdr_on_white_48dp.png, ic_help_outline_white_48dp.png, ic_info_outline_white_48dp.png, ic_mic_red_48dp.png, ic_mic_white_48dp.png, ic_more_horiz_white_48dp.png, ic_pause_circle_outline_white_48dp.png, ic_play_circle_outline_white_48dp.png, ic_photo_camera_white_48dp.png, ic_photo_size_select_large_white_48dp.png, ic_power_settings_new_white_48dp.png, ic_save_white_48dp.png, ic_text_format_white_48dp.png, ic_timer_white_48dp.png, ic_touch_app_white_48dp.png, ic_videocam_white_48dp.png, popup*.png, settings.png, share.png, switch_camera.png, trash.png - from <a href="https://developer.android.com/design/downloads/index.html">https://developer.android.com/&#8203;design/downloads/index.html</a> / <a href="https://github.com/google/material-design-icons/">https://github.com/google/material-design-icons/</a> / <a href="https://design.google.com/icons/">https://design.google.com/icons/</a>, by Google, under <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</li>
+<li>flash_auto.png, flash_off.png, flash_on.png, ic_burst_mode_white_48dp.png, ic_exposure_white_48dp.png, ic_face_white_48dp.png, ic_fast_forward_white_48dp.png, ic_gps_fixed_white_48dp.png, ic_gps_off_white_48dp.png, ic_hdr_on_white_48dp.png, ic_help_outline_white_48dp.png, ic_info_outline_white_48dp.png, ic_mic_off_white_48dp.png, ic_mic_red_48dp.png, ic_mic_white_48dp.png, ic_more_horiz_white_48dp.png, ic_pause_circle_outline_white_48dp.png, ic_play_circle_outline_white_48dp.png, ic_photo_camera_white_48dp.png, ic_photo_size_select_large_white_48dp.png, ic_power_settings_new_white_48dp.png, ic_save_white_48dp.png, ic_slow_motion_video_white_48dp.png, ic_text_format_white_48dp.png, ic_timelapse_white_48dp.png, ic_timer_white_48dp.png, ic_touch_app_white_48dp.png, ic_videocam_white_48dp.png, popup*.png, settings.png, share.png, switch_camera.png, trash.png - from <a href="https://developer.android.com/design/downloads/index.html">https://developer.android.com/&#8203;design/downloads/index.html</a> / <a href="https://github.com/google/material-design-icons/">https://github.com/google/material-design-icons/</a> / <a href="https://design.google.com/icons/">https://design.google.com/icons/</a>, by Google, under <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</li>
 <li>beep.ogg, beep_hi.ogg - from <a href="http://opengameart.org/content/interface-beeps">http://opengameart.org/&#8203;content/interface-beeps</a> , by bart, under CC0 (public domain).</li>
 </ul>
 
@@ -275,7 +300,8 @@ available from
 
 <hr>
 <p><a href="http://sourceforge.net/p/opencamera/">Open Camera on Sourceforge.</a></p>
-<p><a href="http://mdwh2.users.sourceforge.net/">More of my Free software.</a></p>
+<p><a href="http://mark-h.users.sourceforge.net/">More of my Free software.</a></p>
+<hr>
 
 </body>
 </html>

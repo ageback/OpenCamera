@@ -43,6 +43,7 @@ public class StorageUtils {
     static final int MEDIA_TYPE_VIDEO = 2;
 
 	private final Context context;
+	private final MyApplicationInterface applicationInterface;
     private Uri last_media_scanned;
 
 	private final static File base_folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
@@ -50,8 +51,9 @@ public class StorageUtils {
 	// for testing:
 	public volatile boolean failed_to_scan;
 	
-	StorageUtils(Context context) {
+	StorageUtils(Context context, MyApplicationInterface applicationInterface) {
 		this.context = context;
+		this.applicationInterface = applicationInterface;
 	}
 	
 	Uri getLastMediaScanned() {
@@ -233,6 +235,7 @@ public class StorageUtils {
         		 				Log.d(TAG, "set last_media_scanned to " + last_media_scanned);
     		 			}
     		 			announceUri(uri, is_new_picture, is_new_video);
+    		 			applicationInterface.scannedFile(file, uri);
 
     	    			// it seems caller apps seem to prefer the content:// Uri rather than one based on a File
 						// update for Android 7: seems that passing file uris is now restricted anyway, see https://code.google.com/p/android/issues/detail?id=203555
@@ -328,16 +331,24 @@ public class StorageUtils {
 	// http://stackoverflow.com/questions/20067508/get-real-path-from-uri-android-kitkat-new-storage-access-framework/
     // only valid if isUsingSAF()
 	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
-	File getFileFromDocumentUriSAF(Uri uri, boolean is_folder) {
+	public File getFileFromDocumentUriSAF(Uri uri, boolean is_folder) {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "getFileFromDocumentUriSAF: " + uri);
 			Log.d(TAG, "is_folder?: " + is_folder);
 		}
+        String authority = uri.getAuthority();
+        if( MyDebug.LOG ) {
+            Log.d(TAG, "authority: " + authority);
+            Log.d(TAG, "scheme: " + uri.getScheme());
+            Log.d(TAG, "fragment: " + uri.getFragment());
+            Log.d(TAG, "path: " + uri.getPath());
+            Log.d(TAG, "last path segment: " + uri.getLastPathSegment());
+        }
 	    File file = null;
-		if( "com.android.externalstorage.documents".equals(uri.getAuthority()) ) {
-            final String id = is_folder ? DocumentsContract.getTreeDocumentId(uri) : DocumentsContract.getDocumentId(uri);
-    		if( MyDebug.LOG )
-    			Log.d(TAG, "id: " + id);
+		if( "com.android.externalstorage.documents".equals(authority) ) {
+			final String id = is_folder ? DocumentsContract.getTreeDocumentId(uri) : DocumentsContract.getDocumentId(uri);
+			if( MyDebug.LOG )
+				Log.d(TAG, "id: " + id);
 			String [] split = id.split(":");
 			if( split.length >= 2 ) {
 				String type = split[0];
@@ -364,16 +375,36 @@ public class StorageUtils {
 				}
 			}
 		}
-		else if( "com.android.providers.downloads.documents".equals(uri.getAuthority()) ) {
-			final String id = DocumentsContract.getDocumentId(uri);
-			final Uri contentUri = ContentUris.withAppendedId(
-					Uri.parse("content://downloads/public_downloads"), Long.parseLong(id));
+		else if( "com.android.providers.downloads.documents".equals(authority) ) {
+			if( !is_folder ) {
+				final String id = DocumentsContract.getDocumentId(uri);
+				if( id.startsWith("raw:") ) {
+					// unclear if this is needed for Open Camera, but on Vibrance HDR
+				    // on some devices (at least on a Chromebook), I've had reports of id being of the form
+                    // "raw:/storage/emulated/0/Download/..."
+				    String filename = id.replaceFirst("raw:", "");
+					file = new File(filename);
+                }
+                else {
+					final Uri contentUri = ContentUris.withAppendedId(
+							Uri.parse("content://downloads/public_downloads"), Long.parseLong(id));
 
-			String filename = getDataColumn(contentUri, null, null);
-			if( filename != null )
-				file = new File(filename);
+					String filename = getDataColumn(contentUri, null, null);
+					if( filename != null )
+						file = new File(filename);
+				}
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.d(TAG, "downloads uri not supported for folders");
+				// This codepath can be reproduced by enabling SAF and selecting Downloads.
+				// DocumentsContract.getDocumentId() throws IllegalArgumentException for
+				// this (content://com.android.providers.downloads.documents/tree/downloads).
+				// If we use DocumentsContract.getTreeDocumentId() for folders, it returns
+				// "downloads" - not clear how to parse this!
+			}
 		}
-		else if( "com.android.providers.media.documents".equals(uri.getAuthority()) ) {
+		else if( "com.android.providers.media.documents".equals(authority) ) {
 			final String docId = DocumentsContract.getDocumentId(uri);
 			final String[] split = docId.split(":");
 			final String type = split[0];
@@ -524,8 +555,15 @@ public class StorageUtils {
 			e.printStackTrace();
 			throw new IOException();
 		}
+		catch(IllegalStateException e) {
+			// Have reports of this from Google Play for DocumentsContract.createDocument - better to fail gracefully and tell user rather than crash!
+			if( MyDebug.LOG )
+				Log.e(TAG, "createOutputMediaFileSAF failed with IllegalStateException");
+			e.printStackTrace();
+			throw new IOException();
+		}
 		catch(SecurityException e) {
-			// Have reports of this from GooglePlay - better to fail gracefully and tell user rather than crash!
+			// Have reports of this from Google Play - better to fail gracefully and tell user rather than crash!
 			if( MyDebug.LOG )
 				Log.e(TAG, "createOutputMediaFileSAF failed with SecurityException");
 			e.printStackTrace();
@@ -565,13 +603,15 @@ public class StorageUtils {
 		final Uri uri;
 		final long date;
 		final int orientation;
+		final String path;
 
-    	Media(long id, boolean video, Uri uri, long date, int orientation) {
+    	Media(long id, boolean video, Uri uri, long date, int orientation, String path) {
     		this.id = id;
     		this.video = video;
     		this.uri = uri;
     		this.date = date;
     		this.orientation = orientation;
+    		this.path = path;
     	}
     }
     
@@ -591,10 +631,11 @@ public class StorageUtils {
 		Uri baseUri = video ? Video.Media.EXTERNAL_CONTENT_URI : MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
 		final int column_id_c = 0;
 		final int column_date_taken_c = 1;
-		final int column_data_c = 2;
-		final int column_orientation_c = 3;
+		final int column_data_c = 2; // full path and filename, including extension
+		final int column_orientation_c = 3; // for images only
 		String [] projection = video ? new String[] {VideoColumns._ID, VideoColumns.DATE_TAKEN, VideoColumns.DATA} : new String[] {ImageColumns._ID, ImageColumns.DATE_TAKEN, ImageColumns.DATA, ImageColumns.ORIENTATION};
-		String selection = video ? "" : ImageColumns.MIME_TYPE + "='image/jpeg'";
+		// for images, we need to search for JPEG and RAW, to support RAW only mode (even if we're not currently in that mode, it may be that previously the user did take photos in RAW only mode)
+		String selection = video ? "" : ImageColumns.MIME_TYPE + "='image/jpeg' OR " + ImageColumns.MIME_TYPE + "='image/x-adobe-dng'";
 		String order = video ? VideoColumns.DATE_TAKEN + " DESC," + VideoColumns._ID + " DESC" : ImageColumns.DATE_TAKEN + " DESC," + ImageColumns._ID + " DESC";
 		Cursor cursor = null;
 		try {
@@ -629,7 +670,53 @@ public class StorageUtils {
 							break;
 						}
 					}
-				} while( cursor.moveToNext() );
+				}
+				while( cursor.moveToNext() );
+				if( found ) {
+					// make sure we prefer JPEG if there's a JPEG version of this image
+					// this is because we want to support RAW only and JPEG+RAW modes
+					String path = cursor.getString(column_data_c);
+					if( MyDebug.LOG )
+						Log.d(TAG, "path: " + path);
+					// path may be null on Android 4.4, see above!
+					if( path != null && path.toLowerCase(Locale.US).endsWith(".dng") ) {
+						if( MyDebug.LOG )
+							Log.d(TAG, "try to find a JPEG version of the DNG");
+						int dng_pos = cursor.getPosition();
+						boolean found_jpeg = false;
+						String path_without_ext = path.toLowerCase(Locale.US);
+						if( path_without_ext.indexOf(".") > 0 )
+							path_without_ext = path_without_ext.substring(0, path_without_ext.lastIndexOf("."));
+						if( MyDebug.LOG )
+							Log.d(TAG, "path_without_ext: " + path_without_ext);
+						while( cursor.moveToNext() ) {
+							String next_path = cursor.getString(column_data_c);
+							if( MyDebug.LOG )
+								Log.d(TAG, "next_path: " + next_path);
+							if( next_path == null )
+								break;
+							String next_path_without_ext = next_path.toLowerCase(Locale.US);
+							if( next_path_without_ext.indexOf(".") > 0 )
+								next_path_without_ext = next_path_without_ext.substring(0, next_path_without_ext.lastIndexOf("."));
+							if( MyDebug.LOG )
+								Log.d(TAG, "next_path_without_ext: " + next_path_without_ext);
+							if( !path_without_ext.equals(next_path_without_ext) )
+								break;
+							// so we've found another file with matching filename - is it a JPEG?
+							if( next_path.toLowerCase(Locale.US).endsWith(".jpg") ) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "found equivalent jpeg");
+								found_jpeg = true;
+								break;
+							}
+						}
+						if( !found_jpeg ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "can't find equivalent jpeg");
+							cursor.moveToPosition(dng_pos);
+						}
+					}
+				}
 				if( !found ) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "can't find suitable in Open Camera folder, so just go with most recent");
@@ -639,9 +726,10 @@ public class StorageUtils {
 				long date = cursor.getLong(column_date_taken_c);
 				int orientation = video ? 0 : cursor.getInt(column_orientation_c);
 				Uri uri = ContentUris.withAppendedId(baseUri, id);
+				String path = cursor.getString(column_data_c);
 				if( MyDebug.LOG )
 					Log.d(TAG, "found most recent uri for " + (video ? "video" : "images") + ": " + uri);
-				media = new Media(id, video, uri, date, orientation);
+				media = new Media(id, video, uri, date, orientation, path);
 			}
 		}
 		catch(Exception e) {

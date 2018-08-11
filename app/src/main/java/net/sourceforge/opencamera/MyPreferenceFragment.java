@@ -1,11 +1,14 @@
 package net.sourceforge.opencamera;
 
+import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.Preview.Preview;
 import net.sourceforge.opencamera.UI.FolderChooserDialog;
 
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
+import android.app.DialogFragment;
+import android.app.Fragment;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.DialogInterface;
@@ -21,6 +24,7 @@ import android.graphics.Point;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.EditTextPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
@@ -33,6 +37,7 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.View;
@@ -40,6 +45,9 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 
 /** Fragment to handle the Settings UI. Note that originally this was a
@@ -48,9 +56,25 @@ import java.util.Locale;
  *  meaning we couldn't access data from that class. This no longer applies due
  *  to now using a PreferenceFragment, but I've still kept with transferring
  *  information via the bundle (for the most part, at least).
+ *  Also note that passing via a bundle may be necessary to avoid accessing the
+ *  preview, which can be null - see note about video resolutions below.
+ *  Also see https://stackoverflow.com/questions/14093438/after-the-rotate-oncreate-fragment-is-called-before-oncreate-fragmentactivi .
  */
 public class MyPreferenceFragment extends PreferenceFragment implements OnSharedPreferenceChangeListener {
 	private static final String TAG = "MyPreferenceFragment";
+
+	private int cameraId;
+
+	/* Any AlertDialogs we create should be added to dialogs, and removed when dismissed. Any dialogs still
+	 * opened when onDestroy() is called are closed.
+	 * Normally this shouldn't be needed - the settings is usually only closed by the user pressing Back,
+	 * which can only be done once any opened dialogs are also closed. But this is required if we want to
+	 * programmatically close the settings - this is done in MainActivity.onNewIntent(), so that if Open Camera
+	 * is launched from the homescreen again when the settings was opened, we close the settings.
+	 * UPDATE: At the time of writing, we don't set android:launchMode="singleTask", so onNewIntent() is not called,
+	 * so this code isn't necessary - but there shouldn't be harm to leave it here for future use.
+	 */
+	private final HashSet<AlertDialog> dialogs = new HashSet<>();
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -60,7 +84,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		addPreferencesFromResource(R.xml.preferences);
 
 		final Bundle bundle = getArguments();
-		final int cameraId = bundle.getInt("cameraId");
+		this.cameraId = bundle.getInt("cameraId");
 		if( MyDebug.LOG )
 			Log.d(TAG, "cameraId: " + cameraId);
 		final int nCameras = bundle.getInt("nCameras");
@@ -87,6 +111,23 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		//readFromBundle(bundle, "isos", Preview.getISOPreferenceKey(), "auto", "preference_category_camera_effects");
 		//readFromBundle(bundle, "exposures", "preference_exposure", "0", "preference_category_camera_effects");
 
+		boolean has_antibanding = false;
+		String [] antibanding_values = bundle.getStringArray("antibanding");
+		if( antibanding_values != null && antibanding_values.length > 0 ) {
+			String [] antibanding_entries = bundle.getStringArray("antibanding_entries");
+			if( antibanding_entries != null && antibanding_entries.length == antibanding_values.length ) { // should always be true here, but just in case
+				readFromBundle(antibanding_values, antibanding_entries, PreferenceKeys.AntiBandingPreferenceKey, CameraController.ANTIBANDING_DEFAULT, "preference_category_camera_quality");
+				has_antibanding = true;
+			}
+		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "has_antibanding?: " + has_antibanding);
+		if( !has_antibanding ) {
+			Preference pref = findPreference("preference_antibanding");
+			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_camera_quality");
+        	pg.removePreference(pref);
+		}
+
 		final boolean supports_face_detection = bundle.getBoolean("supports_face_detection");
 		if( MyDebug.LOG )
 			Log.d(TAG, "supports_face_detection: " + supports_face_detection);
@@ -103,16 +144,18 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		final int [] preview_heights = bundle.getIntArray("preview_heights");
 		final int [] video_widths = bundle.getIntArray("video_widths");
 		final int [] video_heights = bundle.getIntArray("video_heights");
+		final int [] video_fps = bundle.getIntArray("video_fps");
 
 		final int resolution_width = bundle.getInt("resolution_width");
 		final int resolution_height = bundle.getInt("resolution_height");
 		final int [] widths = bundle.getIntArray("resolution_widths");
 		final int [] heights = bundle.getIntArray("resolution_heights");
-		if( widths != null && heights != null ) {
+		final boolean [] supports_burst = bundle.getBooleanArray("resolution_supports_burst");
+		if( widths != null && heights != null && supports_burst != null ) {
 			CharSequence [] entries = new CharSequence[widths.length];
 			CharSequence [] values = new CharSequence[widths.length];
 			for(int i=0;i<widths.length;i++) {
-				entries[i] = widths[i] + " x " + heights[i] + " " + Preview.getAspectRatioMPString(widths[i], heights[i]);
+				entries[i] = widths[i] + " x " + heights[i] + " " + Preview.getAspectRatioMPString(getResources(), widths[i], heights[i], supports_burst[i]);
 				values[i] = widths[i] + " " + heights[i];
 			}
 			ListPreference lp = (ListPreference)findPreference("preference_resolution");
@@ -130,6 +173,35 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			Preference pref = findPreference("preference_resolution");
 			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_photo_settings");
         	pg.removePreference(pref);
+		}
+
+		String fps_preference_key = PreferenceKeys.getVideoFPSPreferenceKey(cameraId);
+		if( MyDebug.LOG )
+			Log.d(TAG, "fps_preference_key: " + fps_preference_key);
+		String fps_value = sharedPreferences.getString(fps_preference_key, "default");
+		if( MyDebug.LOG )
+			Log.d(TAG, "fps_value: " + fps_value);
+		if( video_fps != null ) {
+			// build video fps settings
+			CharSequence [] entries = new CharSequence[video_fps.length+1];
+			CharSequence [] values = new CharSequence[video_fps.length+1];
+			int i=0;
+			// default:
+			entries[i] = getResources().getString(R.string.preference_video_fps_default);
+			values[i] = "default";
+			i++;
+			for(int fps : video_fps) {
+				entries[i] = "" + fps;
+				values[i] = "" + fps;
+				i++;
+			}
+
+			ListPreference lp = (ListPreference)findPreference("preference_video_fps");
+			lp.setEntries(entries);
+			lp.setEntryValues(values);
+			lp.setValue(fps_value);
+			// now set the key, so we save for the correct cameraId
+			lp.setKey(fps_preference_key);
 		}
 
 		{
@@ -155,13 +227,20 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
         	pg.removePreference(pref);
 		}
 		else {
-        	Preference pref = findPreference("preference_raw");
+        	ListPreference pref = (ListPreference)findPreference("preference_raw");
+
+	        if( Build.VERSION.SDK_INT < Build.VERSION_CODES.N ) {
+	        	// RAW only mode requires at least Android 7; earlier versions seem to have poorer support for DNG files
+	        	pref.setEntries(R.array.preference_raw_entries_preandroid7);
+	        	pref.setEntryValues(R.array.preference_raw_values_preandroid7);
+			}
+
         	pref.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
         		@Override
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
             		if( MyDebug.LOG )
             			Log.d(TAG, "clicked raw: " + newValue);
-            		if( newValue.equals("preference_raw_yes") ) {
+            		if( newValue.equals("preference_raw_yes") || newValue.equals("preference_raw_only") ) {
             			// we check done_raw_info every time, so that this works if the user selects RAW again without leaving and returning to Settings
             			boolean done_raw_info = sharedPreferences.contains(PreferenceKeys.RawInfoPreferenceKey);
             			if( !done_raw_info ) {
@@ -179,7 +258,18 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 				            		editor.apply();
 								}
 	        	            });
-	        	            alertDialog.show();
+							final AlertDialog alert = alertDialog.create();
+							// AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+							alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+								@Override
+								public void onDismiss(DialogInterface arg0) {
+									if( MyDebug.LOG )
+										Log.d(TAG, "raw dialog dismissed");
+									dialogs.remove(alert);
+								}
+							});
+							alert.show();
+	        	            dialogs.add(alert);
             			}
                     }
                 	return true;
@@ -262,6 +352,17 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
         	pg.removePreference(pref);
 		}
 
+		/* Set up video resolutions.
+		   Note that this will be the resolutions for either standard or high speed frame rate (where
+		   the latter may also include being in slow motion mode), depending on the current setting when
+		   this settings fragment is launched. A limitation is that if the user changes the fps value
+		   within the settings, this list won't update until the user exits and re-enters the settings.
+		   This could be fixed by setting a setOnPreferenceChangeListener for the preference_video_fps
+		   ListPreference and updating, but we must not assume that the preview will be non-null (since
+		   if the application is being recreated, MyPreferenceFragment.onCreate() is called via
+		   MainActivity.onCreate()->super.onCreate() before the preview is created! So we still need to
+		   read the info via a bundle, and only update when fps changes if the preview is non-null.
+		 */
 		final String [] video_quality = bundle.getStringArray("video_quality");
 		final String [] video_quality_string = bundle.getStringArray("video_quality_string");
 		if( video_quality != null && video_quality_string != null ) {
@@ -274,29 +375,38 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			ListPreference lp = (ListPreference)findPreference("preference_video_quality");
 			lp.setEntries(entries);
 			lp.setEntryValues(values);
-			String video_quality_preference_key = PreferenceKeys.getVideoQualityPreferenceKey(cameraId);
+			String video_quality_preference_key = bundle.getString("video_quality_preference_key");
+			if( MyDebug.LOG )
+				Log.d(TAG, "video_quality_preference_key: " + video_quality_preference_key);
 			String video_quality_value = sharedPreferences.getString(video_quality_preference_key, "");
 			if( MyDebug.LOG )
 				Log.d(TAG, "video_quality_value: " + video_quality_value);
-			lp.setValue(video_quality_value);
-			// now set the key, so we save for the correct cameraId
+			// set the key, so we save for the correct cameraId and high-speed setting
+			// this must be done before setting the value (otherwise the video resolutions preference won't be
+			// updated correctly when this is called from the callback when the user switches between
+			// normal and high speed frame rates
 			lp.setKey(video_quality_preference_key);
+			lp.setValue(video_quality_value);
 		}
 		else {
 			Preference pref = findPreference("preference_video_quality");
 			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_video_settings");
         	pg.removePreference(pref);
 		}
+
 		final String current_video_quality = bundle.getString("current_video_quality");
 		final int video_frame_width = bundle.getInt("video_frame_width");
 		final int video_frame_height = bundle.getInt("video_frame_height");
 		final int video_bit_rate = bundle.getInt("video_bit_rate");
 		final int video_frame_rate = bundle.getInt("video_frame_rate");
+		final double video_capture_rate = bundle.getDouble("video_capture_rate");
+		final boolean video_high_speed = bundle.getBoolean("video_high_speed");
+		final float video_capture_rate_factor = bundle.getFloat("video_capture_rate_factor");
 
 		final boolean supports_force_video_4k = bundle.getBoolean("supports_force_video_4k");
 		if( MyDebug.LOG )
 			Log.d(TAG, "supports_force_video_4k: " + supports_force_video_4k);
-		if( !supports_force_video_4k || video_quality == null || video_quality_string == null ) {
+		if( !supports_force_video_4k || video_quality == null ) {
 			Preference pref = findPreference("preference_force_video_4k");
 			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_video_debugging");
         	pg.removePreference(pref);
@@ -309,6 +419,16 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			Preference pref = findPreference("preference_video_stabilization");
 			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_video_settings");
         	pg.removePreference(pref);
+		}
+
+		{
+        	ListPreference pref = (ListPreference)findPreference("preference_record_audio_src");
+
+	        if( Build.VERSION.SDK_INT < Build.VERSION_CODES.N ) {
+	        	// some values require at least Android 7
+	        	pref.setEntries(R.array.preference_record_audio_src_entries_preandroid7);
+	        	pref.setEntryValues(R.array.preference_record_audio_src_values_preandroid7);
+			}
 		}
 
 		final boolean can_disable_shutter_sound = bundle.getBoolean("can_disable_shutter_sound");
@@ -328,12 +448,34 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
         	pg.removePreference(pref);
         }
         
+        if( Build.VERSION.SDK_INT < Build.VERSION_CODES.N ) {
+        	// the required ExifInterface tags requires Android N or greater
+        	Preference pref = findPreference("preference_category_exif_tags");
+        	PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_photo_settings");
+        	pg.removePreference(pref);
+        }
+        else {
+			setSummary("preference_exif_artist");
+			setSummary("preference_exif_copyright");
+		}
+
+		setSummary("preference_save_photo_prefix");
+		setSummary("preference_save_video_prefix");
+		setSummary("preference_textstamp");
+
 		final boolean using_android_l = bundle.getBoolean("using_android_l");
+		if( MyDebug.LOG )
+			Log.d(TAG, "using_android_l: " + using_android_l);
+		final boolean supports_photo_video_recording = bundle.getBoolean("supports_photo_video_recording");
+		if( MyDebug.LOG )
+			Log.d(TAG, "supports_photo_video_recording: " + supports_photo_video_recording);
+
         if( !using_android_l ) {
         	Preference pref = findPreference("preference_show_iso");
         	PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_gui");
         	pg.removePreference(pref);
         }
+
         if( !using_android_l ) {
         	Preference pref = findPreference("preference_camera2_fake_flash");
         	PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
@@ -342,7 +484,42 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			pref = findPreference("preference_camera2_fast_burst");
 			pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
 			pg.removePreference(pref);
+
+			pref = findPreference("preference_camera2_photo_video_recording");
+			pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
+			pg.removePreference(pref);
         }
+        else {
+        	if( !supports_photo_video_recording ) {
+				Preference pref = findPreference("preference_camera2_photo_video_recording");
+				PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
+				pg.removePreference(pref);
+			}
+		}
+
+		final int tonemap_max_curve_points = bundle.getInt("tonemap_max_curve_points");
+		final boolean supports_tonemap_curve = bundle.getBoolean("supports_tonemap_curve");
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "tonemap_max_curve_points: " + tonemap_max_curve_points);
+			Log.d(TAG, "supports_tonemap_curve: " + supports_tonemap_curve);
+		}
+        if( !supports_tonemap_curve ) {
+        	Preference pref = findPreference("preference_video_log");
+			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_video_settings");
+        	pg.removePreference(pref);
+		}
+
+		{
+			// remove preference_category_photo_debugging category if empty (which will be the case for old api)
+        	PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_photo_debugging");
+			if( MyDebug.LOG )
+				Log.d(TAG, "preference_category_photo_debugging children: " + pg.getPreferenceCount());
+        	if( pg.getPreferenceCount() == 0 ) {
+        		// pg.getParent() requires API level 26
+	        	PreferenceGroup parent = (PreferenceGroup)this.findPreference("preference_screen_photo_settings");
+        		parent.removePreference(pg);
+			}
+		}
 
 		final boolean supports_camera2 = bundle.getBoolean("supports_camera2");
 		if( MyDebug.LOG )
@@ -355,10 +532,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 	if( pref.getKey().equals("preference_use_camera2") ) {
                 		if( MyDebug.LOG )
                 			Log.d(TAG, "user clicked camera2 API - need to restart");
-                		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
-                		Intent i = getActivity().getBaseContext().getPackageManager().getLaunchIntentForPackage( getActivity().getBaseContext().getPackageName() );
-	                	i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-	                	startActivity(i);
+                		restartOpenCamera();
 	                	return false;
                 	}
                 	return false;
@@ -384,6 +558,29 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 		return false;
                 	}
                 	return false;
+                }
+            });
+        }
+
+        {
+        	ListPreference pref = (ListPreference)findPreference("preference_ghost_image");
+
+	        if( Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP ) {
+	        	// require Storage Access Framework to select a ghost image
+	        	pref.setEntries(R.array.preference_ghost_image_entries_preandroid5);
+	        	pref.setEntryValues(R.array.preference_ghost_image_values_preandroid5);
+			}
+
+        	pref.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+        		@Override
+                public boolean onPreferenceChange(Preference arg0, Object newValue) {
+            		if( MyDebug.LOG )
+            			Log.d(TAG, "clicked ghost image: " + newValue);
+            		if( newValue.equals("preference_ghost_image_selected") ) {
+						MainActivity main_activity = (MainActivity) MyPreferenceFragment.this.getActivity();
+						main_activity.openGhostImageChooserDialogSAF(true);
+					}
+            		return true;
                 }
             });
         }
@@ -498,7 +695,18 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 								Toast.makeText(main_activity, R.string.preference_calibrate_level_calibration_reset, Toast.LENGTH_SHORT).show();
 							}
 						});
-						alertDialog.show();
+						final AlertDialog alert = alertDialog.create();
+						// AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+						alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+							@Override
+							public void onDismiss(DialogInterface arg0) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "calibration dialog dismissed");
+								dialogs.remove(alert);
+							}
+						});
+						alert.show();
+						dialogs.add(alert);
 						return false;
 					}
 					return false;
@@ -563,7 +771,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                         about_string.append(version);
                         about_string.append("\nCode: ");
                         about_string.append(version_code);
-                        about_string.append("\n(c) 2013-2017 Mark Harman");
+                        about_string.append("\n(c) 2013-2018 Mark Harman");
                         about_string.append("\nReleased under the ");
                         about_string.append(gpl_link);
                         about_string.append(" (Open Camera also uses additional third party files, see " + online_help_link + " for full licences and attributions.)");
@@ -596,6 +804,12 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                             about_string.append(display_size.x);
                             about_string.append("x");
                             about_string.append(display_size.y);
+							DisplayMetrics outMetrics = new DisplayMetrics();
+							display.getMetrics(outMetrics);
+                            about_string.append("\nDisplay metrics: ");
+                            about_string.append(outMetrics.widthPixels);
+                            about_string.append("x");
+                            about_string.append(outMetrics.heightPixels);
                         }
 						about_string.append("\nCurrent camera ID: ");
 						about_string.append(cameraId);
@@ -634,6 +848,9 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 				about_string.append(widths[i]);
                 				about_string.append("x");
                 				about_string.append(heights[i]);
+                				if( supports_burst != null && !supports_burst[i] ) {
+                					about_string.append("[no burst]");
+								}
                 			}
                         }
 						about_string.append("\nPhoto resolution: ");
@@ -670,6 +887,12 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 						about_string.append(video_bit_rate);
 						about_string.append("\nVideo frame rate: ");
 						about_string.append(video_frame_rate);
+						about_string.append("\nVideo capture rate: ");
+						about_string.append(video_capture_rate);
+						about_string.append("\nVideo high speed: ");
+						about_string.append(video_high_speed);
+						about_string.append("\nVideo capture rate factor: ");
+						about_string.append(video_capture_rate_factor);
                         about_string.append("\nAuto-stabilise?: ");
                         about_string.append(getString(supports_auto_stabilise ? R.string.about_available : R.string.about_not_available));
 						about_string.append("\nAuto-stabilise enabled?: ");
@@ -716,8 +939,9 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 						}
                         about_string.append("\nVideo stabilization?: ");
                         about_string.append(getString(supports_video_stabilization ? R.string.about_available : R.string.about_not_available));
+						about_string.append("\nTonemap max curve points: " + tonemap_max_curve_points);
 						about_string.append("\nCan disable shutter sound?: ");
-						about_string.append(getString(can_disable_shutter_sound ? R.string.answer_yes : R.string.answer_no));
+						about_string.append(getString(can_disable_shutter_sound ? R.string.about_available : R.string.about_not_available));
                         about_string.append("\nFlash modes: ");
                 		String [] flash_values = bundle.getStringArray("flash_values");
                 		if( flash_values != null && flash_values.length > 0 ) {
@@ -866,7 +1090,18 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 							 	clipboard.setPrimaryClip(clip);
                             }
                         });
-                        alertDialog.show();
+						final AlertDialog alert = alertDialog.create();
+						// AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+						alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+							@Override
+							public void onDismiss(DialogInterface arg0) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "about dialog dismissed");
+								dialogs.remove(alert);
+							}
+						});
+						alert.show();
+						dialogs.add(alert);
                 		return false;
                 	}
                 	return false;
@@ -882,11 +1117,11 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                 	if( pref.getKey().equals("preference_reset") ) {
                 		if( MyDebug.LOG )
                 			Log.d(TAG, "user clicked reset");
-    				    new AlertDialog.Builder(MyPreferenceFragment.this.getActivity())
-			        	.setIcon(android.R.drawable.ic_dialog_alert)
-			        	.setTitle(R.string.preference_reset)
-			        	.setMessage(R.string.preference_reset_question)
-			        	.setPositiveButton(R.string.answer_yes, new DialogInterface.OnClickListener() {
+    				    AlertDialog.Builder alertDialog = new AlertDialog.Builder(MyPreferenceFragment.this.getActivity());
+			        	alertDialog.setIcon(android.R.drawable.ic_dialog_alert);
+			        	alertDialog.setTitle(R.string.preference_reset);
+			        	alertDialog.setMessage(R.string.preference_reset_question);
+			        	alertDialog.setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
 			        		@Override
 					        public void onClick(DialogInterface dialog, int which) {
 		                		if( MyDebug.LOG )
@@ -909,19 +1144,38 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 								main_activity.setDeviceDefaults();
 		                		if( MyDebug.LOG )
 		                			Log.d(TAG, "user clicked reset - need to restart");
-		                		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
-		                		Intent i = getActivity().getBaseContext().getPackageManager().getLaunchIntentForPackage( getActivity().getBaseContext().getPackageName() );
-			                	i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-			                	startActivity(i);
+		                		restartOpenCamera();
 					        }
-			        	})
-			        	.setNegativeButton(R.string.answer_no, null)
-			        	.show();
+			        	});
+			        	alertDialog.setNegativeButton(android.R.string.no, null);
+						final AlertDialog alert = alertDialog.create();
+						// AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+						alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+							@Override
+							public void onDismiss(DialogInterface arg0) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "reset dialog dismissed");
+								dialogs.remove(alert);
+							}
+						});
+						alert.show();
+						dialogs.add(alert);
                 	}
                 	return false;
                 }
             });
         }
+	}
+
+	private void restartOpenCamera() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "restartOpenCamera");
+		MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
+		main_activity.waitUntilImageQueueEmpty();
+		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
+		Intent i = getActivity().getBaseContext().getPackageManager().getLaunchIntentForPackage( getActivity().getBaseContext().getPackageName() );
+		i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+		startActivity(i);
 	}
 
 	public static class SaveFolderChooserDialog extends FolderChooserDialog {
@@ -932,31 +1186,32 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 			// n.b., fragments have to be static (as they might be inserted into a new Activity - see http://stackoverflow.com/questions/15571010/fragment-inner-class-should-be-static),
 			// so we access the MainActivity via the fragment's getActivity().
 			MainActivity main_activity = (MainActivity)this.getActivity();
-			String new_save_location = this.getChosenFolder();
-			main_activity.updateSaveFolder(new_save_location);
+			if( main_activity != null ) { // main_activity may be null if this is being closed via MainActivity.onNewIntent()
+				String new_save_location = this.getChosenFolder();
+				main_activity.updateSaveFolder(new_save_location);
+			}
 			super.onDismiss(dialog);
 		}
 	}
 
-	/*private void readFromBundle(Bundle bundle, String intent_key, String preference_key, String default_value, String preference_category_key) {
+	private void readFromBundle(String [] values, String [] entries, String preference_key, String default_value, String preference_category_key) {
 		if( MyDebug.LOG ) {
-			Log.d(TAG, "readFromBundle: " + intent_key);
+			Log.d(TAG, "readFromBundle");
 		}
-		String [] values = bundle.getStringArray(intent_key);
 		if( values != null && values.length > 0 ) {
 			if( MyDebug.LOG ) {
-				Log.d(TAG, intent_key + " values:");
-				for(int i=0;i<values.length;i++) {
-					Log.d(TAG, values[i]);
+				Log.d(TAG, "values:");
+				for(String value : values) {
+					Log.d(TAG, value);
 				}
 			}
 			ListPreference lp = (ListPreference)findPreference(preference_key);
-			lp.setEntries(values);
+			lp.setEntries(entries);
 			lp.setEntryValues(values);
 			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this.getActivity());
 			String value = sharedPreferences.getString(preference_key, default_value);
 			if( MyDebug.LOG )
-				Log.d(TAG, "    value: " + values);
+				Log.d(TAG, "    value: " + Arrays.toString(values));
 			lp.setValue(value);
 		}
 		else {
@@ -966,7 +1221,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
         	PreferenceGroup pg = (PreferenceGroup)this.findPreference(preference_category_key);
         	pg.removePreference(pref);
 		}
-	}*/
+	}
 	
 	public void onResume() {
 		super.onResume();
@@ -995,17 +1250,93 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		super.onPause();
 	}
 
+    @Override
+    public void onDestroy() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "onDestroy");
+		super.onDestroy();
+
+		// dismiss open dialogs - see comment for dialogs for why we do this
+		for(AlertDialog dialog : dialogs) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "dismiss dialog: " + dialog);
+			dialog.dismiss();
+		}
+		// similarly dimissed any dialog fragments still opened
+	    Fragment folder_fragment = getFragmentManager().findFragmentByTag("FOLDER_FRAGMENT");
+    	if( folder_fragment != null ) {
+	        DialogFragment dialogFragment = (DialogFragment)folder_fragment;
+			if( MyDebug.LOG )
+				Log.d(TAG, "dismiss dialogFragment: " + dialogFragment);
+	        dialogFragment.dismiss();
+    	}
+	}
+
 	/* So that manual changes to the checkbox/switch preferences, while the preferences are showing, show up;
 	 * in particular, needed for preference_using_saf, when the user cancels the SAF dialog (see
 	 * MainActivity.onActivityResult).
+	 * Also programmatically sets summary (see setSummary).
 	 */
 	public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "onSharedPreferenceChanged");
 	    Preference pref = findPreference(key);
-	    if( pref instanceof TwoStatePreference ){
+	    if( pref instanceof TwoStatePreference ) {
 	    	TwoStatePreference twoStatePref = (TwoStatePreference)pref;
 	    	twoStatePref.setChecked(prefs.getBoolean(key, true));
 	    }
+	    else if( pref instanceof  ListPreference ) {
+	    	ListPreference listPref = (ListPreference)pref;
+	    	listPref.setValue(prefs.getString(key, ""));
+		}
+	    setSummary(key);
+	}
+
+	/** Programmatically sets summaries as required.
+	 *  Remember to call setSummary() from the constructor for any keys we set, to initialise the
+	 *  summary.
+	 */
+	private void setSummary(String key) {
+		Preference pref = findPreference(key);
+	    if( pref instanceof EditTextPreference ) {
+	    	// %s only supported for ListPreference
+			// we also display the usual summary if no preference value is set
+	    	if( pref.getKey().equals("preference_exif_artist") ||
+					pref.getKey().equals("preference_exif_copyright") ||
+					pref.getKey().equals("preference_save_photo_prefix") ||
+					pref.getKey().equals("preference_save_video_prefix") ||
+					pref.getKey().equals("preference_textstamp")
+					) {
+	    		String default_value = "";
+				if( pref.getKey().equals("preference_save_photo_prefix") )
+					default_value = "IMG_";
+				else if( pref.getKey().equals("preference_save_video_prefix") )
+					default_value = "VID_";
+				EditTextPreference editTextPref = (EditTextPreference)pref;
+				if( editTextPref.getText().equals(default_value) ) {
+					switch (pref.getKey()) {
+						case "preference_exif_artist":
+							pref.setSummary(R.string.preference_exif_artist_summary);
+							break;
+						case "preference_exif_copyright":
+							pref.setSummary(R.string.preference_exif_copyright_summary);
+							break;
+						case "preference_save_photo_prefix":
+							pref.setSummary(R.string.preference_save_photo_prefix_summary);
+							break;
+						case "preference_save_video_prefix":
+							pref.setSummary(R.string.preference_save_video_prefix_summary);
+							break;
+						case "preference_textstamp":
+							pref.setSummary(R.string.preference_textstamp_summary);
+							break;
+					}
+				}
+				else {
+					// non-default value, so display the current value
+					pref.setSummary(editTextPref.getText());
+				}
+			}
+		}
 	}
 }

@@ -6,9 +6,6 @@
     <string name="action_popup">弹出设置</string>
     <string name="intro_text">轻触聚焦，点击蓝色相机按钮来拍照。点击设置中的在线帮助可以获得更多帮助。Open Camera 是完全免费的。如果你喜欢这个 app，请考虑购买我的捐赠 app :)(查看设置中的链接，或者在线帮助)。\n\n隐私政策：必须允许位置许可才能进行地理标记，但默认这是关闭的。如果开启，你的位置被编码在保存的文件中(并且它仅被用于此目的).\n\n(此消息将不会再显示。)</string>
     <string name="intro_ok">好 (此消息将不再显示)</string>
-    
-    <string name="answer_yes">是</string>
-    <string name="answer_no">否</string>
 
     <string name="on">开启</string> <!-- whether a setting is turned on, e.g., "Auto-stabilise: On" -->
     <string name="off">关闭</string> <!-- whether a setting is turned off, e.g., "Auto-stabilise: Off" -->
@@ -38,7 +35,7 @@
     <string name="exposure_locked">曝光锁定</string>
     <string name="exposure_unlocked">曝光解锁</string>
     <string name="cancelled_timer">已取消定时器</string>
-    <string name="cancelled_burst_mode">已取消连拍模式</string>
+    <string name="cancelled_repeat_mode">已取消连拍模式</string>
     <string name="started_timer">已开始定时器</string>
     <string name="failed_to_save_video">保存视频文件失败</string>
     <string name="failed_to_record_video">录制视频失败</string>
@@ -89,21 +86,18 @@
     <string name="preference_exposure">设置曝光补偿</string>
     <string name="preference_exposure_summary">设为 0 使用默认曝光补偿。</string>
     <string name="preference_lock_orientation">锁定照片/视频方向</string>
-    <string name="preference_lock_orientation_summary">如果设置，设备的方向将被忽略，并且照片/视频的方向将是相对于指定的方向。</string>
+    <string name="preference_lock_orientation_summary">如果设置，设备的方向将被忽略，并且照片/视频的方向将是相对于指定的方向。\n%s</string>
     <string name="preference_face_detection">脸部侦测</string>
     <string name="preference_face_detection_summary">用脸部侦测代替聚焦区。</string>
 
     <string name="preference_category_camera_controls">相机控制</string>
     <string name="preference_timer">定时器</string>
-    <string name="preference_timer_summary">为相机设置一个定时器</string>
     <string name="preference_timer_beep">定时器蜂鸣</string>
     <string name="preference_timer_beep_summary">当计时器倒数或连拍模式延迟时蜂鸣</string>
     <string name="preference_timer_speak">语音定时器倒计时</string>
     <string name="preference_timer_speak_summary">说出定时器倒计时或连拍模式延时（从60秒开始）</string>
     <string name="preference_burst_mode">连拍模式</string>
-    <string name="preference_burst_mode_summary">连续拍摄多张照片</string>
     <string name="preference_burst_interval">连拍模式间隔</string>
-    <string name="preference_burst_interval_summary">连拍模式中拍照之间的延迟(如果有的话)</string>
     <string name="preference_screen_camera_controls_more">更多相机控制…</string>
     <string name="preference_touch_capture">触摸捕获</string>
     <string name="preference_touch_capture_summary">拍照只需通过触摸预览</string>
@@ -112,7 +106,6 @@
     <string name="preference_shutter_sound">快门声音</string>
     <string name="preference_shutter_sound_summary">拍照时播放声音(需要 Android 4.2 或更高才能禁用)</string>
     <string name="preference_volume_keys">音量键</string>
-    <string name="preference_volume_keys_summary">设置音量键按下时的行为</string>
     <string name="preference_audio_control">音频控制选项</string>
     <string name="preference_audio_control_summary">当检测到声音，或者在收到语音命令(\"cheese\")时拍照或录像。当启用时，使用屏幕上的话筒按钮来启动和停止监听。</string> <!-- symbol short for megabytes -->
     <string name="preference_audio_noise_control_sensitivity">音频控制灵敏度</string>
@@ -132,14 +125,11 @@
     <string name="preference_lock_video">录像时锁定屏幕</string>
     <string name="preference_lock_video_summary">当录制视频时，图形用户界面将被锁定以防止意外的停止录像。滑动屏幕以解锁。注意，如果程序转到后台或屏幕是空白，视频录制总是会停止。</string>
     <string name="preference_rotate_preview">旋转预览</string>
-    <string name="preference_rotate_preview_summary">旋转预览选项 (不会影响最终的照片/视频)</string>
+    <string name="preference_rotate_preview_summary">旋转预览选项 (不会影响最终的照片/视频)\n%s</string>
     <string name="preference_screen_gui">屏幕GUI…</string>
     <string name="preference_preview_size">预览大小</string>
-    <string name="preference_preview_size_summary">如何选择预览大小</string>
     <string name="preference_ui_placement">UI 布局</string>
-    <string name="preference_ui_placement_summary">是否有一个左撇子还是右撇子的用户界面</string>
     <string name="preference_immersive_mode">沉浸模式</string>
-    <string name="preference_immersive_mode_summary">\"沉浸模式\" 行为选项</string>
     <string name="preference_show_zoom">显示缩放</string>
     <string name="preference_show_zoom_summary">在屏幕上显示当前的相机缩放水平 (当放大时)</string>
     <string name="preference_show_zoom_controls">显示缩放 -/+ 控件</string>
@@ -163,10 +153,9 @@
     <string name="preference_show_battery">显示电池</string>
     <string name="preference_show_battery_summary">在屏幕上显示当前电池电量</string>
     <string name="preference_grid">显示网格</string>
-    <string name="preference_grid_summary">显示各种网格中的一种</string>
-    <string name="grid">格</string> <!-- short form of Show a grid -->
+    <string name="grid">网格</string> <!-- short form of Show a grid -->
     <string name="preference_crop_guide">显示裁剪指南</string>
-    <string name="preference_crop_guide_summary">裁剪指南显示一个矩形显示指定的宽高比看起来像什么 - 如果你计划以后裁剪照片/视频为不同的分辨率，这有用。需要所见即所得照片模式，或处于视频模式中。</string>
+    <string name="preference_crop_guide_summary">裁剪指南显示一个矩形显示指定的宽高比看起来像什么 - 如果你计划以后裁剪照片/视频为不同的分辨率，这有用。需要所见即所得照片模式，或处于视频模式中。\n%s</string>
     <string name="preference_show_toasts">显示 \"toast\" 消息</string>
     <string name="preference_show_toasts_summary">是否显示弹出的 \"toast\" 消息</string>
     <string name="preference_thumbnail_animation">显示缩略图动画</string>
@@ -181,9 +170,8 @@
     <string name="preference_screen_video_settings">视频设置…</string>
     <string name="preference_screen_location_settings">位置设置…</string>
     <string name="preference_resolution">相机分辨率</string>
-    <string name="preference_resolution_summary">设置相机拍摄的照片的分辨率</string>
     <string name="preference_quality">图像质量</string>
-    <string name="preference_quality_summary">设置保存的照片图像的图像质量（建议值是90%%）</string>
+    <string name="preference_quality_summary">设置保存的照片图像的图像质量（建议值是90%%）\n%s</string>
     <string name="preference_location">存储位置数据 (地理标记)</string>
     <string name="preference_location_summary">在照片/视频中存储 GPS 位置数据</string>
     <string name="preference_gps_direction">存储罗盘方向</string>
@@ -191,13 +179,10 @@
     <string name="preference_require_location">需要位置数据</string>
     <string name="preference_require_location_summary">如果启用位置数据，只拍照/录像如果位置数据可用。</string>
     <string name="preference_stamp">戳记照片</string>
-    <string name="preference_stamp_summary">用日期和时间戳记照片；如果启用了位置/方向数据也戳记 GPS 信息</string>
+    <string name="preference_stamp_summary">用日期和时间戳记照片；如果启用了位置/方向数据也戳记 GPS 信息\n%s</string>
     <string name="preference_stamp_dateformat">日期戳记格式</string>
-    <string name="preference_stamp_dateformat_summary">规定日期戳记的格式（如果启用）</string>
     <string name="preference_stamp_gpsformat">GPS 戳记格式</string>
-    <string name="preference_stamp_gpsformat_summary">指定GPS戳记的格式（如果启用）</string>
     <string name="preference_stamp_timeformat">时间戳记格式</string>
-    <string name="preference_stamp_timeformat_summary">规定时间戳记的格式（如果启用）</string>
     <string name="preference_textstamp">自定义文本</string>
     <string name="preference_textstamp_summary">用自定义文本戳记照片</string>
     <string name="preference_stamp_fontsize">字体大小</string>
@@ -207,27 +192,26 @@
     <string name="preference_stamp_style">文本样式</string>
     <string name="preference_stamp_style_summary">在照片上戳记文本时所用的样式</string>
     <string name="video_quality">视频分辨率</string>
-    <string name="video_quality_summary">设置视频分辨率</string>
     <string name="preference_force_video_4k">强制 4K UHD 视频 (实验)</string>
     <string name="preference_force_video_4k_summary">为后置相机录像启用 3840x2160 分辨率 - 仅当你的设备支持时才能工作，并且如果不支持可能崩溃！</string>
     <string name="preference_video_stabilization">启用视频稳定</string>
     <string name="preference_video_stabilization_summary">视频稳定减少在预览和录像中由于相机移动引起的晃动。</string>
     <string name="preference_video_bitrate">视频比特率 (大约)</string>
-    <string name="preference_video_bitrate_summary">设置视频的大致比特率 (更高表示更好的质量，但是占用更多磁盘空间；如果比特率不被支持可能引起录像失败)</string>
+    <string name="preference_video_bitrate_summary">设置视频的大致比特率 (更高表示更好的质量，但是占用更多磁盘空间；如果比特率不被支持可能引起录像失败)\n%s</string>
     <string name="preference_video_fps">视频帧率 (大约)</string>
-    <string name="preference_video_fps_summary">设置视频的帧率(FPS)(可能是大约，不能保证实现，并可能导致录像失败，如果帧率不被支持)</string>
+    <string name="preference_video_fps_summary">设置视频的帧率(FPS)(可能是大约，不能保证实现，并可能导致录像失败，如果帧率不被支持)\n%s</string>
     <string name="preference_video_max_duration">视频最长持续时间</string>
-    <string name="preference_video_max_duration_summary">在指定的时间后录像将停止。</string>
+    <string name="preference_video_max_duration_summary">在指定的时间后录像将停止。\n%s</string>
     <string name="preference_video_restart">在最大持续时间后重启视频</string>
-    <string name="preference_video_restart_summary">如果在达到最大持续时间(如果设置了)后视频停止，此选项将使视频重启，最多为指定的次数。</string>
+    <string name="preference_video_restart_summary">如果在达到最大持续时间(如果设置了)后视频停止，此选项将使视频重启，最多为指定的次数。\n%s</string>
     <string name="preference_video_max_filesize">视频文件最大尺寸</string>
-    <string name="preference_video_max_filesize_summary">当达到文件(大致)最大尺寸时，视频录制将停止并且/或者重启(参见下面选项)。注意几乎所有的 Android 设备对视频文件都有最大尺寸的限制(通常约为2GB或4GB)，但是此选项允许设置一个指定值</string>
+    <string name="preference_video_max_filesize_summary">当达到文件(大致)最大尺寸时，视频录制将停止并且/或者重启(参见下面选项)。注意几乎所有的 Android 设备对视频文件都有最大尺寸的限制(通常约为2GB或4GB)，但是此选项允许设置一个指定值\n%s</string>
     <string name="preference_video_restart_max_filesize">达到最大尺寸时重启</string>
     <string name="preference_video_restart_max_filesize_summary">当达到最大文件尺寸时是否自动重启(是否设备默认最大文件尺寸，或用户指定值)</string>
     <string name="preference_record_audio">录音</string>
     <string name="preference_record_audio_summary">录像时录音</string>
     <string name="preference_record_audio_src">音频源</string>
-    <string name="preference_record_audio_src_summary">麦克风用于录制音频</string>
+    <string name="preference_record_audio_src_summary">麦克风用于录制音频\n%s</string>
     <string name="preference_record_audio_channels">音频声道</string>
     <string name="preference_record_audio_channels_summary">规定使用单声道或者立体声进行录音（仅部分设备支持立体声）。</string>
     <string name="preference_video_flash">录像时闪光</string>
@@ -253,7 +237,7 @@
     <string name="gallery">图库</string>
     <string name="exposure">曝光</string>
     <string name="exposure_lock">曝光锁定</string>
-    <string name="focus_mode">聚焦模式</string>
+    <string name="focus_mode">对焦模式</string>
     <string name="flash_mode">闪光模式</string>
     <string name="switch_to_front_camera">切换为前置相机</string>
     <string name="switch_to_back_camera">切换为后置相机</string>
@@ -428,7 +412,7 @@
     <string name="donate">捐助</string>
     <string name="whats_new">有何更新:</string>
     <string name="photo_mode_noise_reduction">降噪</string>
-    <string name="photo_mode_expo_bracketing"></string>
+    <string name="photo_mode_expo_bracketing">曝光包围</string>
     <string name="photo_mode_dro">DRO</string>
     <string name="face_detected">面部</string>
     <string name="faces_detected">面部</string>
@@ -437,4 +421,130 @@
     <string name="top_of_screen">在屏幕顶端</string>
     <string name="bottom_of_screen">在屏幕下方</string>
     <string name="centre_of_screen">在中间</string>
+    <string name="high_speed">高速</string>
+    <string name="preference_video_fps_default">默认</string>
+    <string name="preference_category_exif_tags">自定义EXIF标签</string>
+    <string name="preference_exif_artist">艺术家</string>
+    <string name="preference_exif_artist_summary">要保存到图像元数据的艺术家标签的文本。（留空不保存）</string>
+    <string name="preference_exif_copyright">版权</string>
+    <string name="preference_exif_copyright_summary">要保存到图像元数据的版权标签的文本。（留空不保存）</string>
+
+    <string name="processing">正在处理…</string>
+    <string name="preference_raw_no">仅 JPEG</string>
+    <string name="preference_raw_yes">JPEG 和 DNG (RAW)</string>
+    <string name="preference_stamp_dateformat_none">无</string>
+    <string name="preference_stamp_dateformat_default">默认</string>
+    <string name="preference_raw_only">"仅 DNG (RAW) "</string>
+    <string name="photo_mode_standard_full">标准</string>
+    <string name="photo_mode_fast_burst_full">快速连拍</string>
+    <string name="photo_mode_noise_reduction_full">降噪</string>
+    <string name="preference_video_fps_15">15</string>
+    <string name="preference_video_fps_24">24</string>
+    <string name="preference_video_fps_25">25</string>
+    <string name="preference_video_fps_30">30</string>
+    <string name="preference_video_fps_60">60</string>
+    <string name="preference_video_fps_96">96</string>
+    <string name="preference_video_fps_100">100</string>
+    <string name="preference_video_fps_120">120</string>
+    <string name="preference_video_fps_240">240</string>
+    <string name="preference_fast_burst_n_images">照片数量</string>
+    <string name="preference_fast_burst_n_images_entries_2">2</string>
+    <string name="preference_fast_burst_n_images_entries_3">3</string>
+    <string name="preference_fast_burst_n_images_entries_4">4</string>
+    <string name="preference_fast_burst_n_images_entries_5">5</string>
+    <string name="preference_fast_burst_n_images_entries_6">6</string>
+    <string name="preference_fast_burst_n_images_entries_8">8</string>
+    <string name="preference_fast_burst_n_images_entries_10">10</string>
+    <string name="preference_fast_burst_n_images_entries_12">12</string>
+    <string name="preference_fast_burst_n_images_entries_15">15</string>
+    <string name="preference_fast_burst_n_images_entries_20">20</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">yyyy-mm-dd (ISO 8601)</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">dd/mm/yyyy</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">mm/dd/yyyy</string>
+    <string name="photo_mode_hdr">HDR</string>
+    <string name="photo_mode_fast_burst">快速连拍</string>
+    <string name="preference_slow_motion">慢镜头</string>
+
+    <string name="flash_off">关闭闪光</string>
+    <string name="flash_auto">自动闪光</string>
+    <string name="flash_on">开启闪光</string>
+    <string name="flash_torch">手电筒</string>
+    <string name="flash_red_eye">红眼</string>
+    <string name="flash_frontscreen_auto">屏幕闪光自动</string>
+    <string name="flash_frontscreen_on">屏幕闪光开启</string>
+    <string name="flash_frontscreen_torch">屏幕手电筒</string>
+    <string name="preference_video_capture_rate">速度</string>
+    <string name="preference_video_capture_rate_normal">普通</string>
+    <string name="slow_motion_enabled">已启用慢镜头</string>
+    <string name="slow_motion_disabled">已禁用慢镜头</string>
+    <string name="anti_banding_auto">自动</string>
+    <string name="anti_banding_50hz">50Hz</string>
+    <string name="anti_banding_60hz">60Hz</string>
+    <string name="anti_banding_off">关闭</string>
+    <string name="preference_antibanding">抗条纹</string>
+    <string name="preference_antibanding_summary">算法来帮助灯光闪烁。%s</string>
+    <string name="preference_ghost_image">幽灵图像</string>
+    <string name="preference_ghost_image_off">关闭</string>
+    <string name="preference_ghost_image_summary">覆盖图像，以帮助对齐。%s</string>
+    <string name="preference_ghost_image_last">上次拍摄的照片</string>
+    <string name="preference_ghost_image_selected">选中的图像</string>
+    <string name="saf_permission_failed_open_image">无法打开此图像</string>
+    <string name="open_files_saf_exception_ghost">该设备上找不到文件对话框，幽灵图像选项不被支持</string>
+    <string name="preference_camera2_photo_video_recording">在录制视频时允许照片</string>
+    <string name="preference_camera2_photo_video_recording_summary">允许拍摄照片，同时录制视频。 如果在您的设备上启用了Camera2 API进行视频录制时出现问题，请将其禁用。</string>
+    <string name="preference_video_log_off">关闭</string>
+    <string name="preference_video_log_low">低</string>
+    <string name="preference_video_log_medium">中</string>
+    <string name="preference_video_log_strong">强</string>
+    <string name="preference_video_log_extra_strong">超强</string>
+    <string name="video_log">日志配置文件</string>
+    <string name="preference_video_log">视频平坦（日志）配置文件</string>
+    <string name="preference_video_log_summary">为视频模式 %s 启用平坦（日志）配置文件</string>
+    <string name="preference_record_audio_src_camcorder">摄像机</string>
+    <string name="preference_record_audio_src_mic">外部麦克风（如果有的话）</string>
+    <string name="preference_record_audio_src_default">默认音频源</string>
+    <string name="preference_record_audio_src_voice_communication">优化语音通话</string>
+    <string name="preference_record_audio_src_voice_recognition">针对语音识别进行了优化</string>
+    <string name="preference_record_audio_src_unprocessed">未处理的</string>
+    <string name="preference_video_bitrate_default">默认</string>
+    <string name="preference_video_bitrate_100000">100kbps</string>
+    <string name="preference_video_bitrate_200000">200kbps</string>
+    <string name="preference_video_bitrate_500000">500kbps</string>
+    <string name="preference_video_bitrate_1000000">1Mbps</string>
+    <string name="preference_video_bitrate_2000000">2Mbps</string>
+    <string name="preference_video_bitrate_3000000">3Mbps</string>
+    <string name="preference_video_bitrate_4000000">4Mbps</string>
+    <string name="preference_video_bitrate_5000000">5Mbps</string>
+    <string name="preference_video_bitrate_6000000">6Mbps</string>
+    <string name="preference_video_bitrate_7000000">7Mbps</string>
+    <string name="preference_video_bitrate_8000000">8Mbps</string>
+    <string name="preference_video_bitrate_9000000">9Mbps</string>
+    <string name="preference_video_bitrate_10000000">10Mbps</string>
+    <string name="preference_video_bitrate_15000000">15Mbps</string>
+    <string name="preference_video_bitrate_20000000">20Mbps</string>
+    <string name="preference_video_bitrate_30000000">30Mbps</string>
+    <string name="preference_video_bitrate_40000000">40Mbps</string>
+    <string name="preference_video_bitrate_50000000">50Mbps</string>
+    <string name="preference_video_bitrate_60000000">60Mbps</string>
+    <string name="preference_video_bitrate_70000000">70Mbps</string>
+    <string name="preference_video_bitrate_80000000">80Mbps</string>
+    <string name="preference_video_bitrate_90000000">90Mbps</string>
+    <string name="preference_video_bitrate_100000000">100Mbps</string>
+    <string name="preference_video_bitrate_150000000">150Mbps</string>
+    <string name="preference_video_bitrate_200000000">200Mbps</string>
+
+    <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
+    <string name="whats_new_text"><b>v1.41:</b>\n\n
+        <ul>
+            <li>User interface improvements: icons to switch photo/video mode, and switch camera, are
+                next to the shutter button for easier one-handed use; ISO controls are now moved
+                entirely to the exposure icon.\n</li>
+            <li>Take photos while recording video (on supported devices).\n</li>
+            <li>HDR improvements (ghost removal, and brightening of too dark images).\n</li>
+            <li>Performance improvements and bug fixes.\n</li>
+        </ul>
+    </string>
+    <string name="no_burst">无连拍</string>
+    <string name="preference_show_video_max_amp">显示音频电平表</string>
+    <string name="preference_show_video_max_amp_summary">是否在录制视频时显示屏幕音频电平</string>
 </resources>

@@ -50,12 +50,30 @@ public class VideoTests {
 			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoMaxFileSize2"));
 			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoMaxFileSize3"));
 		}
+		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoTimeLapse"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoForceFailure"));
+		if( MainActivityTest.test_camera2 ) {
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testVideoLogProfile"));
+		}
 		// put tests which change bitrate, fps or test 4K at end
+		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoFPS"));
+		if( MainActivityTest.test_camera2 ) {
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoFPSHighSpeedManual"));
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoSlowMotion"));
+		}
 		// update: now deprecating these tests, as setting these settings can be dodgy on some devices
 		/*suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoBitrate"));
-		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideoFPS"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakeVideo4K"));*/
+
+		// tests for video log profile (but these don't actually record video)
+		if( MainActivityTest.test_camera2 ) {
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLogProfile1"));
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLogProfile2"));
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLogProfile3"));
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLogProfile1_extra_strong"));
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLogProfile2_extra_strong"));
+			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLogProfile3_extra_strong"));
+		}
         return suite;
     }
 }

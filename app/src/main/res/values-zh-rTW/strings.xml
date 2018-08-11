@@ -6,9 +6,6 @@
     <string name="action_popup">彈出設定</string>
     <string name="intro_text">輕觸對焦，按下藍色相機按鈕來拍照。按下設定中的線上說明可以取得更多協助。Open Camera 是完全免費的。如果您喜歡這個 app，請考慮購買我的捐贈 app :)(查看設定中的連結，或線上說明)。\n\n隱私政策：必須允許位置許可才能進行地理標記，但預設這是關閉的。如果開啟，您的位置會編碼在儲存的檔案中(且僅被用於此目的).\n\n(此訊息將不會再顯示。)</string>
     <string name="intro_ok">好 (此訊息將不再顯示)</string>
-    
-    <string name="answer_yes">是</string>
-    <string name="answer_no">否</string>
 
     <string name="on">開啟</string> <!-- whether a setting is turned on, e.g., "Auto-stabilise: On" -->
     <string name="off">關閉</string> <!-- whether a setting is turned off, e.g., "Auto-stabilise: Off" -->
@@ -38,7 +35,7 @@
     <string name="exposure_locked">曝光鎖定</string>
     <string name="exposure_unlocked">曝光解鎖</string>
     <string name="cancelled_timer">已取消定時器</string>
-    <string name="cancelled_burst_mode">已取消連拍模式</string>
+    <string name="cancelled_repeat_mode">已取消連拍模式</string>
     <string name="started_timer">已開始定時器</string>
     <string name="failed_to_save_video">儲存影片檔失敗</string>
     <string name="failed_to_record_video">錄製影片失敗</string>
@@ -88,21 +85,18 @@
     <string name="preference_exposure">設定曝光補償</string>
     <string name="preference_exposure_summary">設為 0 使用預設曝光補償。</string>
     <string name="preference_lock_orientation">鎖定照片/影片方向</string>
-    <string name="preference_lock_orientation_summary">如果設定，裝置的方向將被忽略，且照片/影片的方向將相對於指定的方向。</string>
+    <string name="preference_lock_orientation_summary">如果設定，裝置的方向將被忽略，且照片/影片的方向將相對於指定的方向。\n%s</string>
     <string name="preference_face_detection">臉部偵測</string>
     <string name="preference_face_detection_summary">用臉部偵測代替對焦區。</string>
 
     <string name="preference_category_camera_controls">相機控制</string>
     <string name="preference_timer">定時器</string>
-    <string name="preference_timer_summary">為相機設定一個定時器</string>
     <string name="preference_timer_beep">定時器提示音</string>
     <string name="preference_timer_beep_summary">當定時器倒數或連拍模式延遲時提示</string>
     <string name="preference_timer_speak">語音倒數計時</string>
     <string name="preference_timer_speak_summary">定時或連拍模式時使用語音倒數計時 (從 60 秒開始)</string>
 	<string name="preference_burst_mode">連拍模式</string>
-    <string name="preference_burst_mode_summary">連續拍攝多張照片</string>
     <string name="preference_burst_interval">連拍模式間隔</string>
-    <string name="preference_burst_interval_summary">連拍模式中拍照之間的延遲(如果有的話)</string>
     <string name="preference_screen_camera_controls_more">更多相機控制…</string>
 	<string name="preference_touch_capture">快門設定</string>
     <string name="preference_touch_capture_summary">在預覽畫面按一次或兩次來拍照</string>
@@ -111,7 +105,6 @@
     <string name="preference_shutter_sound">快門聲音</string>
     <string name="preference_shutter_sound_summary">拍照時播放聲音(需要 Android 4.2 或更高才能停用)</string>
     <string name="preference_volume_keys">音量鍵</string>
-    <string name="preference_volume_keys_summary">設定音量鍵按下時的行為</string>
     <string name="preference_save_location">儲存位置</string>
     <string name="preference_save_location_summary">用來儲存照片/影片檔的資料夾</string>
 	<string name="preference_using_saf">使用 Storage Access Framework</string>
@@ -125,14 +118,11 @@
     <string name="preference_lock_video">錄影時鎖定螢幕</string>
     <string name="preference_lock_video_summary">當錄製影片時，圖形化使用者介面將被鎖定以防止意外的停止錄影。滑動螢幕以解鎖。注意，如果程式轉到背景或螢幕是空白，影片錄製會停止。</string>
     <string name="preference_rotate_preview">旋轉預覽</string>
-    <string name="preference_rotate_preview_summary">旋轉預覽選項 (不會影響最終的照片/影片)</string>
+    <string name="preference_rotate_preview_summary">旋轉預覽選項 (不會影響最終的照片/影片)\n%s</string>
     <string name="preference_screen_gui">螢幕GUI…</string>
     <string name="preference_preview_size">預覽大小</string>
-    <string name="preference_preview_size_summary">如何選擇預覽大小</string>
     <string name="preference_ui_placement">UI 佈局</string>
-    <string name="preference_ui_placement_summary">是否使用左撇子或右撇子的使用者介面</string>
     <string name="preference_immersive_mode">全螢幕模式</string>
-    <string name="preference_immersive_mode_summary">\"全螢幕模式\" 行為選項</string>
     <string name="preference_show_zoom">顯示縮放</string>
     <string name="preference_show_zoom_summary">在螢幕上顯示目前的相機縮放等級 (當放大時)</string>
     <string name="preference_show_zoom_controls">顯示縮放 -/+ 控制</string>
@@ -156,10 +146,9 @@
     <string name="preference_show_battery">顯示電池</string>
     <string name="preference_show_battery_summary">在螢幕上顯示目前電池電量</string>
     <string name="preference_grid">顯示格線</string>
-    <string name="preference_grid_summary">顯示各種格線中的一種</string>
     <string name="grid">格</string> <!-- short form of Show a grid -->
     <string name="preference_crop_guide">顯示裁切輔助</string>
-    <string name="preference_crop_guide_summary">裁切輔助顯示一個矩形來表示指定的長寬比看起來如何 - 如果您計畫以後裁切照片/影片為不同的解析度很有用。需要所見即所得拍照模式，或處於錄影模式中。</string>
+    <string name="preference_crop_guide_summary">裁切輔助顯示一個矩形來表示指定的長寬比看起來如何 - 如果您計畫以後裁切照片/影片為不同的解析度很有用。需要所見即所得拍照模式，或處於錄影模式中。\n%s</string>
     <string name="preference_show_toasts">顯示拍照前提示訊息</string>
     <string name="preference_show_toasts_summary">是否要在拍照快門前顯示彈出訊息提示</string>
     <string name="preference_thumbnail_animation">顯示縮圖動畫</string>
@@ -174,9 +163,8 @@
     <string name="preference_screen_video_settings">影片設定…</string>
     <string name="preference_screen_location_settings">位置設定…</string>
     <string name="preference_resolution">相機解析度</string>
-    <string name="preference_resolution_summary">設定相機拍攝的照片的解析度</string>
     <string name="preference_quality">圖像品質</string>
-    <string name="preference_quality_summary">設定儲存的照片圖像的圖像品質（建議值是90%%）</string>
+    <string name="preference_quality_summary">設定儲存的照片圖像的圖像品質（建議值是90%%）\n%s</string>
     <string name="preference_location">儲存位置資料 (地理標記)</string>
     <string name="preference_location_summary">在照片/影片中儲存 GPS 位置資料</string>
     <string name="preference_gps_direction">儲存羅盤方向</string>
@@ -184,13 +172,10 @@
     <string name="preference_require_location">需要位置資料</string>
     <string name="preference_require_location_summary">如果啟用位置資料，只拍照/錄影如果位置資料可用。</string>
     <string name="preference_stamp">標記照片</string>
-    <string name="preference_stamp_summary">用日期和時間標記照片；如果啟用了位置/方向資料也標記 GPS 資訊</string>
+    <string name="preference_stamp_summary">用日期和時間標記照片；如果啟用了位置/方向資料也標記 GPS 資訊\n%s</string>
     <string name="preference_stamp_dateformat">日期標記格式</string>
-    <string name="preference_stamp_dateformat_summary">指定日期標記的格式 (如果有啟用)</string>
     <string name="preference_stamp_timeformat">時間標記格式</string>
-    <string name="preference_stamp_timeformat_summary">指定時間標記的格式 (如果有啟用)</string>
     <string name="preference_stamp_gpsformat">GPS 標記格式</string>
-    <string name="preference_stamp_gpsformat_summary">指定 GPS 標記的格式 (如果有啟用)</string>
     <string name="preference_textstamp">自訂文字</string>
     <string name="preference_textstamp_summary">用自訂文字標記照片</string>
     <string name="preference_stamp_fontsize">字型大小</string>
@@ -200,23 +185,22 @@
     <string name="preference_stamp_style">文字風格</string>
     <string name="preference_stamp_style_summary">當在照片上標記文字時使用的字型風格</string>
     <string name="video_quality">影片解析度</string>
-    <string name="video_quality_summary">設定影片解析度</string>
     <string name="preference_force_video_4k">強制 4K UHD 影片 (實驗中)</string>
     <string name="preference_force_video_4k_summary">為後置相機錄影啟用 3840x2160 解析度 - 僅當您的裝置支援時才能作用，且如果不支援可能當機！</string>
     <string name="preference_video_stabilization">啟用影片穩定</string>
     <string name="preference_video_stabilization_summary">影片穩定減少在預覽和錄影中由於相機移動引起的晃動。</string>
     <string name="preference_video_bitrate">影片位元率 (大約)</string>
-    <string name="preference_video_bitrate_summary">設定影片的大致位元率 (越高表示越好的品質，但佔用更多磁碟空間；如果位元率不支援可能造成錄影失敗)</string>
+    <string name="preference_video_bitrate_summary">設定影片的大致位元率 (越高表示越好的品質，但佔用更多磁碟空間；如果位元率不支援可能造成錄影失敗)\n%s</string>
     <string name="preference_video_fps">影片FPS (大約)</string>
-    <string name="preference_video_fps_summary">設定影片的 FPS(大約值，不能保證有用，且如果不支援可能造成錄影失敗)</string>
+    <string name="preference_video_fps_summary">設定影片的 FPS(大約值，不能保證有用，且如果不支援可能造成錄影失敗)\n%s</string>
     <string name="preference_video_max_duration">影片最長持續時間</string>
-    <string name="preference_video_max_duration_summary">在指定的時間後錄影將停止。</string>
+    <string name="preference_video_max_duration_summary">在指定的時間後錄影將停止。\n%s</string>
     <string name="preference_video_restart">在最大持續時間後重啟錄影</string>
-    <string name="preference_video_restart_summary">如果在達到最大持續時間(如果有設定)後影片停止，此選項將使錄影重啟，最多為指定的次數。</string>
+    <string name="preference_video_restart_summary">如果在達到最大持續時間(如果有設定)後影片停止，此選項將使錄影重啟，最多為指定的次數。\n%s</string>
     <string name="preference_record_audio">錄音</string>
     <string name="preference_record_audio_summary">錄影時錄音</string>
     <string name="preference_record_audio_src">音源</string>
-    <string name="preference_record_audio_src_summary">麥克風用於錄製音訊</string>
+    <string name="preference_record_audio_src_summary">麥克風用於錄製音訊\n%s</string>
 	<string name="preference_record_audio_channels">音源頻道</string>
     <string name="preference_record_audio_channels_summary">指定使用單聲道或立體聲來錄音 (立體聲只支援某些裝置)</string>
     <string name="preference_video_flash">錄影時閃光</string>
@@ -282,4 +266,47 @@
     <string name="duration_30m">30 分</string>
     <string name="duration_45m">45 分</string>
     <string name="duration_1h">1 小時</string>
+    <string name="preference_video_fps_default">預設</string>
+
+    <string name="preference_stamp_dateformat_default">預設</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">年-月-日</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">日/月/年</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">月/日/年</string>
+    <string name="preference_stamp_dateformat_none">無</string>
+
+    <string name="flash_off">關閉閃光</string>
+    <string name="flash_auto">自動閃光</string>
+    <string name="flash_on">開啟閃光</string>
+    <string name="flash_torch">手電筒</string>
+    <string name="flash_red_eye">紅眼</string>
+
+    <string name="preference_record_audio_src_camcorder">攝影機</string>
+    <string name="preference_record_audio_src_mic">外部麥克風（如果存在）</string>
+    <string name="preference_record_audio_src_default">預設的音源</string>
+    <string name="preference_record_audio_src_voice_communication">優化語音</string>
+
+    <string name="preference_video_bitrate_default">預設</string>
+    <string name="preference_video_bitrate_100000">100kbps</string>
+    <string name="preference_video_bitrate_200000">200kbps</string>
+    <string name="preference_video_bitrate_500000">500kbps</string>
+    <string name="preference_video_bitrate_1000000">1Mbps</string>
+    <string name="preference_video_bitrate_2000000">2Mbps</string>
+    <string name="preference_video_bitrate_3000000">3Mbps</string>
+    <string name="preference_video_bitrate_4000000">4Mbps</string>
+    <string name="preference_video_bitrate_5000000">5Mbps</string>
+    <string name="preference_video_bitrate_6000000">6Mbps</string>
+    <string name="preference_video_bitrate_7000000">7Mbps</string>
+    <string name="preference_video_bitrate_8000000">8Mbps</string>
+    <string name="preference_video_bitrate_9000000">9Mbps</string>
+    <string name="preference_video_bitrate_10000000">10Mbps</string>
+    <string name="preference_video_bitrate_15000000">15Mbps</string>
+    <string name="preference_video_bitrate_20000000">20Mbps</string>
+    <string name="preference_video_bitrate_30000000">30Mbps</string>
+    <string name="preference_video_bitrate_40000000">40Mbps</string>
+    <string name="preference_video_bitrate_50000000">50Mbps</string>
+    <string name="preference_video_bitrate_60000000">60Mbps</string>
+    <string name="preference_video_bitrate_70000000">70Mbps</string>
+    <string name="preference_video_bitrate_80000000">80Mbps</string>
+    <string name="preference_video_bitrate_90000000">90Mbps</string>
+    <string name="preference_video_bitrate_100000000">100Mbps</string>
 </resources>

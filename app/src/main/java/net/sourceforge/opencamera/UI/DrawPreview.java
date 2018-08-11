@@ -1,5 +1,8 @@
 package net.sourceforge.opencamera.UI;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
 import java.util.Calendar;
@@ -10,9 +13,12 @@ import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyApplicationInterface;
 import net.sourceforge.opencamera.MyDebug;
 import net.sourceforge.opencamera.PreferenceKeys;
+import net.sourceforge.opencamera.Preview.ApplicationInterface;
 import net.sourceforge.opencamera.R;
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.Preview.Preview;
+
+import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -25,8 +31,13 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
+import android.media.ExifInterface;
+import android.net.Uri;
 import android.os.BatteryManager;
+import android.os.Build;
 import android.preference.PreferenceManager;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.util.Pair;
 import android.view.Surface;
@@ -47,6 +58,7 @@ public class DrawPreview {
 	private boolean show_time_pref;
 	private boolean show_free_memory_pref;
 	private boolean show_iso_pref;
+	private boolean show_video_max_amp_pref;
 	private boolean show_zoom_pref;
 	private boolean show_battery_pref;
 	private boolean show_angle_pref;
@@ -60,10 +72,17 @@ public class DrawPreview {
 	private boolean show_geo_direction_lines_pref;
 	private boolean immersive_mode_everything_pref;
 	private boolean has_stamp_pref;
-	private boolean is_raw_pref;
+	private boolean is_raw_pref; // whether in RAW+JPEG or RAW only mode
+	private boolean is_raw_only_pref; // whether in RAW only mode
 	private boolean is_face_detection_pref;
+	private boolean is_audio_enabled_pref;
+	private boolean is_high_speed;
+	private float capture_rate_factor;
 	private boolean auto_stabilise_pref;
 	private String preference_grid_pref;
+	private String ghost_image_pref;
+	private String ghost_selected_image_pref = "";
+	private Bitmap ghost_selected_image_bitmap;
 
 	// avoid doing things that allocate memory every frame!
 	private final Paint p = new Paint();
@@ -71,7 +90,7 @@ public class DrawPreview {
 	//private final int [] gui_location = new int[2];
 	private final static DecimalFormat decimalFormat = new DecimalFormat("#0.0");
 	private final float scale;
-	private final float stroke_width;
+	private final float stroke_width; // stroke_width used for various UI elements
 	private Calendar calendar;
 	private final DateFormat dateFormatTimeInstance = DateFormat.getTimeInstance();
 	private final String ybounds_text;
@@ -101,17 +120,30 @@ public class DrawPreview {
 	private float battery_frac;
 	private long last_battery_time;
 
+	private boolean has_video_max_amp;
+	private int video_max_amp;
+	private long last_video_max_amp_time;
+	private int video_max_amp_prev1;
+	private int video_max_amp_prev2;
+	private int video_max_amp_peak;
+
 	private Bitmap location_bitmap;
 	private Bitmap location_off_bitmap;
-	private final Rect location_dest = new Rect();
 
 	private Bitmap raw_bitmap;
 	private Bitmap auto_stabilise_bitmap;
+	private Bitmap dro_bitmap;
 	private Bitmap hdr_bitmap;
+	private Bitmap expo_bitmap;
+	private Bitmap burst_bitmap;
 	private Bitmap nr_bitmap;
 	private Bitmap photostamp_bitmap;
 	private Bitmap flash_bitmap;
 	private Bitmap face_detection_bitmap;
+	private Bitmap audio_disabled_bitmap;
+	private Bitmap high_speed_fps_bitmap;
+	private Bitmap slow_motion_bitmap;
+	private Bitmap time_lapse_bitmap;
 	private final Rect icon_dest = new Rect();
 	private long needs_flash_time = -1; // time when flash symbol comes on (used for fade-in effect)
 
@@ -121,17 +153,20 @@ public class DrawPreview {
 	private final RectF thumbnail_anim_src_rect = new RectF();
 	private final RectF thumbnail_anim_dst_rect = new RectF();
 	private final Matrix thumbnail_anim_matrix = new Matrix();
+	private boolean last_thumbnail_is_video; // whether thumbnail is for video
 
-	private boolean show_last_image;
+	private boolean show_last_image; // whether to show the last image as part of "pause preview"
 	private final RectF last_image_src_rect = new RectF();
 	private final RectF last_image_dst_rect = new RectF();
 	private final Matrix last_image_matrix = new Matrix();
+	private boolean allow_ghost_last_image; // whether to allow ghosting the last image
 
 	private long ae_started_scanning_ms = -1; // time when ae started scanning
 
     private boolean taking_picture; // true iff camera is in process of capturing a picture (including any necessary prior steps such as autofocus, flash/precapture)
 	private boolean capture_started; // true iff the camera is capturing
     private boolean front_screen_flash; // true iff the front screen display should maximise to simulate flash
+	private boolean image_queue_full; // whether we can no longer take new photos due to image queue being full (or rather, would become full if a new photo taken)
     
 	private boolean continuous_focus_moving;
 	private long continuous_focus_moving_ms;
@@ -150,20 +185,28 @@ public class DrawPreview {
 		// see testHDRRestart
 
 		p.setAntiAlias(true);
+        p.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
         p.setStrokeCap(Paint.Cap.ROUND);
 		scale = getContext().getResources().getDisplayMetrics().density;
 		this.stroke_width = (1.0f * scale + 0.5f); // convert dps to pixels
-		p.setStrokeWidth(stroke_width);
+		// don't set stroke_width now - set it when we use STROKE style (as it'll be overridden by drawTextWithBackground())
 
         location_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_gps_fixed_white_48dp);
     	location_off_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_gps_off_white_48dp);
 		raw_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.raw_icon);
 		auto_stabilise_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.auto_stabilise_icon);
+		dro_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.dro_icon);
 		hdr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_hdr_on_white_48dp);
+		expo_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.expo_icon);
+		burst_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_burst_mode_white_48dp);
 		nr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.nr_icon);
 		photostamp_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_text_format_white_48dp);
 		flash_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.flash_on);
 		face_detection_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_face_white_48dp);
+		audio_disabled_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_mic_off_white_48dp);
+		high_speed_fps_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_fast_forward_white_48dp);
+		slow_motion_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_slow_motion_video_white_48dp);
+		time_lapse_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_timelapse_white_48dp);
 
 		ybounds_text = getContext().getResources().getString(R.string.zoom) + getContext().getResources().getString(R.string.angle) + getContext().getResources().getString(R.string.direction);
 	}
@@ -188,9 +231,21 @@ public class DrawPreview {
 			auto_stabilise_bitmap.recycle();
 			auto_stabilise_bitmap = null;
 		}
+		if( dro_bitmap != null ) {
+			dro_bitmap.recycle();
+			dro_bitmap = null;
+		}
 		if( hdr_bitmap != null ) {
 			hdr_bitmap.recycle();
 			hdr_bitmap = null;
+		}
+		if( expo_bitmap != null ) {
+			expo_bitmap.recycle();
+			expo_bitmap = null;
+		}
+		if( burst_bitmap != null ) {
+			burst_bitmap.recycle();
+			burst_bitmap = null;
 		}
 		if( nr_bitmap != null ) {
 			nr_bitmap.recycle();
@@ -208,16 +263,41 @@ public class DrawPreview {
 			face_detection_bitmap.recycle();
 			face_detection_bitmap = null;
 		}
+		if( audio_disabled_bitmap != null ) {
+			audio_disabled_bitmap.recycle();
+			audio_disabled_bitmap = null;
+		}
+		if( high_speed_fps_bitmap != null ) {
+			high_speed_fps_bitmap.recycle();
+			high_speed_fps_bitmap = null;
+		}
+		if( slow_motion_bitmap != null ) {
+			slow_motion_bitmap.recycle();
+			slow_motion_bitmap = null;
+		}
+		if( time_lapse_bitmap != null ) {
+			time_lapse_bitmap.recycle();
+			time_lapse_bitmap = null;
+		}
+
+		if( ghost_selected_image_bitmap != null ) {
+			ghost_selected_image_bitmap.recycle();
+			ghost_selected_image_bitmap = null;
+		}
+		ghost_selected_image_pref = "";
 	}
 
 	private Context getContext() {
     	return main_activity;
     }
-	
-	public void updateThumbnail(Bitmap thumbnail) {
+
+	/** Sets a current thumbnail for a photo or video just taken. Used for thumbnail animation,
+	 *  and when ghosting the last image.
+	 */
+	public void updateThumbnail(Bitmap thumbnail, boolean is_video, boolean want_thumbnail_animation) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "updateThumbnail");
-		if( applicationInterface.getThumbnailAnimationPref() ) {
+		if( want_thumbnail_animation && applicationInterface.getThumbnailAnimationPref() ) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "thumbnail_anim started");
 			thumbnail_anim = true;
@@ -225,6 +305,8 @@ public class DrawPreview {
 		}
     	Bitmap old_thumbnail = this.last_thumbnail;
     	this.last_thumbnail = thumbnail;
+    	this.last_thumbnail_is_video = is_video;
+    	this.allow_ghost_last_image = true;
     	if( old_thumbnail != null ) {
     		// only recycle after we've set the new thumbnail
     		old_thumbnail.recycle();
@@ -249,6 +331,12 @@ public class DrawPreview {
 		this.show_last_image = false;
 	}
 
+	public void clearGhostImage() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clearGhostImage");
+		this.allow_ghost_last_image = false;
+	}
+
 	public void cameraInOperation(boolean in_operation) {
     	if( in_operation && !main_activity.getPreview().isVideo() ) {
     		taking_picture = true;
@@ -259,6 +347,10 @@ public class DrawPreview {
 			capture_started = false;
     	}
     }
+
+    public void setImageQueueFull(boolean image_queue_full) {
+		this.image_queue_full = image_queue_full;
+	}
 	
 	public void turnFrontScreenFlashOn() {
 		if( MyDebug.LOG )
@@ -312,10 +404,13 @@ public class DrawPreview {
 			Log.d(TAG, "updateSettings");
 
 		photoMode = applicationInterface.getPhotoMode();
+		if( MyDebug.LOG )
+			Log.d(TAG, "photoMode: " + photoMode);
 
 		show_time_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowTimePreferenceKey, true);
 		show_free_memory_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowFreeMemoryPreferenceKey, true);
 		show_iso_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowISOPreferenceKey, true);
+		show_video_max_amp_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowVideoMaxAmpPreferenceKey, false);
 		show_zoom_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowZoomPreferenceKey, true);
 		show_battery_pref = sharedPreferences.getBoolean(PreferenceKeys.ShowBatteryPreferenceKey, true);
 
@@ -336,15 +431,140 @@ public class DrawPreview {
 		immersive_mode_everything_pref = immersive_mode.equals("immersive_mode_everything");
 
 		has_stamp_pref = applicationInterface.getStampPref().equals("preference_stamp_yes");
-		is_raw_pref = applicationInterface.isRawPref();
+		is_raw_pref = applicationInterface.getRawPref() != ApplicationInterface.RawPref.RAWPREF_JPEG_ONLY;
+		is_raw_only_pref = applicationInterface.isRawOnly();
 		is_face_detection_pref = applicationInterface.getFaceDetectionPref();
+		is_audio_enabled_pref = applicationInterface.getRecordAudioPref();
+
+		is_high_speed = applicationInterface.fpsIsHighSpeed();
+		capture_rate_factor = applicationInterface.getVideoCaptureRateFactor();
 
 		auto_stabilise_pref = applicationInterface.getAutoStabilisePref();
 
 		preference_grid_pref = sharedPreferences.getString(PreferenceKeys.ShowGridPreferenceKey, "preference_grid_none");
 
+		ghost_image_pref = sharedPreferences.getString(PreferenceKeys.GhostImagePreferenceKey, "preference_ghost_image_off");
+		if( ghost_image_pref.equals("preference_ghost_image_selected") ) {
+			String new_ghost_selected_image_pref = sharedPreferences.getString(PreferenceKeys.GhostSelectedImageSAFPreferenceKey, "");
+			if( MyDebug.LOG )
+				Log.d(TAG, "new_ghost_selected_image_pref: " + new_ghost_selected_image_pref);
+
+			KeyguardManager keyguard_manager = (KeyguardManager)main_activity.getSystemService(Context.KEYGUARD_SERVICE);
+			boolean is_locked = keyguard_manager != null && keyguard_manager.inKeyguardRestrictedInputMode();
+			if( MyDebug.LOG )
+				Log.d(TAG, "is_locked?: " + is_locked);
+
+			if( is_locked ) {
+				// don't show selected image when device locked, as this could be a security flaw
+				if( ghost_selected_image_bitmap != null ) {
+					ghost_selected_image_bitmap.recycle();
+					ghost_selected_image_bitmap = null;
+					ghost_selected_image_pref = ""; // so we'll load the bitmap again when unlocked
+				}
+			}
+			else if( !new_ghost_selected_image_pref.equals(ghost_selected_image_pref) ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "ghost_selected_image_pref has changed");
+				ghost_selected_image_pref = new_ghost_selected_image_pref;
+				if( ghost_selected_image_bitmap != null ) {
+					ghost_selected_image_bitmap.recycle();
+					ghost_selected_image_bitmap = null;
+				}
+				Uri uri = Uri.parse(ghost_selected_image_pref);
+				try {
+		            File file = main_activity.getStorageUtils().getFileFromDocumentUriSAF(uri, false);
+					ghost_selected_image_bitmap = loadBitmap(uri, file);
+				}
+				catch(IOException e) {
+					Log.e(TAG, "failed to load ghost_selected_image uri: " + uri);
+					e.printStackTrace();
+					ghost_selected_image_bitmap = null;
+					// don't set ghost_selected_image_pref to null, as we don't want to repeatedly try loading the invalid uri
+				}
+			}
+		}
+		else {
+			if( ghost_selected_image_bitmap != null ) {
+				ghost_selected_image_bitmap.recycle();
+				ghost_selected_image_bitmap = null;
+			}
+			ghost_selected_image_pref = "";
+		}
+
 		has_settings = true;
 	}
+
+    /** Loads the bitmap from the uri. File is optional, and is used on pre-Android 7 devices to
+     *  read the exif orientation.
+     */
+    private Bitmap loadBitmap(Uri uri, File file) throws IOException {
+        if( MyDebug.LOG )
+            Log.d(TAG, "loadBitmap: " + uri);
+        Bitmap bitmap = MediaStore.Images.Media.getBitmap(main_activity.getContentResolver(), uri);
+        if( bitmap == null ) {
+            // just in case!
+            Log.e(TAG, "MediaStore.Images.Media.getBitmap returned null");
+            throw new IOException();
+        }
+
+        // now need to take exif orientation into account, as some devices or camera apps store the orientation in the exif tag,
+        // which getBitmap() doesn't account for
+        ExifInterface exif = null;
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ) {
+            // better to use the Uri from Android 7, so this works when images are shared to Vibrance
+            try( InputStream inputStream = main_activity.getContentResolver().openInputStream(uri) ) {
+                exif = new ExifInterface(inputStream);
+            }
+        }
+        else {
+            if( file != null ) {
+                exif = new ExifInterface(file.getAbsolutePath());
+            }
+        }
+        if( exif != null ) {
+            int exif_orientation_s = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
+    		boolean needs_tf = false;
+			int exif_orientation = 0;
+			// from http://jpegclub.org/exif_orientation.html
+			// and http://stackoverflow.com/questions/20478765/how-to-get-the-correct-orientation-of-the-image-selected-from-the-default-image
+			if( exif_orientation_s == ExifInterface.ORIENTATION_UNDEFINED || exif_orientation_s == ExifInterface.ORIENTATION_NORMAL ) {
+				// leave unchanged
+			}
+			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_180 ) {
+				needs_tf = true;
+				exif_orientation = 180;
+			}
+			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_90 ) {
+				needs_tf = true;
+				exif_orientation = 90;
+			}
+			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_270 ) {
+				needs_tf = true;
+				exif_orientation = 270;
+			}
+			else {
+				// just leave unchanged for now
+	    		if( MyDebug.LOG )
+	    			Log.e(TAG, "    unsupported exif orientation: " + exif_orientation_s);
+			}
+    		if( MyDebug.LOG )
+    			Log.d(TAG, "    exif orientation: " + exif_orientation);
+
+			if( needs_tf ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "    need to rotate bitmap due to exif orientation tag");
+				Matrix m = new Matrix();
+				m.setRotate(exif_orientation, bitmap.getWidth() * 0.5f, bitmap.getHeight() * 0.5f);
+				Bitmap rotated_bitmap = Bitmap.createBitmap(bitmap, 0, 0,bitmap.getWidth(), bitmap.getHeight(), m, true);
+				if( rotated_bitmap != bitmap ) {
+					bitmap.recycle();
+					bitmap = rotated_bitmap;
+				}
+			}
+        }
+
+        return bitmap;
+    }
 
     private String getTimeStringFromSeconds(long time) {
     	int secs = (int)(time % 60);
@@ -415,6 +635,7 @@ public class DrawPreview {
 				}
 				p.setColor(Color.WHITE);
 				p.setStyle(Paint.Style.STROKE);
+				p.setStrokeWidth(stroke_width);
 				int fibb = 34;
 				int fibb_n = 21;
 				int left = 0, top = 0;
@@ -537,6 +758,7 @@ public class DrawPreview {
 			String preference_crop_guide = sharedPreferences.getString(PreferenceKeys.ShowCropGuidePreferenceKey, "crop_guide_none");
 			if( camera_controller != null && preview.getTargetRatio() > 0.0 && !preference_crop_guide.equals("crop_guide_none") ) {
 				p.setStyle(Paint.Style.STROKE);
+				p.setStrokeWidth(stroke_width);
 				p.setColor(Color.rgb(255, 235, 59)); // Yellow 500
 				double crop_ratio = -1.0;
 				switch(preference_crop_guide) {
@@ -598,24 +820,24 @@ public class DrawPreview {
 		}
 	}
 
-	private void onDrawInfoLines(Canvas canvas, final int top_y, final int location_size, long time_ms) {
+	private void onDrawInfoLines(Canvas canvas, final int top_y, long time_ms) {
 		Preview preview = main_activity.getPreview();
 		CameraController camera_controller = preview.getCameraController();
 		int ui_rotation = preview.getUIRotation();
 
 		// set up text etc for the multiple lines of "info" (time, free mem, etc)
-		p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
+		p.setTextSize(16 * scale + 0.5f); // convert dps to pixels
 		p.setTextAlign(Paint.Align.LEFT);
-		int location_x = (int) (50 * scale + 0.5f); // convert dps to pixels
+		int location_x = (int) ((show_battery_pref ? 15 : 5) * scale + 0.5f); // convert dps to pixels
 		int location_y = top_y;
-		final int gap_y = (int) (2 * scale + 0.5f); // convert dps to pixels
+		final int gap_y = (int) (0 * scale + 0.5f); // convert dps to pixels
 		if( ui_rotation == 90 || ui_rotation == 270 ) {
 			int diff = canvas.getWidth() - canvas.getHeight();
 			location_x += diff/2;
 			location_y -= diff/2;
 		}
 		if( ui_rotation == 90 ) {
-			location_y = canvas.getHeight() - location_y - location_size;
+			location_y = canvas.getHeight() - location_y - (int) (20 * scale + 0.5f);
 		}
 		if( ui_rotation == 180 ) {
 			location_x = canvas.getWidth() - location_x;
@@ -709,12 +931,12 @@ public class DrawPreview {
 						iso_exposure_string += " ";
 					iso_exposure_string += preview.getExposureTimeString(exposure_time);
 				}
-				/*if( camera_controller.captureResultHasFrameDuration() ) {
+				if( preview.isVideoRecording() && camera_controller.captureResultHasFrameDuration() ) {
 					long frame_duration = camera_controller.captureResultFrameDuration();
 					if( iso_exposure_string.length() > 0 )
 						iso_exposure_string += " ";
 					iso_exposure_string += preview.getFrameDurationString(frame_duration);
-				}*/
+				}
 
 				last_iso_exposure_time = time_ms;
 			}
@@ -724,7 +946,7 @@ public class DrawPreview {
 				if( camera_controller.captureResultIsAEScanning() ) {
 					// only show as scanning if in auto ISO mode (problem on Nexus 6 at least that if we're in manual ISO mode, after pausing and
 					// resuming, the camera driver continually reports CONTROL_AE_STATE_SEARCHING)
-					String value = sharedPreferences.getString(PreferenceKeys.ISOPreferenceKey, main_activity.getPreview().getCameraController().getDefaultISO());
+					String value = sharedPreferences.getString(PreferenceKeys.ISOPreferenceKey, CameraController.ISO_DEFAULT);
 					if( value.equals("auto") ) {
 						is_scanning = true;
 					}
@@ -766,12 +988,39 @@ public class DrawPreview {
 				location_x2 = location_x - icon_size + flash_padding;
 			}
 
+			if( store_location_pref ) {
+				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
+				p.setStyle(Paint.Style.FILL);
+				p.setColor(Color.BLACK);
+				p.setAlpha(64);
+				canvas.drawRect(icon_dest, p);
+				p.setAlpha(255);
+
+				if( applicationInterface.getLocation() != null ) {
+					canvas.drawBitmap(location_bitmap, null, icon_dest, p);
+					int location_radius = icon_size / 10;
+					int indicator_x = location_x2 + icon_size - (int)(location_radius*1.5);
+					int indicator_y = location_y + (int)(location_radius*1.5);
+					p.setColor(applicationInterface.getLocation().getAccuracy() < 25.01f ? Color.rgb(37, 155, 36) : Color.rgb(255, 235, 59)); // Green 500 or Yellow 500
+					canvas.drawCircle(indicator_x, indicator_y, location_radius, p);
+				}
+				else {
+					canvas.drawBitmap(location_off_bitmap, null, icon_dest, p);
+				}
+
+				if( ui_rotation == 180 ) {
+					location_x2 -= icon_size + flash_padding;
+				}
+				else {
+					location_x2 += icon_size + flash_padding;
+				}
+			}
+
 			// RAW not enabled in HDR or ExpoBracketing modes (see note in CameraController.takePictureBurstExpoBracketing())
 			// RAW not enabled in NR mode (see note in CameraController.takePictureBurst())
 			if(
 					is_raw_pref &&
 					preview.supportsRaw() && // RAW can be enabled, even if it isn't available for this camera (e.g., user enables RAW for back camera, but then switches to front camera which doesn't support it)
-					!applicationInterface.isVideoPref() && // RAW not supported for video mode
 					photoMode != MyApplicationInterface.PhotoMode.HDR &&
 					photoMode != MyApplicationInterface.PhotoMode.ExpoBracketing &&
 					photoMode != MyApplicationInterface.PhotoMode.NoiseReduction ) {
@@ -825,25 +1074,41 @@ public class DrawPreview {
 				}
 			}
 
-			if( ( photoMode == MyApplicationInterface.PhotoMode.HDR || photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ) &&
-					!applicationInterface.isVideoPref() ) { // HDR or NR not supported for video mode
+			if( (
+					photoMode == MyApplicationInterface.PhotoMode.DRO ||
+					photoMode == MyApplicationInterface.PhotoMode.HDR ||
+					photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ||
+					photoMode == MyApplicationInterface.PhotoMode.FastBurst ||
+					photoMode == MyApplicationInterface.PhotoMode.NoiseReduction
+					) &&
+					!applicationInterface.isVideoPref() ) { // these photo modes not supported for video mode
 				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
 				p.setStyle(Paint.Style.FILL);
 				p.setColor(Color.BLACK);
 				p.setAlpha(64);
 				canvas.drawRect(icon_dest, p);
 				p.setAlpha(255);
-				canvas.drawBitmap(photoMode == MyApplicationInterface.PhotoMode.HDR ? hdr_bitmap : nr_bitmap, null, icon_dest, p);
+				Bitmap bitmap = photoMode == MyApplicationInterface.PhotoMode.DRO ? dro_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.HDR ? hdr_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ? expo_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.FastBurst ? burst_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ? nr_bitmap :
+								null;
+				if( bitmap != null ) {
+					canvas.drawBitmap(bitmap, null, icon_dest, p);
 
-				if( ui_rotation == 180 ) {
-					location_x2 -= icon_size + flash_padding;
-				}
-				else {
-					location_x2 += icon_size + flash_padding;
+					if( ui_rotation == 180 ) {
+						location_x2 -= icon_size + flash_padding;
+					}
+					else {
+						location_x2 += icon_size + flash_padding;
+					}
 				}
 			}
 
-			if( has_stamp_pref ) { // photo-stamp is supported for photos taken in video mode
+			// photo-stamp is supported for photos taken in video mode
+			// but it isn't supported in RAW-only mode
+			if( has_stamp_pref && !( is_raw_only_pref && preview.supportsRaw() ) ) {
 				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
 				p.setStyle(Paint.Style.FILL);
 				p.setColor(Color.BLACK);
@@ -860,10 +1125,63 @@ public class DrawPreview {
 				}
 			}
 
+			if( !is_audio_enabled_pref && applicationInterface.isVideoPref() ) {
+				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
+				p.setStyle(Paint.Style.FILL);
+				p.setColor(Color.BLACK);
+				p.setAlpha(64);
+				canvas.drawRect(icon_dest, p);
+				p.setAlpha(255);
+				canvas.drawBitmap(audio_disabled_bitmap, null, icon_dest, p);
+
+				if( ui_rotation == 180 ) {
+					location_x2 -= icon_size + flash_padding;
+				}
+				else {
+					location_x2 += icon_size + flash_padding;
+				}
+			}
+
+			// icons for slow motion, time lapse or high speed video
+			if( Math.abs(capture_rate_factor - 1.0f) > 1.0e-5 && applicationInterface.isVideoPref() ) {
+				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
+				p.setStyle(Paint.Style.FILL);
+				p.setColor(Color.BLACK);
+				p.setAlpha(64);
+				canvas.drawRect(icon_dest, p);
+				p.setAlpha(255);
+				canvas.drawBitmap(capture_rate_factor < 1.0f ? slow_motion_bitmap : time_lapse_bitmap, null, icon_dest, p);
+
+				if( ui_rotation == 180 ) {
+					location_x2 -= icon_size + flash_padding;
+				}
+				else {
+					location_x2 += icon_size + flash_padding;
+				}
+			}
+			else if( is_high_speed && applicationInterface.isVideoPref() ) {
+				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
+				p.setStyle(Paint.Style.FILL);
+				p.setColor(Color.BLACK);
+				p.setAlpha(64);
+				canvas.drawRect(icon_dest, p);
+				p.setAlpha(255);
+				canvas.drawBitmap(high_speed_fps_bitmap, null, icon_dest, p);
+
+				if( ui_rotation == 180 ) {
+					location_x2 -= icon_size + flash_padding;
+				}
+				else {
+					location_x2 += icon_size + flash_padding;
+				}
+			}
+
 			String flash_value = preview.getCurrentFlashValue();
 			// note, flash_frontscreen_auto not yet support for the flash symbol (as camera_controller.needsFlash() only returns info on the built-in actual flash, not frontscreen flash)
 			if( flash_value != null &&
-					( flash_value.equals("flash_on") || flash_value.equals("flash_red_eye") || ( flash_value.equals("flash_auto") && camera_controller.needsFlash() ) ) &&
+					( flash_value.equals("flash_on") || flash_value.equals("flash_red_eye")
+							|| ( flash_value.equals("flash_auto") && camera_controller.needsFlash() )
+							|| camera_controller.needsFrontScreenFlash() ) &&
 					!applicationInterface.isVideoPref() ) { // flash-indicator not supported for photos taken in video mode
 				if( needs_flash_time != -1 ) {
 					final long fade_ms = 500;
@@ -1077,6 +1395,58 @@ public class DrawPreview {
             	}
 				if( !preview.isVideoRecordingPaused() || ((int)(time_ms / 500)) % 2 == 0 ) { // if video is paused, then flash the video time
 					applicationInterface.drawTextWithBackground(canvas, p, time_s, color, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
+            		pixels_offset_y += text_y;
+				}
+				if( show_video_max_amp_pref && !preview.isVideoRecordingPaused() ) {
+            		// audio amplitude
+					if( !this.has_video_max_amp || time_ms > this.last_video_max_amp_time + 33 ) {
+						has_video_max_amp = true;
+						video_max_amp_prev1 = video_max_amp_prev2;
+						video_max_amp_prev2 = video_max_amp;
+						video_max_amp = preview.getMaxAmplitude();
+						last_video_max_amp_time = time_ms;
+						if( MyDebug.LOG ) {
+							if( video_max_amp > 30000 ) {
+								Log.d(TAG, "max_amp: " + video_max_amp);
+							}
+							if( video_max_amp > 32767 ) {
+								Log.e(TAG, "video_max_amp greater than max: " + video_max_amp);
+							}
+						}
+						if( video_max_amp_prev2 > video_max_amp_prev1 && video_max_amp_prev2 > video_max_amp ) {
+							// new peak
+							video_max_amp_peak = video_max_amp_prev2;
+						}
+						//video_max_amp_peak = Math.max(video_max_amp_peak, video_max_amp);
+					}
+					float amp_frac = video_max_amp/32767.0f;
+					amp_frac = Math.max(amp_frac, 0.0f);
+					amp_frac = Math.min(amp_frac, 1.0f);
+					//applicationInterface.drawTextWithBackground(canvas, p, "" + max_amp, color, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
+
+		            int amp_width = (int) (120 * scale + 0.5f); // convert dps to pixels
+		            int amp_height = (int) (5 * scale + 0.5f); // convert dps to pixels
+                    int amp_x = (canvas.getWidth() - amp_width)/2;
+					p.setColor(Color.WHITE);
+					p.setStyle(Paint.Style.STROKE);
+    				canvas.drawRect(amp_x, text_base_y - pixels_offset_y, amp_x+amp_width, text_base_y - pixels_offset_y+amp_height, p);
+					p.setStyle(Paint.Style.FILL);
+    				canvas.drawRect(amp_x, text_base_y - pixels_offset_y, amp_x+amp_frac*amp_width, text_base_y - pixels_offset_y+amp_height, p);
+    				if( amp_frac < 1.0f ) {
+	    				p.setColor(Color.BLACK);
+		    			p.setAlpha(64);
+        				canvas.drawRect(amp_x+amp_frac*amp_width+1, text_base_y - pixels_offset_y, amp_x+amp_width, text_base_y - pixels_offset_y+amp_height, p);
+		    			p.setAlpha(255);
+				    }
+				    if( video_max_amp_peak > video_max_amp ) {
+						float peak_frac = video_max_amp_peak/32767.0f;
+						peak_frac = Math.max(peak_frac, 0.0f);
+						peak_frac = Math.min(peak_frac, 1.0f);
+						p.setColor(Color.YELLOW);
+						p.setStyle(Paint.Style.STROKE);
+						canvas.drawLine(amp_x+peak_frac*amp_width, text_base_y - pixels_offset_y, amp_x+peak_frac*amp_width, text_base_y - pixels_offset_y+amp_height, p);
+						p.setColor(Color.WHITE);
+					}
 				}
 			}
 			else if( taking_picture && capture_started ) {
@@ -1092,6 +1462,14 @@ public class DrawPreview {
 							applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.capturing), color, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
 						}
 					}
+				}
+			}
+			else if( image_queue_full ) {
+				if( ((int)(time_ms / 500)) % 2 == 0 ) {
+					p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
+					p.setTextAlign(Paint.Align.CENTER);
+					int pixels_offset_y = 3 * text_y; // avoid overwriting the zoom, and also allow a bit extra space
+					applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.processing), Color.LTGRAY, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
 				}
 			}
 
@@ -1132,10 +1510,9 @@ public class DrawPreview {
 		}
 
 		final int top_y = (int) (5 * scale + 0.5f); // convert dps to pixels
-		final int location_size = (int) (20 * scale + 0.5f); // convert dps to pixels
 
 		int battery_x = (int) (5 * scale + 0.5f); // convert dps to pixels
-		int battery_y = top_y;
+		int battery_y = top_y + (int) (5 * scale + 0.5f);
 		int battery_width = (int) (5 * scale + 0.5f); // convert dps to pixels
 		int battery_height = 4*battery_width;
 		if( ui_rotation == 90 || ui_rotation == 270 ) {
@@ -1172,43 +1549,16 @@ public class DrawPreview {
 				p.setColor(battery_frac > 0.15f ? Color.rgb(37, 155, 36) : Color.rgb(244, 67, 54)); // Green 500 or Red 500
 				p.setStyle(Paint.Style.FILL);
 				canvas.drawRect(battery_x, battery_y+(1.0f-battery_frac)*(battery_height-2), battery_x+battery_width, battery_y+battery_height, p);
+				if( battery_frac < 1.0f ) {
+					p.setColor(Color.BLACK);
+					p.setAlpha(64);
+					canvas.drawRect(battery_x, battery_y, battery_x + battery_width, battery_y + (1.0f - battery_frac) * (battery_height - 2), p);
+					p.setAlpha(255);
+				}
 			}
 		}
 
-		if( store_location_pref ) {
-			int location_x = (int) (20 * scale + 0.5f); // convert dps to pixels
-			int location_y = top_y;
-			if( ui_rotation == 90 || ui_rotation == 270 ) {
-				int diff = canvas.getWidth() - canvas.getHeight();
-				location_x += diff / 2;
-				location_y -= diff / 2;
-			}
-			if( ui_rotation == 90 ) {
-				location_y = canvas.getHeight() - location_y - location_size;
-			}
-			if( ui_rotation == 180 ) {
-				location_x = canvas.getWidth() - location_x - location_size;
-			}
-			location_dest.set(location_x, location_y, location_x + location_size, location_y + location_size);
-			p.setStyle(Paint.Style.FILL);
-			p.setColor(Color.BLACK);
-			p.setAlpha(64);
-			canvas.drawRect(location_dest, p);
-			p.setAlpha(255);
-			if( applicationInterface.getLocation() != null ) {
-				canvas.drawBitmap(location_bitmap, null, location_dest, p);
-				int location_radius = location_size / 10;
-				int indicator_x = location_x + location_size - (int)(location_radius*1.5);
-				int indicator_y = location_y + (int)(location_radius*1.5);
-				p.setColor(applicationInterface.getLocation().getAccuracy() < 25.01f ? Color.rgb(37, 155, 36) : Color.rgb(255, 235, 59)); // Green 500 or Yellow 500
-				canvas.drawCircle(indicator_x, indicator_y, location_radius, p);
-			}
-			else {
-				canvas.drawBitmap(location_off_bitmap, null, location_dest, p);
-			}
-		}
-
-		onDrawInfoLines(canvas, top_y, location_size, time_ms);
+		onDrawInfoLines(canvas, top_y, time_ms);
 
 		canvas.restore();
 	}
@@ -1259,7 +1609,7 @@ public class DrawPreview {
 			canvas.save();
 			canvas.rotate((float)angle, cx, cy);
 
-			final int line_alpha = 96;
+			final int line_alpha = 160;
 			float hthickness = (0.5f * scale + 0.5f); // convert dps to pixels
 			p.setStyle(Paint.Style.FILL);
 			if( show_angle_line_pref ) {
@@ -1493,6 +1843,7 @@ public class DrawPreview {
 				}*/
 				p.setColor(Color.WHITE);
 				p.setStyle(Paint.Style.STROKE);
+				p.setStrokeWidth(stroke_width);
 				canvas.drawCircle(pos_x, pos_y, radius, p);
 				p.setStyle(Paint.Style.FILL); // reset
 			}
@@ -1529,6 +1880,7 @@ public class DrawPreview {
 			else
 				p.setColor(Color.WHITE);
 			p.setStyle(Paint.Style.STROKE);
+			p.setStrokeWidth(stroke_width);
 			int pos_x;
 			int pos_y;
 			if( preview.hasFocusArea() ) {
@@ -1559,6 +1911,8 @@ public class DrawPreview {
 		/*if( MyDebug.LOG )
 			Log.d(TAG, "onDrawPreview");*/
 		if( !has_settings ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "onDrawPreview: need to update settings");
 			updateSettings();
 		}
 		Preview preview = main_activity.getPreview();
@@ -1577,6 +1931,13 @@ public class DrawPreview {
 			p.setColor(Color.WHITE);
 			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p);
 		}
+		else if( preview != null && "flash_frontscreen_torch".equals(preview.getCurrentFlashValue()) ) { // getCurrentFlashValue() may return null
+			p.setColor(Color.WHITE);
+			p.setAlpha(200); // set alpha so user can still see some of the preview
+			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p);
+			p.setAlpha(255);
+		}
+
 		if( main_activity.getMainUI().inImmersiveMode() ) {
 			if( immersive_mode_everything_pref ) {
 				// exit, to ensure we don't display anything!
@@ -1589,6 +1950,7 @@ public class DrawPreview {
 		if( camera_controller != null && taking_picture && !front_screen_flash && take_photo_border_pref ) {
 			p.setColor(Color.WHITE);
 			p.setStyle(Paint.Style.STROKE);
+			p.setStrokeWidth(stroke_width);
 			float this_stroke_width = (5.0f * scale + 0.5f); // convert dps to pixels
 			p.setStrokeWidth(this_stroke_width);
 			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p);
@@ -1599,38 +1961,29 @@ public class DrawPreview {
 
 		drawCropGuides(canvas);
 
-		if( show_last_image && last_thumbnail != null ) {
+		if( last_thumbnail != null && !last_thumbnail_is_video && camera_controller != null && ( show_last_image || ( allow_ghost_last_image && ghost_image_pref.equals("preference_ghost_image_last") ) ) ) {
 			// If changing this code, ensure that pause preview still works when:
 			// - Taking a photo in portrait or landscape - and check rotating the device while preview paused
 			// - Taking a photo with lock to portrait/landscape options still shows the thumbnail with aspect ratio preserved
-			p.setColor(Color.rgb(0, 0, 0)); // in case image doesn't cover the canvas (due to different aspect ratios)
-			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p); // in case
-			last_image_src_rect.left = 0;
-			last_image_src_rect.top = 0;
-			last_image_src_rect.right = last_thumbnail.getWidth();
-			last_image_src_rect.bottom = last_thumbnail.getHeight();
-			if( ui_rotation == 90 || ui_rotation == 270 ) {
-				last_image_src_rect.right = last_thumbnail.getHeight();
-				last_image_src_rect.bottom = last_thumbnail.getWidth();
+			// Also check ghost last image works okay!
+			if( show_last_image ) {
+				p.setColor(Color.rgb(0, 0, 0)); // in case image doesn't cover the canvas (due to different aspect ratios)
+				canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p); // in case
 			}
-			last_image_dst_rect.left = 0;
-			last_image_dst_rect.top = 0;
-			last_image_dst_rect.right = canvas.getWidth();
-			last_image_dst_rect.bottom = canvas.getHeight();
-			/*if( MyDebug.LOG ) {
-				Log.d(TAG, "thumbnail: " + last_thumbnail.getWidth() + " x " + last_thumbnail.getHeight());
-				Log.d(TAG, "canvas: " + canvas.getWidth() + " x " + canvas.getHeight());
-			}*/
-			last_image_matrix.setRectToRect(last_image_src_rect, last_image_dst_rect, Matrix.ScaleToFit.CENTER); // use CENTER to preserve aspect ratio
-			if( ui_rotation == 90 || ui_rotation == 270 ) {
-				// the rotation maps (0, 0) to (tw/2 - th/2, th/2 - tw/2), so we translate to undo this
-				float diff = last_thumbnail.getHeight() - last_thumbnail.getWidth();
-				last_image_matrix.preTranslate(diff/2.0f, -diff/2.0f);
-			}
-			last_image_matrix.preRotate(ui_rotation, last_thumbnail.getWidth()/2.0f, last_thumbnail.getHeight()/2.0f);
+			setLastImageMatrix(canvas, last_thumbnail, ui_rotation, !show_last_image);
+			if( !show_last_image )
+				p.setAlpha(127);
 			canvas.drawBitmap(last_thumbnail, last_image_matrix, p);
+			if( !show_last_image )
+				p.setAlpha(255);
 		}
-		
+		else if( camera_controller != null && ghost_selected_image_bitmap != null ) {
+			setLastImageMatrix(canvas, ghost_selected_image_bitmap, ui_rotation, true);
+			p.setAlpha(127);
+			canvas.drawBitmap(ghost_selected_image_bitmap, last_image_matrix, p);
+			p.setAlpha(255);
+		}
+
 		doThumbnailAnimation(canvas, time_ms);
 
 		drawUI(canvas, time_ms);
@@ -1643,6 +1996,7 @@ public class DrawPreview {
 		if( faces_detected != null ) {
 			p.setColor(Color.rgb(255, 235, 59)); // Yellow 500
 			p.setStyle(Paint.Style.STROKE);
+			p.setStrokeWidth(stroke_width);
 			for(CameraController.Face face : faces_detected) {
 				// Android doc recommends filtering out faces with score less than 50 (same for both Camera and Camera2 APIs)
 				if( face.score >= 50 ) {
@@ -1678,10 +2032,54 @@ public class DrawPreview {
 		}
     }
 
+    private void setLastImageMatrix(Canvas canvas, Bitmap bitmap, int this_ui_rotation, boolean flip_front) {
+		Preview preview = main_activity.getPreview();
+		CameraController camera_controller = preview.getCameraController();
+		last_image_src_rect.left = 0;
+		last_image_src_rect.top = 0;
+		last_image_src_rect.right = bitmap.getWidth();
+		last_image_src_rect.bottom = bitmap.getHeight();
+		if( this_ui_rotation == 90 || this_ui_rotation == 270 ) {
+			last_image_src_rect.right = bitmap.getHeight();
+			last_image_src_rect.bottom = bitmap.getWidth();
+		}
+		last_image_dst_rect.left = 0;
+		last_image_dst_rect.top = 0;
+		last_image_dst_rect.right = canvas.getWidth();
+		last_image_dst_rect.bottom = canvas.getHeight();
+		/*if( MyDebug.LOG ) {
+			Log.d(TAG, "thumbnail: " + bitmap.getWidth() + " x " + bitmap.getHeight());
+			Log.d(TAG, "canvas: " + canvas.getWidth() + " x " + canvas.getHeight());
+		}*/
+		last_image_matrix.setRectToRect(last_image_src_rect, last_image_dst_rect, Matrix.ScaleToFit.CENTER); // use CENTER to preserve aspect ratio
+		if( this_ui_rotation == 90 || this_ui_rotation == 270 ) {
+			// the rotation maps (0, 0) to (tw/2 - th/2, th/2 - tw/2), so we translate to undo this
+			float diff = bitmap.getHeight() - bitmap.getWidth();
+			last_image_matrix.preTranslate(diff/2.0f, -diff/2.0f);
+		}
+		last_image_matrix.preRotate(this_ui_rotation, bitmap.getWidth()/2.0f, bitmap.getHeight()/2.0f);
+		if( flip_front ) {
+			boolean is_front_facing = camera_controller != null && camera_controller.isFrontFacing();
+			if( is_front_facing && !sharedPreferences.getString(PreferenceKeys.FrontCameraMirrorKey, "preference_front_camera_mirror_no").equals("preference_front_camera_mirror_photo") ) {
+				last_image_matrix.preScale(-1.0f, 1.0f, bitmap.getWidth()/2, 0.0f);
+			}
+		}
+	}
+
     private void drawGyroSpot(Canvas canvas, float distance_x, float distance_y) {
 		p.setAlpha(64);
 		float radius = (45 * scale + 0.5f); // convert dps to pixels
 		canvas.drawCircle(canvas.getWidth()/2.0f + distance_x, canvas.getHeight()/2.0f + distance_y, radius, p);
 		p.setAlpha(255);
+	}
+
+	// for testing:
+
+	public boolean getStoredHasStampPref() {
+		return this.has_stamp_pref;
+	}
+
+	public boolean getStoredAutoStabilisePref() {
+		return this.auto_stabilise_pref;
 	}
 }

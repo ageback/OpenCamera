@@ -12,13 +12,19 @@
 <!-- EU cookie law, needed for analytics and adsense -->
 <!-- Begin Cookie Consent plugin by Silktide - http://silktide.com/cookieconsent -->
 <script type="text/javascript">
-    window.cookieconsent_options = {"message":"This website uses cookies to ensure you get the best experience on our website","dismiss":"Got it!","learnMore":"More info","link":null,"theme":"dark-bottom"};
+    window.cookieconsent_options = {
+        "message":"This website uses cookies, including for Google Analytics and to display ads",
+        "dismiss":"Got it!",
+        "learnMore":"More info",
+        "link":"http://opencamera.org.uk/#privacy",
+        "theme":"dark-bottom"};
 </script>
 
 <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/cookieconsent2/1.0.9/cookieconsent.min.js"></script>
 <!-- End Cookie Consent plugin -->
 
 <!-- Google Analytics -->
+<!-- anonymizeIp is set: unclear if this is needed for EU GDPR, but just in case -->
 <script>
   (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
   (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -26,6 +32,7 @@
   })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
   ga('create', 'UA-38364448-5', 'auto');
+  ga('set', 'anonymizeIp', true);
   ga('send', 'pageview');
 </script>
 
@@ -64,7 +71,7 @@
                 <a href="http://opencamera.org.uk/help.html#faq">the FAQ</a> . Note that in some cases, it seems that SD cards
                 can't be selected even when using the Storage Access Framework option - this is an operating system issue, and
                 something out of my control (due to the way Google have locked down on SD cards). If you're wanting to have lots
-                of storage for tsking photos or videos, it's probably better to make sure you get a device with plenty of
+                of storage for taking photos or videos, it's probably better to make sure you get a device with plenty of
                 internal storage (internal storage is faster anyway, so means faster taking of photos, and more reliable high
                 resolution video recording).</li>
 </ul>
@@ -86,12 +93,13 @@
 <p>In general, Google Nexuses have worked well for Open Camera. Firstly because Google provide good support for their own
         Android camera API, both old and Camera2 (as you'd hope!) - and they use it for their own Google camera. Secondly because
         I've owned several Nexuses (Galaxy Nexus, Nexus 7, Nexus 6), and so have been able to test Open Camera against them.
-        That's not to say they're bug free (exposure lock has often been flaky for example).</p>
+        That's not to say they're bug free (exposure lock has sometimes been flaky for example).</p>
 
 <p>Camera2 on the Nexus 6 works well (there are some minor issues, e.g., manual exposure doesn't work well when recording
         video). It's hard to be sure about other Nexuses though.</p>
 
-<p>In theory all this should apply to the Pixels, but I haven't been able to test.</p>
+<p>In theory all this should apply to the Pixels, but I haven't been able to test - though from what people tell me, things
+seem to work including Camera2 features. Open Camera also supports Google's HDR+ mode on the Pixels.</p>
 
 <p>Color effects don't work on the Nexus 7.</p>
 
@@ -100,11 +108,19 @@
 <p>I've had reports of expo bracketing and HDR in Camera2 mode not working properly on some Huawei devices
         (Huawei P8 lite 2017, P9). See <a href="https://sourceforge.net/p/opencamera/tickets/368/">here</a> for details.</p>
 
+<p>I've also had reports of RAW/DNG images being saved with red/blue swapped. See
+<a href="https://sourceforge.net/p/opencamera/tickets/422/">here</a> for details.</p>
+
 <h3>Lenovo Vibe S1</h3>
 
 <p>A special prize goes to this device - several people have told me they can't even install Open Camera (error 504 from
         Google Play) on at least some versions of this device. This seems to be due to a pre-installed app "Stereo Verify"
         that uses Open Camera's package name (net.sourceforge.opencamera), which prevents installation of Open Camera.</p>
+
+<h3>Nokia</h3>
+
+<p>I've tested Open Camera with the Nokia 8. Everything seems to work as far as I can tell, including Camera2 API with full
+manual controls, RAW and 120fps video.</p>
 
 <h3>OnePlus</h3>
 
@@ -125,6 +141,7 @@
         <li>Low light scenes show the wrong ISO and shutter speed, both on-screen and in the saved Exif info (although the
                 photos themselves still come out okay); also a knock on effect of this bug is that HDR and expo bracketing
                 don't work in low light. Manual ISO also doesn't work above 799 (the images still come out with ISO at 799).</li>
+        <li>High speed (120 fps) frame rate doesn't work.</li>
 </ul>
 
 <p>See <a href="https://forums.oneplus.net/threads/camera2-api-bugs-for-3rd-party-camera-apps.506100">this thread</a> for more
@@ -152,7 +169,7 @@
 <p>A few devices have shown problems with corrupted video recording with Open Camera, though this seems to be rare (and doesn't
         seem to be consistent enough to name any particular device).</p>
 
-<p>I've had reports of the audio being out of sync with video on the Galaxy S8.</p>
+<p>I've had reports of the audio being out of sync with video on the Galaxy S7 and S8 when in Camera2 API mode.</p>
 
 <p>4K video recording isn't made available for third party cameras like Open Camera (at least on some Samsung devices). In some
         cases it can be enabled with the "Force 4K" option, but this only works on some devices (in some cases whether it works
@@ -173,8 +190,10 @@
                 not making this available for third party camera applications</a>.</p>
 
 <hr>
+<p><a href="http://opencamera.org.uk/#privacy">Open Camera Privacy Policy.</a></p>
 <p><a href="http://sourceforge.net/p/opencamera/">Open Camera on Sourceforge.</a></p>
-<p><a href="http://mdwh2.users.sourceforge.net/">More of my Free software.</a></p>
+<p><a href="http://mark-h.users.sourceforge.net/">More of my Free software.</a></p>
+<hr>
 
 </body>
 </html>

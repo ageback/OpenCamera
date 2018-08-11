@@ -41,8 +41,8 @@ public class PreferenceKeys {
     	return "camera_resolution_" + cameraId;
     }
     
-    public static String getVideoQualityPreferenceKey(int cameraId) {
-    	return "video_quality_" + cameraId;
+    public static String getVideoQualityPreferenceKey(int cameraId, boolean high_speed) {
+    	return "video_quality_" + cameraId + (high_speed ? "_highspeed" : "");
     }
     
 	public static final String IsVideoPreferenceKey = "is_video";
@@ -56,6 +56,8 @@ public class PreferenceKeys {
 	public static final String WhiteBalancePreferenceKey = "preference_white_balance";
 
 	public static final String WhiteBalanceTemperaturePreferenceKey = "preference_white_balance_temperature";
+
+	public static final String AntiBandingPreferenceKey = "preference_antibanding";
 
 	public static final String ISOPreferenceKey = "preference_iso";
 
@@ -83,11 +85,17 @@ public class PreferenceKeys {
 
 	public static final String NRSaveExpoPreferenceKey = "preference_nr_save";
 
+	public static final String FastBurstNImagesPreferenceKey = "preference_fast_burst_n_images";
+
 	public static final String LocationPreferenceKey = "preference_location";
 
 	public static final String GPSDirectionPreferenceKey = "preference_gps_direction";
 
 	public static final String RequireLocationPreferenceKey = "preference_require_location";
+
+	public static final String ExifArtistPreferenceKey = "preference_exif_artist";
+
+	public static final String ExifCopyrightPreferenceKey = "preference_exif_copyright";
 
 	public static final String StampPreferenceKey = "preference_stamp";
 
@@ -109,11 +117,13 @@ public class PreferenceKeys {
 
 	public static final String FrontCameraMirrorKey = "preference_front_camera_mirror";
 
-	public static final String BackgroundPhotoSavingPreferenceKey = "preference_background_photo_saving";
+	//public static final String BackgroundPhotoSavingPreferenceKey = "preference_background_photo_saving";
 
 	public static final String Camera2FakeFlashPreferenceKey = "preference_camera2_fake_flash";
 
 	public static final String Camera2FastBurstPreferenceKey = "preference_camera2_fast_burst";
+
+	public static final String Camera2PhotoVideoRecordingPreferenceKey = "preference_camera2_photo_video_recording";
 
 	public static final String UIPlacementPreferenceKey = "preference_ui_placement";
 
@@ -177,6 +187,8 @@ public class PreferenceKeys {
 
 	public static final String ShowISOPreferenceKey = "preference_show_iso";
 
+	public static final String ShowVideoMaxAmpPreferenceKey = "preference_show_video_max_amp";
+
 	public static final String ShowAnglePreferenceKey = "preference_show_angle";
 
 	public static final String ShowAngleLinePreferenceKey = "preference_show_angle_line";
@@ -203,6 +215,10 @@ public class PreferenceKeys {
 
 	public static final String FaceDetectionPreferenceKey = "preference_face_detection";
 
+	public static final String GhostImagePreferenceKey = "preference_ghost_image";
+
+	public static final String GhostSelectedImageSAFPreferenceKey = "preference_ghost_selected_image_saf";
+
     public static String getVideoStabilizationPreferenceKey() {
     	return "preference_video_stabilization";
     }
@@ -215,10 +231,18 @@ public class PreferenceKeys {
     	return "preference_video_bitrate";
     }
 
-    public static String getVideoFPSPreferenceKey() {
-    	return "preference_video_fps";
+    public static String getVideoFPSPreferenceKey(int cameraId) {
+    	// for cameraId==0, we return preference_video_fps instead of preference_video_fps_0, for
+		// backwards compatibility for people upgrading
+    	return "preference_video_fps" + ((cameraId==0) ? "" : ("_"+cameraId));
     }
     
+    public static String getVideoCaptureRatePreferenceKey(int cameraId) {
+    	return "preference_capture_rate_" + cameraId;
+    }
+
+	public static final String VideoLogPreferenceKey = "preference_video_log";
+
     public static String getVideoMaxDurationPreferenceKey() {
     	return "preference_video_max_duration";
     }
@@ -281,11 +305,15 @@ public class PreferenceKeys {
     	return "preference_timer_speak";
     }
     
-    public static String getBurstModePreferenceKey() {
+    public static String getRepeatModePreferenceKey() {
+    	// note for historical reasons the preference refers to burst; the feature was renamed to
+		// "repeat" in v1.43, but we still need to use the old string to avoid changing user settings
+		// when people upgrade
     	return "preference_burst_mode";
     }
     
-    public static String getBurstIntervalPreferenceKey() {
+    public static String getRepeatIntervalPreferenceKey() {
+    	// see note about "repeat" vs "burst" under getRepeatModePreferenceKey()
     	return "preference_burst_interval";
     }
     

@@ -12,13 +12,19 @@
 <!-- EU cookie law, needed for analytics and adsense -->
 <!-- Begin Cookie Consent plugin by Silktide - http://silktide.com/cookieconsent -->
 <script type="text/javascript">
-    window.cookieconsent_options = {"message":"This website uses cookies to ensure you get the best experience on our website","dismiss":"Got it!","learnMore":"More info","link":null,"theme":"dark-bottom"};
+    window.cookieconsent_options = {
+        "message":"This website uses cookies, including for Google Analytics and to display ads",
+        "dismiss":"Got it!",
+        "learnMore":"More info",
+        "link":"http://opencamera.org.uk/#privacy",
+        "theme":"dark-bottom"};
 </script>
 
 <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/cookieconsent2/1.0.9/cookieconsent.min.js"></script>
 <!-- End Cookie Consent plugin -->
 
 <!-- Google Analytics -->
+<!-- anonymizeIp is set: unclear if this is needed for EU GDPR, but just in case -->
 <script>
   (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
   (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -26,6 +32,7 @@
   })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
   ga('create', 'UA-38364448-5', 'auto');
+  ga('set', 'anonymizeIp', true);
   ga('send', 'pageview');
 </script>
 
@@ -41,6 +48,114 @@
 <p>&lt; <small><a href="index.html">Main Page.</a></small></p>
 
 <pre>
+Version 1.44 (Work in progress)
+
+FIXED   Crash if activity is destroyed as photo is taken.
+FIXED   Fixed some crashes for old camera API.
+FIXED   In Camera2 API mode, wasn't checking to see if video stabilization option is supported.
+FIXED   Preview size/"Maximise preview size" option didn't always work correctly on some devices
+        (e.g., Nokia 8).
+FIXED   Fixed a crash related to failing to save with storage access framework.
+FIXED   Switching from slow motion back to regular speed wouldn't reset exposure level on some
+        devices.
+FIXED   Norwegian strings for video bitrate preferences were incorrect.
+ADDED   New option "Ghost image", to overlay either last photo taken, or a selected image on your
+        device.
+ADDED   New option On screen GUI/"Show audio level meter", to display on-screen audio level when
+        recording video.
+ADDED   New option to record video with a flat (log) profile. (Camera2 API only.)
+ADDED   On-screen flash icon (to show whether flash will fire or not) now supported for front screen
+        flash.
+ADDED   New Camera2 API debug option under Settings/"Photo settings" to disable taking photos whilst
+        recording video feature (if your device has problems recording videos with Camera2 API
+        enabled, try disabling this).
+ADDED   Camera2 support for high resolution photo resolutions (required for supporting highest
+        resolutions on some devices, e.g., Nokia 6, Samsung Galaxy S6).
+ADDED   Launching from intent now recognises request for front or back camera
+        (android.intent.extras.CAMERA_FACING, android.intent.extras.LENS_FACING_FRONT,
+        android.intent.extras.LENS_FACING_BACK, android.intent.extra.USE_FRONT_CAMERA).
+ADDED   Video bitrate options for 150Mbps and 200Mbps (may not work on all devices).
+ADDED   New video audio source options: UNPROCESSED (requires Android 7) and VOICE_RECOGNITION.
+UPDATED No longer wait for image queue to be saved to go to settings, or background.
+UPDATED On Android 8 when restarting video due to hitting maximum filesize, transition to new file
+        is now seamless.
+UPDATED Show FPS on-screen when recording video (Camera2 API only).
+UPDATED Made on-screen level lines clearer.
+UPDATED Show video bitrate on info toast if not set to default.
+UPDATED More preferences in settings now show the currently selected value.
+UPDATED Camera opening on background thread (for smoother operation) now enabled for Android 6
+        devices (was already supported for Android 7+).
+
+Version 1.43.3 (2018/04/20)
+
+FIXED   Fixed some crashes.
+ADDED   Added video capture rate, capture rate factor and high speed info to About debug dialog.
+UPDATED Fix toast message if slow motion video fails.
+
+Version 1.43.2 (2018/04/13)
+
+FIXED   Fixed some crashes.
+
+Version 1.43.1 (2018/04/12)
+
+FIXED   Crash when selecting antibanding setting on devices with no support for antibanding; this
+        option is now removed on such devices.
+FIXED   Crash when using Storage Access Framework to select "Downloads" on Android 8+.
+FIXED   Fixed some other crashes.
+
+Version 1.43 (2018/04/10)
+
+FIXED   Fixed crash when sharing images (if not using Storage Access Framework) on some Android 7+
+        devices.
+FIXED   Fixed crash related to devices that don't support video.
+FIXED   Fixed some crashes for when Camera2 API enabled.
+FIXED   Problems when taking HDR or expo photos quickly without pause, the second photo would use
+        incorrect exposure.
+FIXED   Problems with popup view layout on some non-English languages.
+FIXED   On-screen icons (e.g., for HDR) didn't show after restarting.
+FIXED   When using volume keys to switch auto-level on/off, user interface wasn't updating properly.
+FIXED   Face detection mode on Camera2 API wasn't affecting resultant exposure etc.
+FIXED   Bug with video subtitles (.SRT) option, overlapping subtitles could appear briefly when
+        pausing/resuming video.
+FIXED   Bug on some devices (e.g., Nokia 8) where manual sliders (e.g., for manual ISO) could only
+        go up to 1 less than the true maximum allowed value.
+FIXED   Some stored "values" for zh-rCN shouldn't have been translated.
+ADDED   New Fast Burst photo mode (Camera2 API only).
+ADDED   Slow motion video (Camera2 API only).
+ADDED   Time lapse video (requires Android 5).
+ADDED   Torch option for front cameras without flash, which lights up the screen.
+ADDED   Option to save only in RAW/DNG format (requires Android 7).
+ADDED   New options under "Photo settings" to support Artist and/or Copyright Exif tags in images
+        (requires Android 7).
+ADDED   On-screen icons for DRO and Expo Bracketing modes.
+ADDED   On-screen icon for when audio is disabled in video mode.
+UPDATED Now targetting Android 8.1.
+UPDATED Improved appearance of on-screen text and photo stamp text (draw fonts with outline, rather
+        than shaded background).
+UPDATED Improved layout of on-screen information.
+UPDATED Improved look of popup menu.
+UPDATED Improved support for setting frame rates (including high speed support) when using Camera2
+        API. Thanks to George Joseph.
+UPDATED Video frame rate preference is now stored per-camera (as with video resolution).
+UPDATED Burst mode now renamed to Repeat mode (note, some translations may still refer to "burst").
+UPDATED Some preferences in settings now show the currently selected value.
+UPDATED Improved performance when going to settings in portrait mode.
+UPDATED Don't request audio permission (or show toast if not available) if record audio option for
+        video is disabled.
+UPDATED Zoom now resets when pausing the application, switching camera, or switching between photo
+        and video modes (not resetting zoom tends to confuse users; this change also makes behaviour
+        consistent with other camera applications).
+UPDATED For "Pause after taking photo" option, pressing Back when preview is paused now unpauses the
+        preview and keeps the photo, rather than exiting the application.
+UPDATED Don't block UI when image saving queue is full, instead simply don't allow more photos to be
+        taken until queue is no longer full. Size of image saving queue is also increased, depending
+        on memory of device.
+UPDATED Datestamp format (for "Stamp photos" option) yyyy/mm/dd replaced with yyyy-mm-dd (to match
+        ISO 8601 standard).
+UPDATED Camera2 API now sets CONTROL_ENABLE_ZSL for standard and DRO photo modes on Android 8+.
+UPDATED "Use background thread" debug option removed (now defaults to using background thread for
+        saving photos).
+
 Version 1.42.2 (2017/12/30)
 
 FIXED   Fixed some crashes.
@@ -1156,8 +1271,10 @@ First release.
 </pre>
 
 <hr>
+<p><a href="http://opencamera.org.uk/#privacy">Open Camera Privacy Policy.</a></p>
 <p><a href="http://sourceforge.net/p/opencamera/">Open Camera on Sourceforge.</a></p>
-<p><a href="http://mdwh2.users.sourceforge.net/">More of my Free software.</a></p>
+<p><a href="http://mark-h.users.sourceforge.net/">More of my Free software.</a></p>
+<hr>
 
 </body>
 </html>

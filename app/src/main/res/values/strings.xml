@@ -6,9 +6,6 @@
     <string name="action_popup">Popup settings</string>
     <string name="intro_text">Touch to focus, and press the blue camera button to take photos. For more help, click Online help from Settings. Open Camera is completely free. If you like this app, please consider buying my donate app :) (see link in Settings, or Online help).\n\nPrivacy Policy: Location permission is required for geotagging, but this is disabled by default. If enabled, your location is encoded in the saved files (and it is only used for this purpose).</string>
     <string name="intro_ok">OK (This message won\'t show again)</string>
-    
-    <string name="answer_yes">Yes</string>
-    <string name="answer_no">No</string>
 
     <string name="on">On</string> <!-- whether a setting is turned on, e.g., "Auto-level: On" -->
     <string name="off">Off</string> <!-- whether a setting is turned off, e.g., "Auto-level: Off" -->
@@ -38,7 +35,7 @@
     <string name="exposure_locked">Exposure Locked</string>
     <string name="exposure_unlocked">Exposure unlocked</string>
     <string name="cancelled_timer">Cancelled timer</string>
-    <string name="cancelled_burst_mode">Cancelled burst mode</string>
+    <string name="cancelled_repeat_mode">Cancelled repeat mode</string>
     <string name="started_timer">Started timer</string>
     <string name="failed_to_save_video">Failed to save video file</string>
     <string name="failed_to_record_video">Failed to record video</string>
@@ -90,21 +87,18 @@
     <string name="preference_exposure">Set the exposure compensation</string>
     <string name="preference_exposure_summary">Set to 0 for the default exposure compensation</string>
     <string name="preference_lock_orientation">Lock photo/video orientation</string>
-    <string name="preference_lock_orientation_summary">If set, the orientation of the device will be ignored, and the orientation of the photo/video will be with respect to the specified orientation</string>
+    <string name="preference_lock_orientation_summary">If set, the orientation of the device will be ignored, and the orientation of the photo/video will be with respect to the specified orientation\n%s</string>
     <string name="preference_face_detection">Face detection</string>
     <string name="preference_face_detection_summary">Use face detection instead of focus areas</string>
 
     <string name="preference_category_camera_controls">Camera Controls</string>
     <string name="preference_timer">Timer</string>
-    <string name="preference_timer_summary">Set a timer for the camera</string>
     <string name="preference_timer_beep">Timer beep</string>
-    <string name="preference_timer_beep_summary">Beep when timer is counting down or for burst mode delay</string>
+    <string name="preference_timer_beep_summary">Beep when timer is counting down or for repeat mode delay</string>
     <string name="preference_timer_speak">Voice timer countdown</string>
-    <string name="preference_timer_speak_summary">Speak the countdown for timer or burst mode delay (from 60 seconds)</string>
-    <string name="preference_burst_mode">Burst</string> <!-- also used in popup menu, so shouldn't be too long a string -->
-    <string name="preference_burst_mode_summary">Take multiple photos in succession</string>
-    <string name="preference_burst_interval">Burst mode interval</string>
-    <string name="preference_burst_interval_summary">Delay (if any) between taking photos in burst mode</string>
+    <string name="preference_timer_speak_summary">Speak the countdown for timer or repeat mode delay (from 60 seconds)</string>
+    <string name="preference_burst_mode">Repeat</string> <!-- preference is called "burst" for historical reasons, but is more of a repeat mode; also used in popup menu, so shouldn't be too long a string -->
+    <string name="preference_burst_interval">Repeat mode interval</string>
     <string name="preference_screen_camera_controls_more">More camera controls…</string>
     <string name="preference_touch_capture">Touch to capture</string>
     <string name="preference_touch_capture_summary">Take a photo just by touching or double-tapping the preview</string>
@@ -113,7 +107,6 @@
     <string name="preference_shutter_sound">Shutter sound</string>
     <string name="preference_shutter_sound_summary">Play a sound when taking a photo</string>
     <string name="preference_volume_keys">Volume keys</string>
-    <string name="preference_volume_keys_summary">Set behaviour for when volume keys are pressed</string>
     <string name="preference_audio_control">Audio control options</string>
     <string name="preference_audio_control_summary">Take photo or record video when a noise is detected, or on a voice command (\"cheese\"). When enabled, use the on-screen microphone button to start and stop listening.</string> <!-- note that cheese shouldn't be translated, as we listen for this no matter what language is being used -->
     <string name="preference_audio_noise_control_sensitivity">Audio control sensitivity</string>
@@ -127,7 +120,6 @@
     <string name="preference_save_video_prefix">Save video prefix</string>
     <string name="preference_save_video_prefix_summary">The prefix to use for the save filenames for videos</string>
     <string name="preference_save_zulu_time">Time format for filename</string>
-    <string name="preference_save_zulu_time_summary">Whether to use local or UTC (Coordinated Universal Time) time for naming photos and videos</string>
     <string name="preference_show_when_locked">Show camera when locked</string>
     <string name="preference_show_when_locked_summary">If enabled, Open Camera will still show above any lockscreen (you\'ll still have to unlock to access Settings, Gallery etc)</string>
     <string name="preference_startup_focus">Perform auto-focus on startup</string>
@@ -135,14 +127,11 @@
     <string name="preference_lock_video">Lock screen when recording video</string>
     <string name="preference_lock_video_summary">When recording video, the GUI will be locked to prevent accidentally stopping recording. Swipe the screen to unlock. Note that video recording will always stop if the app goes into background or the screen is blanked.</string>
     <string name="preference_rotate_preview">Rotate preview</string>
-    <string name="preference_rotate_preview_summary">Option to rotate the preview (won\'t affect resultant photos/videos)</string>
+    <string name="preference_rotate_preview_summary">Option to rotate the preview (won\'t affect resultant photos/videos)\n%s</string>
     <string name="preference_screen_gui">On screen GUI…</string>
     <string name="preference_preview_size">Preview size</string>
-    <string name="preference_preview_size_summary">How to choose the preview size</string>
     <string name="preference_ui_placement">UI placement</string>
-    <string name="preference_ui_placement_summary">Whether to have a left-handed or right-handed user interface</string>
     <string name="preference_immersive_mode">Immersive mode</string>
-    <string name="preference_immersive_mode_summary">Options for \"immersive mode\" behaviour</string>
     <string name="preference_show_zoom">Show zoom</string>
     <string name="preference_show_zoom_summary">Display the current camera zoom level on screen (when zoomed in)</string>
     <string name="preference_show_zoom_controls">Show zoom -/+ controls</string>
@@ -166,10 +155,9 @@
     <string name="preference_show_battery">Show battery</string>
     <string name="preference_show_battery_summary">Display the current battery level on screen</string>
     <string name="preference_grid">Show a grid</string>
-    <string name="preference_grid_summary">Display one of various grids</string>
     <string name="grid">Grid</string> <!-- short form of Show a grid -->
     <string name="preference_crop_guide">Show a crop guide</string>
-    <string name="preference_crop_guide_summary">A crop guide displays a rectangle showing what the specified aspect ratio looks like - useful if you plan to crop the photo/video afterwards to a different aspect ratio. Requires WYSIWYG photo mode, or being in video mode.</string>
+    <string name="preference_crop_guide_summary">A crop guide displays a rectangle showing what the specified aspect ratio looks like - useful if you plan to crop the photo/video afterwards to a different aspect ratio. Requires WYSIWYG photo mode, or being in video mode.\n%s</string>
     <string name="preference_show_toasts">Show \"toast\" messages</string>
     <string name="preference_show_toasts_summary">Whether to display the popup \"toast\" messages</string>
     <string name="preference_thumbnail_animation">Show thumbnail animation</string>
@@ -186,25 +174,20 @@
     <string name="preference_screen_video_settings">Video settings…</string>
     <string name="preference_screen_location_settings">Location settings…</string>
     <string name="preference_resolution">Camera resolution</string>
-    <string name="preference_resolution_summary">Set the resolution of photos taken by the camera</string>
     <string name="preference_quality">Image quality</string>
-    <string name="preference_quality_summary">Set the image JPEG quality of saved photo images (default value is 90%%)</string> <!-- '%' is encoded as '%%' - a single % can crash devices, and this isn't picked up by Android Lint! -->
+    <string name="preference_quality_summary">Set the image JPEG quality of saved photo images (default value is 90%%)\n%s</string> <!-- '%' is encoded as '%%' - a single % can crash devices, and this isn't picked up by Android Lint! -->
     <string name="preference_raw">RAW</string>
-    <string name="preference_raw_summary">Whether to save in RAW (DNG) format</string>
     <string name="preference_location">Store location data (Geotagging)</string>
     <string name="preference_location_summary">Store GPS location data in the photos/videos</string>
     <string name="preference_gps_direction">Store compass direction</string>
-    <string name="preference_gps_direction_summary">Store GPS compass direction in the photos</string>
+    <string name="preference_gps_direction_summary">Store GPS compass direction in the photos (JPEG format only)</string>
     <string name="preference_require_location">Require location data</string>
     <string name="preference_require_location_summary">If location data is enabled, only take photo/video if location data is available</string>
     <string name="preference_stamp">Stamp photos</string>
-    <string name="preference_stamp_summary">Stamp photos with date and time; and also GPS info if location/direction data is enabled</string>
+    <string name="preference_stamp_summary">Stamp photos with date and time; and also GPS info if location/direction data is enabled\n%s</string>
     <string name="preference_stamp_dateformat">Datestamp format</string>
-    <string name="preference_stamp_dateformat_summary">Specify the format of the datestamp (if enabled)</string>
     <string name="preference_stamp_timeformat">Timestamp format</string>
-    <string name="preference_stamp_timeformat_summary">Specify the format of the timestamp (if enabled)</string>
     <string name="preference_stamp_gpsformat">GPS stamp format</string>
-    <string name="preference_stamp_gpsformat_summary">Specify the format of the GPS stamp (if enabled)</string>
     <string name="preference_textstamp">Custom text</string>
     <string name="preference_textstamp_summary">Stamp photos with a custom text</string>
     <string name="preference_stamp_fontsize">Font size</string>
@@ -216,27 +199,26 @@
     <string name="preference_background_photo_saving">Use background thread</string>
     <string name="preference_background_photo_saving_summary">Whether to save photos on a background thread (for faster operation)</string>
     <string name="video_quality">Video resolution</string>
-    <string name="video_quality_summary">Set the resolution of videos</string>
     <string name="preference_force_video_4k">Force 4K UHD video (only works on some devices)</string>
     <string name="preference_force_video_4k_summary">Enable 3840x2160 resolution for video recording on back camera - this option is a hack that may allow 4K devices on 4K cameras that don\'t expose the option to 3rd party camera apps. This isn\'t guaranteed to work, please test before working.</string>
     <string name="preference_video_stabilization">Enable video stabilization</string>
     <string name="preference_video_stabilization_summary">Video stabilization reduces the shaking due to the motion of the camera in both the preview and in recorded videos</string>
     <string name="preference_video_bitrate">Video bitrate (approx)</string>
-    <string name="preference_video_bitrate_summary">Set the approximate bitrate of videos (higher means better quality, but takes up more disk space; may cause video recording to fail if bitrate not supported)</string>
+    <string name="preference_video_bitrate_summary">Set the approximate bitrate of videos (higher means better quality, but takes up more disk space; may cause video recording to fail if bitrate not supported)\n%s</string>
     <string name="preference_video_fps">Video frame rate (approx)</string>
-    <string name="preference_video_fps_summary">Set the frame rate (FPS) of videos (may be approx, not guaranteed to be achieved, and may cause video recording to fail if frame rate not supported)</string>
+    <string name="preference_video_fps_summary">Set the frame rate (FPS) of videos (may be approx, not guaranteed to be achieved, and may cause video recording to fail if frame rate not supported). Note that this setting is ignored for slow motion videos.\n%s</string>
     <string name="preference_video_max_duration">Maximum duration of video</string>
-    <string name="preference_video_max_duration_summary">The video recording will stop after the specified duration</string>
+    <string name="preference_video_max_duration_summary">The video recording will stop after the specified duration\n%s</string>
     <string name="preference_video_restart">Restart video after max duration</string>
-    <string name="preference_video_restart_summary">If the video has stopped after hitting the maximum duration (if set), this option will make the video restart, up to the specified number of times</string>
+    <string name="preference_video_restart_summary">If the video has stopped after hitting the maximum duration (if set), this option will make the video restart, up to the specified number of times\n%s</string>
     <string name="preference_video_max_filesize">Maximum file size of video</string>
-    <string name="preference_video_max_filesize_summary">The video recording will stop and/or restart (see option below) when the (approximate) maximum file size is reached. Note that almost all Android devices have a maximum file size for videos (typically around 2GB or 4GB), but this option allows setting a specific value</string>
+    <string name="preference_video_max_filesize_summary">The video recording will stop and/or restart (see option below) when the (approximate) maximum file size is reached. Note that almost all Android devices have a maximum file size for videos (typically around 2GB or 4GB), but this option allows setting a specific value.\n%s</string>
     <string name="preference_video_restart_max_filesize">Restart on maximum file size</string>
     <string name="preference_video_restart_max_filesize_summary">Whether to automatically restart when the maximum file size is reached (whether the device default max file size, or user specified)</string>
     <string name="preference_record_audio">Record audio</string>
     <string name="preference_record_audio_summary">Record audio when recording video</string>
     <string name="preference_record_audio_src">Audio source</string>
-    <string name="preference_record_audio_src_summary">Microphone to use for recording audio</string>
+    <string name="preference_record_audio_src_summary">Microphone to use for recording audio\n%s</string>
     <string name="preference_record_audio_channels">Audio channels</string>
     <string name="preference_record_audio_channels_summary">Specify mono or stereo for recording audio (stereo only supported on some devices)</string>
     <string name="preference_video_flash">Flash while recording video</string>
@@ -248,7 +230,7 @@
     <string name="preference_donate">Donate to support development</string>
     <string name="preference_donate_summary">If you like this app, please consider making a donation to support development. You can do this by purchasing my "donation app" - click this option to open up the page for my donation app. Thanks!</string>
     <string name="preference_use_camera2">Use Camera2 API</string>
-    <string name="preference_use_camera2_summary">Enables Android 5\'s Camera2 API - offers extra features, but may not work properly on all devices (will cause a restart)</string>
+    <string name="preference_use_camera2_summary">Enables extra features such as manual modes for exposure, focus, white balance, along with RAW (if supported by the device), but may not work properly on all devices (will cause a restart)</string>
     <string name="preference_about">About</string>
     <string name="preference_about_summary">App and debug information</string>
     <string name="preference_reset">Reset settings</string>
@@ -301,17 +283,21 @@
     <string name="audio_listener_started">Make a loud noise</string>
 
     <string name="auto_stabilise_info">Auto-level will automatically rotate photos so that they appear level.\n\nNote that this means images will come out a slightly lower resolution (due to the rotation and cropping that\'s required).</string>
-    <string name="raw_info">DNG files contain the full uncompressed and unprocessed information from your camera.\n\nMost gallery apps won\'t recognise DNG, instead they should be used with specialised apps like Snapseed or Lightroom.\n\nNote that various processing options such as "Stamp photos" and "Auto-level" will only apply to the JPEG images, and not the DNG images.\n\nDNG files take up a lot of space; a file explorer app may be useful for transferring or deleting them.\n\nDNG files are only saved in Standard or DRO photo modes.</string>
+    <string name="raw_info">DNG files contain the full uncompressed and unprocessed information from your camera.\n\nNote that some gallery apps don\'t recognise DNG files. DNG images can be used with specialised image editors like Snapseed or Lightroom.\n\nNote that various processing options such as "Stamp photos" and "Auto-level" will only apply to the JPEG images, and not the DNG images.\n\n\n\nDNG files are only saved in Standard or DRO photo modes.</string>
     <string name="hdr_info">HDR mode is useful for shots with a large variation in brightness. It works by taking multiple shots at different exposures, and combining them to create the final image.\n\nNote that HDR is not suitable for scenes with fast movement, and may result in less accurate colour reproduction.\n\nTaking photos in HDR mode will be slower.</string>
 
     <string name="dont_show_again">Don\'t show again</string>
 
     <string name="photo_mode">Photo Mode</string>
-    <string name="photo_mode_standard">Std</string>
-    <string name="photo_mode_hdr">HDR</string>
-    <string name="photo_mode_expo_bracketing">Expo {}</string>
+    <string name="photo_mode_standard">Std</string> <!-- keep short, as this shows in the popup menu -->
+    <string name="photo_mode_standard_full">Standard</string>
+    <string name="photo_mode_hdr">HDR</string> <!-- keep short, as this shows in the popup menu -->
+    <string name="photo_mode_expo_bracketing">Expo {}</string> <!-- keep short, as this shows in the popup menu -->
     <string name="photo_mode_expo_bracketing_full">Exposure Bracketing</string>
-    <string name="photo_mode_noise_reduction">NR</string>
+    <string name="photo_mode_fast_burst">[]]]</string> <!-- keep short, as this shows in the popup menu; shouldn't be translated -->
+    <string name="photo_mode_fast_burst_full">Fast Burst</string>
+    <string name="photo_mode_noise_reduction">NR</string> <!-- keep short, as this shows in the popup menu; probably shouldn't be translated? -->
+    <string name="photo_mode_noise_reduction_full">Noise Reduction</string>
     <string name="preference_category_stamp">Photo Stamp</string>
     <string name="preference_hdr_save_expo">Save all images for HDR mode</string>
     <string name="preference_hdr_save_expo_summary">If enabled, when using HDR photo mode, the three base exposure images will be saved as well as the final HDR photo. Note this will make saving slower, especially if options like \"Stamp photos\" or Auto-level are also used.</string>
@@ -329,12 +315,12 @@
     <string name="preference_camera2_fake_flash_summary">Enable this if your device has buggy flash behaviour with Camera2 API</string>
 
     <string name="preference_expo_bracketing_n_images">Exposure Bracketing</string>
-    <string name="preference_expo_bracketing_n_images_summary">Number of images for exposure bracketing mode</string>
+    <string name="preference_expo_bracketing_n_images_summary">Number of images for exposure bracketing mode\n%s</string>
     <string name="preference_expo_bracketing_stops">Exposure Bracketing Stops</string>
-    <string name="preference_expo_bracketing_stops_summary">How many stops to subtract/add for the darkest/brightest image</string>
+    <string name="preference_expo_bracketing_stops_summary">How many stops to subtract/add for the darkest/brightest image\n%s</string>
 
     <string name="preference_nr_save">Noise Reduction original images</string>
-    <string name="preference_nr_save_summary">Whether to save original images in noise reduction mode. Note this can make saving photos much slower.</string>
+    <string name="preference_nr_save_summary">Whether to save original images in noise reduction mode. Note this can make saving photos much slower.\n%s</string>
 
     <string name="preference_nr_save_no">Don\'t save original images</string>
     <string name="preference_nr_save_single">Save single original image</string>
@@ -361,24 +347,24 @@
     <string name="selfie">Selfie</string>
 
     <string name="preference_front_camera_mirror">Front camera mirror</string>
-    <string name="preference_front_camera_mirror_summary">Whether to mirror images when using the front camera.</string>
+    <string name="preference_front_camera_mirror_summary">Whether to mirror images when using the front camera\n%s</string>
 
     <string name="preference_calibrate_level">Calibrate level angle</string>
-    <string name="preference_calibrate_level_summary">This option calibrates your device\'s accelerometer, so the auto-level and on-screen level/angle options work correctly.</string>
+    <string name="preference_calibrate_level_summary">This option calibrates your device\'s accelerometer, so the auto-level and on-screen level/angle options work correctly</string>
     <string name="preference_calibrate_level_dialog">Please place your device on a flat horizontal surface so that it is level (either in portrait or landscape orientation), and then select Calibrate.\n\nPress Reset to remove the calibration from your device.\n\nPress back button to cancel.</string>
     <string name="preference_calibrate_level_calibrate">Calibrate</string>
     <string name="preference_calibrate_level_reset">Reset</string>
     <string name="preference_calibrate_level_calibrated">Level calibrated</string>
     <string name="preference_calibrate_level_calibration_reset">Level calibration reset</string>
 
-    <string name="photo_mode_dro">DRO</string>
+    <string name="photo_mode_dro">DRO</string> <!-- keep short, as this shows in the popup menu -->
 
     <string name="preference_show_pitch_lines">Show pitch lines</string>
     <string name="preference_show_pitch_lines_summary">Display horizontal pitch lines</string>
     <string name="preference_show_geo_direction_lines">Show compass direction lines</string>
     <string name="preference_show_geo_direction_lines_summary">Display compass direction lines</string>
     <string name="preference_video_subtitle">Video subtitles</string>
-    <string name="preference_video_subtitle_summary">Create a subtitles (.SRT) file storing date and time; and also GPS info if location/direction data is enabled</string>
+    <string name="preference_video_subtitle_summary">Create a subtitles (.SRT) file storing date and time; and also GPS info if location/direction data is enabled\n%s</string>
 
     <string name="duration_unlimited">Unlimited</string>
     <string name="duration_3s">3 seconds</string>
@@ -405,8 +391,8 @@
     <string name="duration_45m">45 minutes</string>
     <string name="duration_1h">1 hour</string>
 
-    <string name="preference_show_take_photo">Show take photo icon</string>
-    <string name="preference_show_take_photo_summary">Show the icon for taking photos and recording videos. Useful if your device has a hardware shutter button and you\'d rather use that.</string>
+    <string name="preference_show_take_photo">Show \"Take Photo\" icon</string>
+    <string name="preference_show_take_photo_summary">Show the icon for taking photos and recording videos. Uncheck if you\'d rather take photos by other methods (e.g., if your device has a hardware shutter button, or using the volume keys).</string>
 
     <string name="video_pause">Video paused</string>
     <string name="video_resume">Video resumed</string>
@@ -466,6 +452,121 @@
     <string name="top_of_screen">at top of screen</string>
     <string name="bottom_of_screen">at bottom of screen</string>
     <string name="centre_of_screen">at centre</string>
+
+    <string name="high_speed">High Speed</string> <!-- in the sense of high speed video frame rates -->
+
+    <string name="preference_video_fps_default">Default</string>
+
+    <string name="preference_category_exif_tags">Custom EXIF tags</string>
+    <string name="preference_exif_artist">Artist</string>
+    <string name="preference_exif_artist_summary">Text to store in the image metadata for the "artist" tag  (JPEG format only). (Leave blank for none.)</string>
+    <string name="preference_exif_copyright">Copyright</string>
+    <string name="preference_exif_copyright_summary">Text to store in the image metadata for the "copyright" tag  (JPEG format only). (Leave blank for none.)</string>
+
+    <string name="processing">Processing…</string>
+
+    <string name="preference_raw_no">JPEG only</string>
+    <string name="preference_raw_yes">JPEG and DNG (RAW)</string>
+    <string name="preference_raw_only">DNG (RAW) only</string>
+
+    <string name="preference_stamp_dateformat_default">Default</string>
+    <string name="preference_stamp_dateformat_yyyymmdd">yyyy-mm-dd (ISO 8601)</string>
+    <string name="preference_stamp_dateformat_ddmmyyyy">dd/mm/yyyy</string>
+    <string name="preference_stamp_dateformat_mmddyyyy">mm/dd/yyyy</string>
+    <string name="preference_stamp_dateformat_none">None</string>
+
+    <string name="preference_fast_burst_n_images">Number of photos</string>
+    <string name="preference_fast_burst_n_images_entries_2">2</string>
+    <string name="preference_fast_burst_n_images_entries_3">3</string>
+    <string name="preference_fast_burst_n_images_entries_4">4</string>
+    <string name="preference_fast_burst_n_images_entries_5">5</string>
+    <string name="preference_fast_burst_n_images_entries_6">6</string>
+    <string name="preference_fast_burst_n_images_entries_8">8</string>
+    <string name="preference_fast_burst_n_images_entries_10">10</string>
+    <string name="preference_fast_burst_n_images_entries_12">12</string>
+    <string name="preference_fast_burst_n_images_entries_15">15</string>
+    <string name="preference_fast_burst_n_images_entries_20">20</string>
+
+    <string name="preference_video_capture_rate">Speed</string>
+    <string name="preference_video_capture_rate_normal">Normal</string>
+    <string name="slow_motion_enabled">Slow motion enabled</string>
+    <string name="slow_motion_disabled">Slow motion disabled</string>
+
+    <string name="flash_off">Flash Off</string>
+    <string name="flash_auto">Flash Auto</string>
+    <string name="flash_on">Flash On</string>
+    <string name="flash_torch">Torch</string>
+    <string name="flash_red_eye">Red Eye</string>
+    <string name="flash_frontscreen_auto">Screen Flash Auto</string>
+    <string name="flash_frontscreen_on">Screen Flash On</string>
+    <string name="flash_frontscreen_torch">Screen Torch</string>
+
+    <string name="preference_antibanding">Anti-banding</string>
+    <string name="preference_antibanding_summary">Algorithms to help with light flickering.\n%s</string>
+    <string name="anti_banding_auto">Auto</string>
+    <string name="anti_banding_50hz">50Hz</string>
+    <string name="anti_banding_60hz">60Hz</string>
+    <string name="anti_banding_off">Off</string>
+
+    <string name="preference_ghost_image">Ghost image</string>
+    <string name="preference_ghost_image_summary">Overlay an image, to help with alignment.\n%s</string>
+    <string name="preference_ghost_image_off">Off</string>
+    <string name="preference_ghost_image_last">Last photo taken</string>
+    <string name="preference_ghost_image_selected">Selected image</string>
+
+    <string name="open_files_saf_exception_ghost">No file dialog found on this device, ghost image option is not supported</string>
+    <string name="saf_permission_failed_open_image">Unable to open this image</string>
+
+    <string name="preference_camera2_photo_video_recording">Allow photos whilst recording video</string>
+    <string name="preference_camera2_photo_video_recording_summary">Allows taking photos whilst recording videos. Disable this if there are problems with video recording with Camera2 API enabled on your device.</string>
+
+    <string name="preference_video_log">Video flat (log) profile</string>
+    <string name="preference_video_log_summary">Enable a flat (log) profile for video mode\n%s</string>
+    <string name="preference_video_log_off">Off</string>
+    <string name="preference_video_log_low">Low</string>
+    <string name="preference_video_log_medium">Medium</string>
+    <string name="preference_video_log_strong">Strong</string>
+    <string name="preference_video_log_extra_strong">Extra strong</string>
+    <string name="video_log">Log profile</string>
+
+    <string name="preference_record_audio_src_camcorder">Camcorder</string>
+    <string name="preference_record_audio_src_mic">External mic (if present)</string>
+    <string name="preference_record_audio_src_default">Default audio source</string>
+    <string name="preference_record_audio_src_voice_communication">Optimised for voice calls</string>
+    <string name="preference_record_audio_src_voice_recognition">Optimised for voice recognition</string>
+    <string name="preference_record_audio_src_unprocessed">Unprocessed</string>
+
+    <string name="preference_video_bitrate_default">Default</string>
+    <string name="preference_video_bitrate_100000">100kbps</string>
+    <string name="preference_video_bitrate_200000">200kbps</string>
+    <string name="preference_video_bitrate_500000">500kbps</string>
+    <string name="preference_video_bitrate_1000000">1Mbps</string>
+    <string name="preference_video_bitrate_2000000">2Mbps</string>
+    <string name="preference_video_bitrate_3000000">3Mbps</string>
+    <string name="preference_video_bitrate_4000000">4Mbps</string>
+    <string name="preference_video_bitrate_5000000">5Mbps</string>
+    <string name="preference_video_bitrate_6000000">6Mbps</string>
+    <string name="preference_video_bitrate_7000000">7Mbps</string>
+    <string name="preference_video_bitrate_8000000">8Mbps</string>
+    <string name="preference_video_bitrate_9000000">9Mbps</string>
+    <string name="preference_video_bitrate_10000000">10Mbps</string>
+    <string name="preference_video_bitrate_15000000">15Mbps</string>
+    <string name="preference_video_bitrate_20000000">20Mbps</string>
+    <string name="preference_video_bitrate_30000000">30Mbps</string>
+    <string name="preference_video_bitrate_40000000">40Mbps</string>
+    <string name="preference_video_bitrate_50000000">50Mbps</string>
+    <string name="preference_video_bitrate_60000000">60Mbps</string>
+    <string name="preference_video_bitrate_70000000">70Mbps</string>
+    <string name="preference_video_bitrate_80000000">80Mbps</string>
+    <string name="preference_video_bitrate_90000000">90Mbps</string>
+    <string name="preference_video_bitrate_100000000">100Mbps</string>
+    <string name="preference_video_bitrate_150000000">150Mbps</string>
+    <string name="preference_video_bitrate_200000000">200Mbps</string>
+
+    <string name="no_burst">no burst</string> <!-- string for burst mode not being supported for a resolution -->
+
+    <string name="preference_show_video_max_amp">Show audio level meter</string>
+    <string name="preference_show_video_max_amp_summary">Whether to show on-screen audio level when recording video</string>
 
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text"><b>v1.41:</b>\n\n
