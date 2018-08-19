@@ -4,6 +4,7 @@ import android.media.CamcorderProfile;
 
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.CameraController.CameraController2;
+import net.sourceforge.opencamera.HDRProcessor;
 import net.sourceforge.opencamera.ImageSaver;
 import net.sourceforge.opencamera.LocationSupplier;
 import net.sourceforge.opencamera.MainActivity;
@@ -608,5 +609,60 @@ public class UnitTest {
 				new float4(0, 51, 53, 53)
 		);
 		assertEquals(m2, new float4(49, 49, 71, 71));
+	}
+
+	@Test
+	public void testBrightenFactors() {
+		Log.d(TAG, "testBrightenFactors");
+
+		HDRProcessor.BrightenFactors brighten_factors = HDRProcessor.computeBrightenFactors(1600, 20, 63);
+		assertEquals(4.0f, brighten_factors.gain, 1.0e-5f);
+		assertEquals(4.0f, brighten_factors.low_x, 0.1f);
+		assertEquals(255.5f, brighten_factors.mid_x, 1.0e-5f);
+		assertEquals(1.0f, brighten_factors.gamma, 1.0e-5f);
+
+		// this checks for stability - we change the inputs so we enter "use piecewise function with gain and gamma", but
+		// we should not significantly change the values of gain or low_x, and gamma should be close to 1
+		brighten_factors = HDRProcessor.computeBrightenFactors(1600, 20, 64);
+		assertEquals(4.0f, brighten_factors.gain, 1.0e-5f);
+		assertEquals(4.0f, brighten_factors.low_x, 0.1f);
+		assertEquals(32.0f, brighten_factors.mid_x, 0.5f);
+		assertEquals(1.0f, brighten_factors.gamma, 0.5f);
+
+	}
+
+	@Test
+	public void testFocusBracketingDistances() {
+		Log.d(TAG, "testFocusBracketingDistances");
+
+		List<Float> focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/0.1f, 1.0f/10.0f, 5);
+		assertEquals(5, focus_distances.size());
+		assertEquals(1.0f/0.1f, focus_distances.get(0), 1.0e-5);
+		assertEquals(1.0f/2.575f, focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/5.05f, focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/7.525f, focus_distances.get(3), 1.0e-5);
+		assertEquals(1.0f/10.0f, focus_distances.get(4), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/10.0f, 1.0f/0.1f, 5);
+		assertEquals(5, focus_distances.size());
+		// should be reverse of above
+		assertEquals(1.0f/0.1f, focus_distances.get(4), 1.0e-5);
+		assertEquals(1.0f/2.575f, focus_distances.get(3), 1.0e-5);
+		assertEquals(1.0f/5.05f, focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/7.525f, focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/10.0f, focus_distances.get(0), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/0.1f, 1.0f/15.0f, 3);
+		assertEquals(3, focus_distances.size());
+		assertEquals(1.0f/0.1f, focus_distances.get(0), 1.0e-5);
+		assertEquals(1.0f/5.05f, focus_distances.get(1), 1.0e-5); // not 7.55, as we clamp distances to a max of 10m when averaging
+		assertEquals(1.0f/15.0f, focus_distances.get(2), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/15.0f, 1.0f/0.1f, 3);
+		assertEquals(3, focus_distances.size());
+		// should be reverse of above
+		assertEquals(1.0f/0.1f, focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/5.05f, focus_distances.get(1), 1.0e-5); // not 7.55, as we clamp distances to a max of 10m when averaging
+		assertEquals(1.0f/15.0f, focus_distances.get(0), 1.0e-5);
 	}
 }

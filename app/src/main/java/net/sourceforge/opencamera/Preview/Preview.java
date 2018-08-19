@@ -223,8 +223,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	private float exposure_step;
 	private boolean supports_expo_bracketing;
 	private int max_expo_bracketing_n_images;
-	private boolean supports_raw;
+	private boolean supports_focus_bracketing;
 	private boolean supports_burst;
+	private boolean supports_raw;
 	private float view_angle_x;
 	private float view_angle_y;
 
@@ -1294,8 +1295,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		exposure_step = 0.0f;
 		supports_expo_bracketing = false;
 		max_expo_bracketing_n_images = 0;
-		supports_raw = false;
+		supports_focus_bracketing = false;
 		supports_burst = false;
+		supports_raw = false;
 		view_angle_x = 55.0f; // set a sensible default
 		view_angle_y = 43.0f; // set a sensible default
 		sizes = null;
@@ -1738,6 +1740,11 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			camera_controller.setExpoBracketingStops( applicationInterface.getExpoBracketingStopsPref() );
 			// setUseExpoFastBurst called when taking a photo
 		}
+		else if( this.supports_focus_bracketing && applicationInterface.isFocusBracketingPref() ) {
+			camera_controller.setBurstType(CameraController.BurstType.BURSTTYPE_FOCUS);
+			camera_controller.setFocusBracketingNImages( applicationInterface.getFocusBracketingNImagesPref() );
+			camera_controller.setFocusBracketingAddInfinity( applicationInterface.getFocusBracketingAddInfinityPref() );
+		}
 		else if( this.supports_burst && applicationInterface.isCameraBurstPref() ) {
 			if( applicationInterface.getBurstForNoiseReduction() ) {
 				if( this.supports_exposure_time ) { // noise reduction mode also needs manual exposure
@@ -1939,8 +1946,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			this.exposure_step = camera_features.exposure_step;
 			this.supports_expo_bracketing = camera_features.supports_expo_bracketing;
 			this.max_expo_bracketing_n_images = camera_features.max_expo_bracketing_n_images;
-			this.supports_raw = camera_features.supports_raw;
+			this.supports_focus_bracketing = camera_features.supports_focus_bracketing;
 			this.supports_burst = camera_features.supports_burst;
+			this.supports_raw = camera_features.supports_raw;
 			this.view_angle_x = camera_features.view_angle_x;
 			this.view_angle_y = camera_features.view_angle_y;
 			this.supports_video_high_speed = camera_features.video_sizes_high_speed != null && camera_features.video_sizes_high_speed.size() > 0;
@@ -2620,7 +2628,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 
 		{
-			float focus_distance_value = applicationInterface.getFocusDistancePref();
+			float focus_distance_value = applicationInterface.getFocusDistancePref(false);
 			if( MyDebug.LOG )
 				Log.d(TAG, "saved focus_distance: " + focus_distance_value);
 			if( focus_distance_value < 0.0f )
@@ -2628,8 +2636,21 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			else if( focus_distance_value > minimum_focus_distance )
 				focus_distance_value = minimum_focus_distance;
 			camera_controller.setFocusDistance(focus_distance_value);
+			camera_controller.setFocusBracketingSourceDistance(focus_distance_value);
 			// now save
-			applicationInterface.setFocusDistancePref(focus_distance_value);
+			applicationInterface.setFocusDistancePref(focus_distance_value, false);
+		}
+		{
+			float focus_distance_value = applicationInterface.getFocusDistancePref(true);
+			if( MyDebug.LOG )
+				Log.d(TAG, "saved focus_bracketing_target_distance: " + focus_distance_value);
+			if( focus_distance_value < 0.0f )
+				focus_distance_value = 0.0f;
+			else if( focus_distance_value > minimum_focus_distance )
+				focus_distance_value = minimum_focus_distance;
+			camera_controller.setFocusBracketingTargetDistance(focus_distance_value);
+			// now save
+			applicationInterface.setFocusDistancePref(focus_distance_value, true);
 		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "setupCameraParameters: time after setting up focus: " + (System.currentTimeMillis() - debug_time));
@@ -3607,17 +3628,44 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         }
 	}
 	
-	public void setFocusDistance(float new_focus_distance) {
-		if( MyDebug.LOG )
+	private final Handler focus_bracketing_handler = new Handler(); // used to set focus distance back to source, after temporarily showing the target
+
+	public void setFocusDistance(float new_focus_distance, boolean is_target_distance) {
+		if( MyDebug.LOG ) {
 			Log.d(TAG, "setFocusDistance: " + new_focus_distance);
+			Log.d(TAG, "is_target_distance: " + is_target_distance);
+		}
 		if( camera_controller != null ) {
 			if( new_focus_distance < 0.0f )
 				new_focus_distance = 0.0f;
 			else if( new_focus_distance > minimum_focus_distance )
 				new_focus_distance = minimum_focus_distance;
-			if( camera_controller.setFocusDistance(new_focus_distance) ) {
+			boolean focus_changed = false;
+			if( is_target_distance ) {
+				focus_changed = true;
+				camera_controller.setFocusBracketingTargetDistance(new_focus_distance);
+				// also set the focus distance, so the user can see what the target distance looks like
+				final float saved_focus_distance = camera_controller.getFocusBracketingSourceDistance();
+				camera_controller.setFocusDistance(new_focus_distance);
+				// but now set to revert back to the source
+				focus_bracketing_handler.removeCallbacksAndMessages(null); // remove any previous postDelayed (so we don't keep switching back when moving the target distance slider)
+				focus_bracketing_handler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						if( MyDebug.LOG )
+							Log.d(TAG, "set manual focus distance back to start");
+						camera_controller.setFocusDistance(saved_focus_distance);
+					}
+				}, 100);
+			}
+			else if( camera_controller.setFocusDistance(new_focus_distance) ) {
+				focus_changed = true;
+				camera_controller.setFocusBracketingSourceDistance(new_focus_distance);
+			}
+
+			if( focus_changed ) {
 				// now save
-				applicationInterface.setFocusDistancePref(new_focus_distance);
+				applicationInterface.setFocusDistancePref(new_focus_distance, is_target_distance);
 				{
 					String focus_distance_s;
 					if( new_focus_distance > 0.0f ) {
@@ -3627,7 +3675,10 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					else {
 						focus_distance_s = getResources().getString(R.string.infinite);
 					}
-		    		showToast(seekbar_toast, getResources().getString(R.string.focus_distance) + " " + focus_distance_s);
+					int id = R.string.focus_distance;
+					if( this.supports_focus_bracketing && applicationInterface.isFocusBracketingPref() )
+						id = is_target_distance ? R.string.focus_bracketing_target_distance : R.string.focus_bracketing_source_distance;
+		    		showToast(seekbar_toast, getResources().getString(id) + " " + focus_distance_s);
 				}
 			}
 		}
@@ -6237,7 +6288,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		if( MyDebug.LOG )
 			Log.d(TAG, "getMaximumExposureTime");
 		long max = max_exposure_time;
-		if( applicationInterface.isExpoBracketingPref() || applicationInterface.isCameraBurstPref() ) {
+		if( applicationInterface.isExpoBracketingPref() || applicationInterface.isFocusBracketingPref() || applicationInterface.isCameraBurstPref() ) {
 			// doesn't make sense to allow exposure times more than 0.5s in these modes
 			max = Math.min(max_exposure_time, 1000000000L/2);
 		}
@@ -6291,12 +6342,16 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     	return this.max_expo_bracketing_n_images;
     }
 
-    public boolean supportsRaw() {
-    	return this.supports_raw;
+    public boolean supportsFocusBracketing() {
+    	return this.supports_focus_bracketing;
     }
 
     public boolean supportsBurst() {
     	return this.supports_burst;
+    }
+
+    public boolean supportsRaw() {
+    	return this.supports_raw;
     }
 
 	/** Returns the horizontal angle of view in degrees (when unzoomed).

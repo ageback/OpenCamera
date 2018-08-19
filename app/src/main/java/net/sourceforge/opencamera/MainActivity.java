@@ -889,8 +889,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		mainUI.changeSeekbar(R.id.iso_seekbar, change);
 	}
 
-	public void changeFocusDistance(int change) {
-		mainUI.changeSeekbar(R.id.focus_seekbar, change);
+	public void changeFocusDistance(int change, boolean is_target_distance) {
+		mainUI.changeSeekbar(is_target_distance ? R.id.focus_bracketing_target_seekbar : R.id.focus_seekbar, change);
 	}
 	
 	private final SensorEventListener accelerometerListener = new SensorEventListener() {
@@ -2967,28 +2967,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		{
 			if( MyDebug.LOG )
 				Log.d(TAG, "set up manual focus");
-		    SeekBar focusSeekBar = findViewById(R.id.focus_seekbar);
-		    focusSeekBar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
-			setProgressSeekbarScaled(focusSeekBar, 0.0, preview.getMinimumFocusDistance(), preview.getCameraController().getFocusDistance());
-		    focusSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
-				@Override
-				public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-					double frac = progress/(double)manual_n;
-					double scaling = MainActivity.seekbarScaling(frac);
-					float focus_distance = (float)(scaling * preview.getMinimumFocusDistance());
-					preview.setFocusDistance(focus_distance);
-				}
-
-				@Override
-				public void onStartTrackingTouch(SeekBar seekBar) {
-				}
-
-				@Override
-				public void onStopTrackingTouch(SeekBar seekBar) {
-				}
-			});
-	    	final int visibility = preview.getCurrentFocusValue() != null && this.getPreview().getCurrentFocusValue().equals("focus_mode_manual2") ? View.VISIBLE : View.GONE;
-		    focusSeekBar.setVisibility(visibility);
+			setManualFocusSeekbar(false);
+			setManualFocusSeekbar(true);
 		}
 		if( MyDebug.LOG )
 			Log.d(TAG, "cameraSetup: time after setting up manual focus: " + (System.currentTimeMillis() - debug_time));
@@ -3142,6 +3122,37 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			Log.d(TAG, "cameraSetup: total time for cameraSetup: " + (System.currentTimeMillis() - debug_time));
     }
 
+    private void setManualFocusSeekbar(final boolean is_target_distance) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setManualFocusSeekbar");
+		SeekBar focusSeekBar = findViewById(is_target_distance ? R.id.focus_bracketing_target_seekbar : R.id.focus_seekbar);
+		focusSeekBar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
+		setProgressSeekbarScaled(focusSeekBar, 0.0, preview.getMinimumFocusDistance(), is_target_distance ? preview.getCameraController().getFocusBracketingTargetDistance() : preview.getCameraController().getFocusDistance());
+		focusSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+			@Override
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				double frac = progress/(double)manual_n;
+				double scaling = MainActivity.seekbarScaling(frac);
+				float focus_distance = (float)(scaling * preview.getMinimumFocusDistance());
+				preview.setFocusDistance(focus_distance, is_target_distance);
+			}
+
+			@Override
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			@Override
+			public void onStopTrackingTouch(SeekBar seekBar) {
+			}
+		});
+		boolean is_visible = preview.getCurrentFocusValue() != null && this.getPreview().getCurrentFocusValue().equals("focus_mode_manual2");
+		if( is_target_distance ) {
+			is_visible = is_visible && (applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.FocusBracketing);
+		}
+		final int visibility = is_visible ? View.VISIBLE : View.GONE;
+		focusSeekBar.setVisibility(visibility);
+	}
+
     public void setManualWBSeekbar() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setManualWBSeekbar");
@@ -3196,6 +3207,10 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     
     public boolean supportsExpoBracketing() {
 		return preview.supportsExpoBracketing();
+    }
+
+    public boolean supportsFocusBracketing() {
+		return preview.supportsFocusBracketing();
     }
 
     public boolean supportsFastBurst() {
@@ -3390,10 +3405,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 		}
 		else {
+			MyApplicationInterface.PhotoMode photo_mode = applicationInterface.getPhotoMode();
 			toast_string = getResources().getString(R.string.photo);
 			CameraController.Size current_size = preview.getCurrentPictureSize();
 			toast_string += " " + current_size.width + "x" + current_size.height;
-			if( preview.supportsFocus() && preview.getSupportedFocusValues().size() > 1 ) {
+			if( preview.supportsFocus() && preview.getSupportedFocusValues().size() > 1 && photo_mode != MyApplicationInterface.PhotoMode.FocusBracketing ) {
 				String focus_value = preview.getCurrentFocusValue();
 				if( focus_value != null && !focus_value.equals("focus_mode_auto") && !focus_value.equals("focus_mode_continuous_picture") ) {
 					String focus_entry = preview.findFocusEntryForValue(focus_value);
@@ -3408,7 +3424,6 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				simple = false;
 			}
 			String photo_mode_string = null;
-			MyApplicationInterface.PhotoMode photo_mode = applicationInterface.getPhotoMode();
 			if( photo_mode == MyApplicationInterface.PhotoMode.DRO ) {
 				photo_mode_string = getResources().getString(R.string.photo_mode_dro);
 			}
@@ -3417,6 +3432,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 			else if( photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing ) {
 				photo_mode_string = getResources().getString(R.string.photo_mode_expo_bracketing_full);
+			}
+			else if( photo_mode == MyApplicationInterface.PhotoMode.FocusBracketing ) {
+				photo_mode_string = getResources().getString(R.string.photo_mode_focus_bracketing_full);
+				int n_images = applicationInterface.getFocusBracketingNImagesPref();
+				photo_mode_string += " (" + n_images + ")";
 			}
 			else if( photo_mode == MyApplicationInterface.PhotoMode.FastBurst ) {
 				photo_mode_string = getResources().getString(R.string.photo_mode_fast_burst_full);

@@ -58,6 +58,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		DRO, // single image "fake" HDR
     	HDR, // HDR created from multiple (expo bracketing) images
     	ExpoBracketing, // take multiple expo bracketed images, without combining to a single image
+		FocusBracketing, // take multiple focus bracketed images, without combining to a single image
 		FastBurst,
 		NoiseReduction
     }
@@ -120,6 +121,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 	// camera properties which are saved in bundle, but not stored in preferences (so will be remembered if the app goes into background, but not after restart)
 	private int cameraId = 0;
 	private float focus_distance = 0.0f;
+	private float focus_bracketing_target_distance = 0.0f;
 	// camera properties that aren't saved even in the bundle; these should also be reset in reset()
 	private int zoom_factor = 0; // don't save zoom, as doing so tends to confuse users; other camera applications don't seem to save zoom when pause/resuming
 
@@ -153,6 +155,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 			focus_distance = savedInstanceState.getFloat("focus_distance", 0.0f);
 			if( MyDebug.LOG )
 				Log.d(TAG, "found focus_distance: " + focus_distance);
+			focus_bracketing_target_distance = savedInstanceState.getFloat("focus_bracketing_target_distance", 0.0f);
+			if( MyDebug.LOG )
+				Log.d(TAG, "found focus_bracketing_target_distance: " + focus_bracketing_target_distance);
         }
 
 		if( MyDebug.LOG )
@@ -172,6 +177,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 		if( MyDebug.LOG )
 			Log.d(TAG, "save focus_distance: " + focus_distance);
     	state.putFloat("focus_distance", focus_distance);
+		if( MyDebug.LOG )
+			Log.d(TAG, "save focus_bracketing_target_distance: " + focus_bracketing_target_distance);
+    	state.putFloat("focus_bracketing_target_distance", focus_bracketing_target_distance);
 	}
 	
 	void onDestroy() {
@@ -291,6 +299,10 @@ public class MyApplicationInterface implements ApplicationInterface {
 
     @Override
 	public String getFocusPref(boolean is_video) {
+		if( getPhotoMode() == PhotoMode.FocusBracketing && !main_activity.getPreview().isVideo() ) {
+			// alway run in manual focus mode for focus bracketing
+			return "focus_mode_manual2";
+		}
 		return sharedPreferences.getString(PreferenceKeys.getFocusPreferenceKey(cameraId, is_video), "");
     }
 
@@ -420,7 +432,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 		// at 100% quality for post-processing, the final image will then be saved at the user requested
 		// setting
 		PhotoMode photo_mode = getPhotoMode();
-		if( photo_mode == PhotoMode.DRO )
+		if( main_activity.getPreview().isVideo() )
+			; // for video photo snapshot mode, the photo modes for 100% quality won't be enabled
+		else if( photo_mode == PhotoMode.DRO )
 			return 100;
 		else if( photo_mode == PhotoMode.HDR )
 			return 100;
@@ -935,6 +949,10 @@ public class MyApplicationInterface implements ApplicationInterface {
 				n_raw = 0;
 				n_jpegs = this.getExpoBracketingNImagesPref();
 			}
+			else if( main_activity.getPreview().supportsFocusBracketing() && this.isFocusBracketingPref() ) {
+				n_raw = 0;
+				n_jpegs = this.getFocusBracketingNImagesPref();
+			}
 			else if( main_activity.getPreview().supportsBurst() && this.isCameraBurstPref() ) {
 				n_raw = 0;
 				if( this.getBurstForNoiseReduction() ) {
@@ -1010,14 +1028,20 @@ public class MyApplicationInterface implements ApplicationInterface {
     }
     
     @Override
-	public float getFocusDistancePref() {
-    	return focus_distance;
+	public float getFocusDistancePref(boolean is_target_distance) {
+    	return is_target_distance ? focus_bracketing_target_distance : focus_distance;
     }
     
     @Override
 	public boolean isExpoBracketingPref() {
     	PhotoMode photo_mode = getPhotoMode();
 		return photo_mode == PhotoMode.HDR || photo_mode == PhotoMode.ExpoBracketing;
+	}
+
+    @Override
+	public boolean isFocusBracketingPref() {
+    	PhotoMode photo_mode = getPhotoMode();
+		return photo_mode == PhotoMode.FocusBracketing;
 	}
 
     @Override
@@ -1104,6 +1128,30 @@ public class MyApplicationInterface implements ApplicationInterface {
 		return n_stops;
     }
 
+    @Override
+	public int getFocusBracketingNImagesPref() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getFocusBracketingNImagesPref");
+		int n_images;
+		String n_images_s = sharedPreferences.getString(PreferenceKeys.FocusBracketingNImagesPreferenceKey, "3");
+		try {
+			n_images = Integer.parseInt(n_images_s);
+		}
+		catch(NumberFormatException exception) {
+			if( MyDebug.LOG )
+				Log.e(TAG, "n_images_s invalid format: " + n_images_s);
+			n_images = 3;
+		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "n_images = " + n_images);
+		return n_images;
+	}
+
+    @Override
+	public boolean getFocusBracketingAddInfinityPref() {
+		return sharedPreferences.getBoolean(PreferenceKeys.FocusBracketingAddInfinityPreferenceKey, false);
+	}
+
 	/** Returns the current photo mode.
 	 *  Note, this always should return the true photo mode - if we're in video mode and taking a photo snapshot while
 	 *  video recording, the caller should override. We don't override here, as this preference may be used to affect how
@@ -1122,6 +1170,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 		boolean expo_bracketing = photo_mode_pref.equals("preference_photo_mode_expo_bracketing");
 		if( expo_bracketing && main_activity.supportsExpoBracketing() )
 			return PhotoMode.ExpoBracketing;
+		boolean focus_bracketing = photo_mode_pref.equals("preference_photo_mode_focus_bracketing");
+		if( focus_bracketing && main_activity.supportsFocusBracketing() )
+			return PhotoMode.FocusBracketing;
 		boolean fast_burst = photo_mode_pref.equals("preference_photo_mode_fast_burst");
 		if( fast_burst && main_activity.supportsFastBurst() )
 			return PhotoMode.FastBurst;
@@ -2009,8 +2060,11 @@ public class MyApplicationInterface implements ApplicationInterface {
     }
 
     @Override
-	public void setFocusDistancePref(float focus_distance) {
-		this.focus_distance = focus_distance;
+	public void setFocusDistancePref(float focus_distance, boolean is_target_distance) {
+		if( is_target_distance )
+			this.focus_bracketing_target_distance = focus_distance;
+		else
+			this.focus_distance = focus_distance;
 	}
 
     private int getStampFontColor() {
@@ -2317,7 +2371,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		PhotoMode photo_mode = getPhotoMode();
 		if( main_activity.getPreview().isVideo() ) {
 			if( MyDebug.LOG )
-				Log.d(TAG, "snapshop mode");
+				Log.d(TAG, "snapshot mode");
 			// must be in photo snapshot while recording video mode, only support standard photo mode
 			photo_mode = PhotoMode.Standard;
 		}
@@ -2332,8 +2386,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 		}
 		else {
 			if( MyDebug.LOG ) {
-				Log.d(TAG, "exposure bracketing mode mode");
-				if( photo_mode != PhotoMode.ExpoBracketing )
+				Log.d(TAG, "exposure/focus bracketing mode mode");
+				if( photo_mode != PhotoMode.ExpoBracketing && photo_mode != PhotoMode.FocusBracketing )
 					Log.e(TAG, "onBurstPictureTaken called with unexpected photo mode?!: " + photo_mode);
 			}
 			

@@ -92,14 +92,17 @@ public interface ApplicationInterface {
 	boolean canTakeNewPhoto(); // whether taking new photos is allowed (e.g., can return false if queue for processing images would become full)
 	// Camera2 only modes:
 	long getExposureTimePref(); // only called if getISOPref() is not "default"
-	float getFocusDistancePref();
+	float getFocusDistancePref(boolean is_target_distance);
 	boolean isExpoBracketingPref(); // whether to enable burst photos with expo bracketing
     int getExpoBracketingNImagesPref(); // how many images to take for exposure bracketing
     double getExpoBracketingStopsPref(); // stops per image for exposure bracketing
-	boolean getOptimiseAEForDROPref(); // see CameraController doc for setOptimiseAEForDRO().
+    int getFocusBracketingNImagesPref(); // how many images to take for focus bracketing
+	boolean getFocusBracketingAddInfinityPref(); // whether to include an additional image at infinite focus distance, for focus bracketing
+	boolean isFocusBracketingPref(); // whether to enable burst photos with focus bracketing
 	boolean isCameraBurstPref(); // whether to shoot the camera in burst mode (n.b., not the same as the "auto-repeat" mode)
 	int getBurstNImages(); // only relevant if isCameraBurstPref() returns true; see CameraController doc for setBurstNImages().
 	boolean getBurstForNoiseReduction(); // only relevant if isCameraBurstPref() returns true; see CameraController doc for setBurstForNoiseReduction().
+	boolean getOptimiseAEForDROPref(); // see CameraController doc for setOptimiseAEForDRO().
 	enum RawPref {
 		RAWPREF_JPEG_ONLY, // JPEG only
 		RAWPREF_JPEG_DNG // JPEG and RAW (DNG)
@@ -164,7 +167,7 @@ public interface ApplicationInterface {
 	// Camera2 only modes:
 	void setExposureTimePref(long exposure_time);
 	void clearExposureTimePref();
-	void setFocusDistancePref(float focus_distance);
+	void setFocusDistancePref(float focus_distance, boolean is_target_distance);
 	
 	// callbacks
 	void onDrawPreview(Canvas canvas);

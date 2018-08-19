@@ -8326,6 +8326,16 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		assertTrue( mActivity.getApplicationInterface().getImageQualityPref() == 100 );
 
+	    View switchVideoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_video);
+	    clickView(switchVideoButton);
+		waitUntilCameraOpened();
+
+		assertTrue( mActivity.getApplicationInterface().getImageQualityPref() == 90 );
+
+	    clickView(switchVideoButton);
+		waitUntilCameraOpened();
+		assertTrue( mActivity.getApplicationInterface().getImageQualityPref() == 100 );
+
 		editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std");
 		editor.apply();
 		updateForSettings();
@@ -10657,7 +10667,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		Bitmap nr_bitmap;
 		try {
 			// initialise allocation from first two bitmaps
-			int inSampleSize = mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize();
+			//int inSampleSize = mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize(inputs.size());
+			int inSampleSize = mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize(iso);
 			Bitmap bitmap0 = getBitmapFromFile(inputs.get(0), inSampleSize);
 			Bitmap bitmap1 = getBitmapFromFile(inputs.get(1), inSampleSize);
 			int width = bitmap0.getWidth();
@@ -10762,8 +10773,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, 1, 0};
 					//int [] exp_offsets_x = {0, 7, 0};
 					//int [] exp_offsets_y = {0, -1, 0};
+					//int [] exp_offsets_x = {0, 8, 0};
+					//int [] exp_offsets_y = {0, -4, 0};
 					int [] exp_offsets_x = {0, 8, 0};
-					int [] exp_offsets_y = {0, -4, 0};
+					int [] exp_offsets_y = {0, 0, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 				}
 				else {
@@ -10914,7 +10927,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 21, 177);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg4".
@@ -11170,7 +11183,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, 2, 0};
 					//int [] exp_offsets_x = {0, -4, 0};
 					//int [] exp_offsets_y = {0, 0, 0};
-					int [] exp_offsets_x = {0, 0, 0};
+					//int [] exp_offsets_x = {0, 0, 0};
+					//int [] exp_offsets_y = {0, 0, 0};
+					int [] exp_offsets_x = {0, -4, 0};
 					int [] exp_offsets_y = {0, 0, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 					assertTrue(mActivity.getApplicationInterface().getHDRProcessor().sharp_index == 0);
@@ -11216,7 +11231,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 4, 26, 92);
 		//checkHistogramDetails(hdrHistogramDetails, 3, 19, 68);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 10, 60);
-		checkHistogramDetails(hdrHistogramDetails, 1, 8, 72);
+		//checkHistogramDetails(hdrHistogramDetails, 1, 8, 72);
+		//checkHistogramDetails(hdrHistogramDetails, 1, 6, 64);
+		checkHistogramDetails(hdrHistogramDetails, 1, 15, 75);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg9".
@@ -12013,7 +12030,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 88, 127, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg30".
@@ -12038,10 +12055,28 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
+				if( index == 1 ) {
+					int [] exp_offsets_x = {0, 0, 0};
+					int [] exp_offsets_y = {0, 0, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else if( index == 2 ) {
+					int [] exp_offsets_x = {0, 0, 0};
+					int [] exp_offsets_y = {0, -4, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else if( index == 3 ) {
+					int [] exp_offsets_x = {0, 0, 0};
+					int [] exp_offsets_y = {0, -4, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else {
+					assertTrue(false);
+				}
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 134, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg31".
@@ -12076,7 +12111,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 24, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg32".
@@ -12108,7 +12143,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 34, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg33".
@@ -12143,7 +12178,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 81, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg34".
@@ -12316,7 +12351,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 64, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg40".
@@ -12350,7 +12385,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 50, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg41".
@@ -12385,7 +12420,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		//checkHistogramDetails(hdrHistogramDetails, 1, 39, 253);
+		checkHistogramDetails(hdrHistogramDetails, 0, 49, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvgtemp".

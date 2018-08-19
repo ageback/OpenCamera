@@ -1021,14 +1021,24 @@ public class HDRProcessor {
 		}
 	}
 
+	private int cached_avg_sample_size = 1;
+
 	/** As part of the noise reduction process, the caller should scale the input images down by the factor returned
 	 *  by this method. This both provides a spatial smoothing, as well as improving performance and memory usage.
-	 *  The bitmap returned by avgBrighten() will automatically be scaled up again by this factor.
 	 */
+	public int getAvgSampleSize(int capture_result_iso) {
+		// If changing this, may also want to change the radius of the spatial filter in avg_brighten.rs ?
+		//this.cached_avg_sample_size = (n_images>=8) ? 2 : 1;
+		this.cached_avg_sample_size = (capture_result_iso >= 1100) ? 2 : 1;
+		//this.cached_avg_sample_size = 1;
+		//this.cached_avg_sample_size = 2;
+		if( MyDebug.LOG )
+			Log.d(TAG, "getAvgSampleSize: " + cached_avg_sample_size);
+		return cached_avg_sample_size;
+	}
+
 	public int getAvgSampleSize() {
-		// If changing this, may also want to change the radius of the spatial filter in avg_brighten.rs
-		return 1;
-		//return 2;
+		return cached_avg_sample_size;
 	}
 
 	public class AvgData {
@@ -1222,7 +1232,11 @@ public class HDRProcessor {
 			//final boolean scale_align = false;
 			final boolean scale_align = true;
 			//final int scale_align_size = 2;
-			final int scale_align_size = 4;
+			//final int scale_align_size = 4;
+			//final int scale_align_size = Math.max(4 / this.cached_avg_sample_size, 1);
+			final int scale_align_size = Math.max(4 / this.getAvgSampleSize(iso), 1);
+			if( MyDebug.LOG )
+				Log.d(TAG, "scale_align_size: " + scale_align_size);
 			boolean crop_to_centre = true;
 			if( scale_align ) {
 			    // use scaled down bitmaps for alignment
@@ -2381,7 +2395,7 @@ public class HDRProcessor {
 		return new HistogramInfo(total, mean_brightness, median_brightness, max_brightness);
 	}
 
-	private int getBrightnessTarget(int brightness, int max_gain_factor, int ideal_brightness) {
+	private static int getBrightnessTarget(int brightness, int max_gain_factor, int ideal_brightness) {
 		if( brightness <= 0 )
 			brightness = 1;
 		if( MyDebug.LOG ) {
@@ -2392,30 +2406,23 @@ public class HDRProcessor {
 		return Math.max(brightness, median_target); // don't make darker
 	}
 
-	/** Final stage of the noise reduction algorithm.
-	 *  Note that the returned bitmap will be scaled up by the factor returned by getAvgSampleSize().
-	 * @param input         The allocation in floating point format.
-	 * @param width         Width of the input.
-	 * @param height        Height of the input.
-	 * @param iso           ISO used for the original images.
-	 * @return              Resultant bitmap.
-	 */
-	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	public Bitmap avgBrighten(Allocation input, int width, int height, int iso) {
-		if( MyDebug.LOG ) {
-			Log.d(TAG, "avgBrighten");
-			Log.d(TAG, "iso: " + iso);
+	public static class BrightenFactors {
+		public final float gain;
+		public final float low_x;
+		public final float mid_x;
+		public final float gamma;
+
+		BrightenFactors(float gain, float low_x, float mid_x, float gamma) {
+			this.gain = gain;
+			this.low_x = low_x;
+			this.mid_x = mid_x;
+			this.gamma = gamma;
 		}
-        initRenderscript();
+	}
 
-    	long time_s = System.currentTimeMillis();
-
-		int [] histo = computeHistogram(input, false, true);
-		HistogramInfo histogramInfo = getHistogramInfo(histo);
-		int brightness = histogramInfo.median_brightness;
-		int max_brightness = histogramInfo.max_brightness;
-		if( MyDebug.LOG )
-			Log.d(TAG, "### time after computeHistogram: " + (System.currentTimeMillis() - time_s));
+	/** Computes various factors used in the avg_brighten.rs script.
+	 */
+	public static BrightenFactors computeBrightenFactors(int iso, int brightness, int max_brightness) {
 		int max_gain_factor = 4;
 		int ideal_brightness = 119;
 		if( iso <= 120 ) {
@@ -2425,9 +2432,6 @@ public class HDRProcessor {
 		int brightness_target = getBrightnessTarget(brightness, max_gain_factor, ideal_brightness);
 		//int max_target = Math.min(255, (int)((max_brightness*brightness_target)/(float)brightness + 0.5f) );
 		if( MyDebug.LOG ) {
-			Log.d(TAG, "median brightness: " + histogramInfo.median_brightness);
-			Log.d(TAG, "mean brightness: " + histogramInfo.mean_brightness);
-			Log.d(TAG, "max brightness: " + max_brightness);
 			Log.d(TAG, "brightness target: " + brightness_target);
 			//Log.d(TAG, "max target: " + max_target);
 		}
@@ -2503,14 +2507,59 @@ public class HDRProcessor {
 		float low_x = 0.0f;
 		if( iso >= 400 ) {
 			// this helps: testAvg10, testAvg28, testAvg31, testAvg33
-			low_x = Math.min(8.0f, 0.125f*mid_x);
-			//low_x = Math.min(12.0f, 0.375f*mid_x);
+			//low_x = Math.min(8.0f, 0.125f*mid_x);
+			// don't use mid_x directly, otherwise we get unstable behaviour depending on whether we
+			// entered "use piecewise gain/gamma" above or not
+			// see unit test testBrightenFactors().
+			float piecewise_mid_y = 0.5f*255.0f;
+			float piecewise_mid_x = piecewise_mid_y / gain;
+			low_x = Math.min(8.0f, 0.125f*piecewise_mid_x);
 		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "low_x " + low_x);
 			Log.d(TAG, "mid_x " + mid_x);
 			Log.d(TAG, "gamma " + gamma);
 		}
+
+		return new BrightenFactors(gain, low_x, mid_x, gamma);
+	}
+
+	/** Final stage of the noise reduction algorithm.
+	 *  Note that the returned bitmap will be scaled up by the factor returned by getAvgSampleSize().
+	 * @param input         The allocation in floating point format.
+	 * @param width         Width of the input.
+	 * @param height        Height of the input.
+	 * @param iso           ISO used for the original images.
+	 * @return              Resultant bitmap.
+	 */
+	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+	public Bitmap avgBrighten(Allocation input, int width, int height, int iso) {
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "avgBrighten");
+			Log.d(TAG, "iso: " + iso);
+		}
+        initRenderscript();
+
+    	long time_s = System.currentTimeMillis();
+
+		int [] histo = computeHistogram(input, false, true);
+		HistogramInfo histogramInfo = getHistogramInfo(histo);
+		int brightness = histogramInfo.median_brightness;
+		int max_brightness = histogramInfo.max_brightness;
+		if( MyDebug.LOG )
+			Log.d(TAG, "### time after computeHistogram: " + (System.currentTimeMillis() - time_s));
+
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "median brightness: " + histogramInfo.median_brightness);
+			Log.d(TAG, "mean brightness: " + histogramInfo.mean_brightness);
+			Log.d(TAG, "max brightness: " + max_brightness);
+		}
+
+		BrightenFactors brighten_factors = computeBrightenFactors(iso, brightness, max_brightness);
+		float gain = brighten_factors.gain;
+		float low_x = brighten_factors.low_x;
+		float mid_x = brighten_factors.mid_x;
+		float gamma = brighten_factors.gamma;
 
 		//float gain = brightness_target / (float)brightness;
 		/*float gamma = (float)(Math.log(max_target/(float)brightness_target) / Math.log(max_brightness/(float)brightness));
@@ -2537,21 +2586,9 @@ public class HDRProcessor {
 		ScriptC_avg_brighten avgBrightenScript = new ScriptC_avg_brighten(rs);
 		avgBrightenScript.set_bitmap(input);
 		float black_level = 0.0f;
-		// need to do this for ISO >= 400 to help: testAvg31
-		//if( iso >= 700 ) {
-		if( iso >= 400 ) {
-			black_level = 4.0f;
-		}
-		if( MyDebug.LOG ) {
-			Log.d(TAG, "black_level: " + black_level);
-		}
-		//if( iso <= 200 )
-		if( iso <= 700 )
 		{
 			// quick and dirty dehaze algorithm
-			// helps (among others): testAvg27, testAvg30, testAvg31, testAvg39, testAvg40
-			// we don't do for "dark" images, as this can cause problems due to exaggerating noise (e.g.,
-			// see testAvg38)
+			// helps (among others): testAvg1 to testAvg10, testAvg27, testAvg30, testAvg31, testAvg39, testAvg40
 			int total = histogramInfo.total;
 			int percentile = (int)(total*0.001f);
 			int count = 0;
@@ -2563,7 +2600,9 @@ public class HDRProcessor {
 				}
 			}
 			black_level = Math.max(black_level, darkest_brightness);
-			black_level = Math.min(black_level, 18);
+			// don't allow black_level too high for "dark" images, as this can cause problems due to exaggerating noise (e.g.,
+			// see testAvg38)
+			black_level = Math.min(black_level, iso <= 700 ? 18 : 4);
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "percentile: " + percentile);
 				Log.d(TAG, "darkest_brightness: " + darkest_brightness);
@@ -2670,7 +2709,7 @@ public class HDRProcessor {
 		if( MyDebug.LOG )
 			Log.d(TAG, "### time after copying to bitmap: " + (System.currentTimeMillis() - time_s));
 
-		int sample_size = getAvgSampleSize();
+		/*int sample_size = getAvgSampleSize();
 		if( MyDebug.LOG )
 			Log.d(TAG, "sample_size: " + sample_size);
 		if( sample_size > 1 ) {
@@ -2679,7 +2718,7 @@ public class HDRProcessor {
 			Bitmap new_bitmap = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true);
 			bitmap.recycle();
 			bitmap = new_bitmap;
-		}
+		}*/
 
 		freeScripts();
 		if( MyDebug.LOG )

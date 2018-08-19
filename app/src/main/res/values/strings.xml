@@ -487,6 +487,18 @@
     <string name="preference_fast_burst_n_images_entries_15">15</string>
     <string name="preference_fast_burst_n_images_entries_20">20</string>
 
+    <string name="preference_focus_bracketing_n_images">Number of photos</string>
+    <string name="preference_focus_bracketing_n_images_entries_2">2</string>
+    <string name="preference_focus_bracketing_n_images_entries_3">3</string>
+    <string name="preference_focus_bracketing_n_images_entries_4">4</string>
+    <string name="preference_focus_bracketing_n_images_entries_5">5</string>
+    <string name="preference_focus_bracketing_n_images_entries_6">6</string>
+    <string name="preference_focus_bracketing_n_images_entries_8">8</string>
+    <string name="preference_focus_bracketing_n_images_entries_10">10</string>
+    <string name="preference_focus_bracketing_n_images_entries_12">12</string>
+    <string name="preference_focus_bracketing_n_images_entries_15">15</string>
+    <string name="preference_focus_bracketing_n_images_entries_20">20</string>
+
     <string name="preference_video_capture_rate">Speed</string>
     <string name="preference_video_capture_rate_normal">Normal</string>
     <string name="slow_motion_enabled">Slow motion enabled</string>
@@ -567,6 +579,14 @@
 
     <string name="preference_show_video_max_amp">Show audio level meter</string>
     <string name="preference_show_video_max_amp_summary">Whether to show on-screen audio level when recording video</string>
+
+    <string name="photo_mode_focus_bracketing">Focus {}</string> <!-- keep short, as this shows in the popup menu -->
+    <string name="photo_mode_focus_bracketing_full">Focus Bracketing</string>
+
+    <string name="focus_bracketing_source_distance">Focus bracketing source distance</string>
+    <string name="focus_bracketing_target_distance">Focus bracketing target distance</string>
+
+    <string name="focus_bracketing_add_infinity">Add infinite distance</string>
 
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text"><b>v1.41:</b>\n\n

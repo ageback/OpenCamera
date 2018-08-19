@@ -1019,6 +1019,38 @@ public class CameraController1 extends CameraController {
 		return false;
 	}
 
+	@Override
+	public void setFocusBracketingNImages(int n_images) {
+		// not supported for CameraController1
+	}
+
+	@Override
+	public void setFocusBracketingAddInfinity(boolean focus_bracketing_add_infinity) {
+		// not supported for CameraController1
+	}
+
+	@Override
+	public void setFocusBracketingSourceDistance(float focus_bracketing_source_distance) {
+		// not supported for CameraController1!
+	}
+
+	@Override
+	public float getFocusBracketingSourceDistance() {
+		// not supported for CameraController1!
+		return 0.0f;
+	}
+
+	@Override
+	public void setFocusBracketingTargetDistance(float focus_bracketing_target_distance) {
+		// not supported for CameraController1!
+	}
+
+	@Override
+	public float getFocusBracketingTargetDistance() {
+		// not supported for CameraController1!
+		return 0.0f;
+	}
+
 	private String convertFlashValueToMode(String flash_value) {
 		String flash_mode = "";
 		switch(flash_value) {

@@ -95,6 +95,9 @@ public class CameraController2 extends CameraController {
 	private boolean use_expo_fast_burst = true;
 	// for BURSTTYPE_FOCUS:
 	private int focus_bracketing_n_images = 3;
+	private float focus_bracketing_source_distance = 0.0f;
+	private float focus_bracketing_target_distance = 0.0f;
+	private boolean focus_bracketing_add_infinity = false;
 	// for BURSTTYPE_NORMAL:
 	private boolean burst_for_noise_reduction; // chooses number of burst images and other settings for noise reduction mode
 	private int burst_requested_n_images; // if burst_for_noise_reduction==false, this gives the number of images for the burst
@@ -208,7 +211,7 @@ public class CameraController2 extends CameraController {
 		private boolean has_af_mode;
 		private int af_mode = CaptureRequest.CONTROL_AF_MODE_AUTO;
 		private float focus_distance; // actual value passed to camera device (set to 0.0 if in infinity mode)
-		private float focus_distance_manual; // saved setting when in manual mode
+		private float focus_distance_manual; // saved setting when in manual mode (so if user switches to infinity mode and back, we'll still remember the manual focus distance)
 		private boolean ae_lock;
 		private MeteringRectangle [] af_regions; // no need for has_scalar_crop_region, as we can set to null instead
 		private MeteringRectangle [] ae_regions; // no need for has_scalar_crop_region, as we can set to null instead
@@ -865,6 +868,24 @@ public class CameraController2 extends CameraController {
 						cb.onBurstPictureTaken(images);
 						pending_burst_images.clear();
 						cb.onCompleted();
+
+						if( burst_type == BurstType.BURSTTYPE_FOCUS ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "focus bracketing complete, reset manual focus");
+							camera_settings.setFocusDistance(previewBuilder);
+							try {
+								setRepeatingRequest();
+							}
+							catch(CameraAccessException e) {
+								if( MyDebug.LOG ) {
+									Log.e(TAG, "failed to set focus distance");
+									Log.e(TAG, "reason: " + e.getReason());
+									Log.e(TAG, "message: " + e.getMessage());
+								}
+								e.printStackTrace();
+							}
+						}
+
 					}
 					else {
 						if( MyDebug.LOG )
@@ -874,6 +895,9 @@ public class CameraController2 extends CameraController {
 								Log.d(TAG, "need to execute the next capture");
 								Log.d(TAG, "time since start: " + (System.currentTimeMillis() - slow_burst_start_ms));
 							}
+							if( burst_type != BurstType.BURSTTYPE_FOCUS )
+							{
+
 							try {
 								captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
 							}
@@ -890,58 +914,63 @@ public class CameraController2 extends CameraController {
 									take_picture_error_cb = null;
 								}
 							}
-							/*
-							// code for focus bracketing
-							try {
-								float focus_distance = slow_burst_capture_requests.get(pending_burst_images.size()).get(CaptureRequest.LENS_FOCUS_DISTANCE);
-								if( MyDebug.LOG ) {
-									Log.d(TAG, "prepare preview for next focus_distance: " + focus_distance);
-								}
-								previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-								previewBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distance);
 
-								setRepeatingRequest(previewBuilder.build());
-								//captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
 							}
-							catch(CameraAccessException e) {
-								if( MyDebug.LOG ) {
-									Log.e(TAG, "failed to take next burst");
-									Log.e(TAG, "reason: " + e.getReason());
-									Log.e(TAG, "message: " + e.getMessage());
-								}
-								e.printStackTrace();
-								jpeg_cb = null;
-								if( take_picture_error_cb != null ) {
-									take_picture_error_cb.onError();
-									take_picture_error_cb = null;
-								}
-							}
-							handler.postDelayed(new Runnable(){
-								@Override
-								public void run(){
-									if( MyDebug.LOG )
-										Log.d(TAG, "take picture after delay for next expo");
-									if( camera != null ) { // make sure camera wasn't released in the meantime
-										try {
-											captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
-										}
-										catch(CameraAccessException e) {
-											if( MyDebug.LOG ) {
-												Log.e(TAG, "failed to take next burst");
-												Log.e(TAG, "reason: " + e.getReason());
-												Log.e(TAG, "message: " + e.getMessage());
-											}
-											e.printStackTrace();
-											jpeg_cb = null;
-											if( take_picture_error_cb != null ) {
-												take_picture_error_cb.onError();
-												take_picture_error_cb = null;
-											}
-										}
+							else {
+								if( MyDebug.LOG )
+									Log.d(TAG, "focus bracketing");
+
+								// code for focus bracketing
+								try {
+									float focus_distance = slow_burst_capture_requests.get(pending_burst_images.size()).get(CaptureRequest.LENS_FOCUS_DISTANCE);
+									if( MyDebug.LOG ) {
+										Log.d(TAG, "prepare preview for next focus_distance: " + focus_distance);
 									}
-							   }
-							}, 500);
-							*/
+									previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+									previewBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distance);
+
+									setRepeatingRequest(previewBuilder.build());
+									//captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
+								}
+								catch(CameraAccessException e) {
+									if( MyDebug.LOG ) {
+										Log.e(TAG, "failed to take next burst");
+										Log.e(TAG, "reason: " + e.getReason());
+										Log.e(TAG, "message: " + e.getMessage());
+									}
+									e.printStackTrace();
+									jpeg_cb = null;
+									if( take_picture_error_cb != null ) {
+										take_picture_error_cb.onError();
+										take_picture_error_cb = null;
+									}
+								}
+								handler.postDelayed(new Runnable(){
+									@Override
+									public void run(){
+										if( MyDebug.LOG )
+											Log.d(TAG, "take picture after delay for next expo");
+										if( camera != null ) { // make sure camera wasn't released in the meantime
+											try {
+												captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
+											}
+											catch(CameraAccessException e) {
+												if( MyDebug.LOG ) {
+													Log.e(TAG, "failed to take next burst");
+													Log.e(TAG, "reason: " + e.getReason());
+													Log.e(TAG, "message: " + e.getMessage());
+												}
+												e.printStackTrace();
+												jpeg_cb = null;
+												if( take_picture_error_cb != null ) {
+													take_picture_error_cb.onError();
+													take_picture_error_cb = null;
+												}
+											}
+										}
+								   }
+								}, 500);
+							}
 						}
 					}
 				}
@@ -1840,6 +1869,9 @@ public class CameraController2 extends CameraController {
 
 		int [] supported_focus_modes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES); // Android format
 		camera_features.supported_focus_values = convertFocusModesToValues(supported_focus_modes, camera_features.minimum_focus_distance); // convert to our format (also resorts)
+		if( camera_features.supported_focus_values != null && camera_features.supported_focus_values.contains("focus_mode_manual2") ) {
+			camera_features.supports_focus_bracketing = true;
+		}
 		camera_features.max_num_focus_areas = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF);
 
 		camera_features.is_exposure_lock_supported = true;
@@ -3247,6 +3279,44 @@ public class CameraController2 extends CameraController {
     	return true;
 	}
 
+	@Override
+	public void setFocusBracketingNImages(int n_images) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingNImages: " + n_images);
+		this.focus_bracketing_n_images = n_images;
+	}
+
+	@Override
+	public void setFocusBracketingAddInfinity(boolean focus_bracketing_add_infinity) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingAddInfinity: " + focus_bracketing_add_infinity);
+		this.focus_bracketing_add_infinity = focus_bracketing_add_infinity;
+	}
+
+	@Override
+	public void setFocusBracketingSourceDistance(float focus_bracketing_source_distance) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingSourceDistance: " + focus_bracketing_source_distance);
+		this.focus_bracketing_source_distance = focus_bracketing_source_distance;
+	}
+
+	@Override
+	public float getFocusBracketingSourceDistance() {
+		return this.focus_bracketing_source_distance;
+	}
+
+	@Override
+	public void setFocusBracketingTargetDistance(float focus_bracketing_target_distance) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingTargetDistance: " + focus_bracketing_target_distance);
+		this.focus_bracketing_target_distance = focus_bracketing_target_distance;
+	}
+
+	@Override
+	public float getFocusBracketingTargetDistance() {
+		return this.focus_bracketing_target_distance;
+	}
+
 	/** Decides whether we should be using fake precapture mode.
 	 */
 	private void updateUseFakePrecaptureMode(String flash_value) {
@@ -4466,6 +4536,54 @@ public class CameraController2 extends CameraController {
 		}
 	}
 
+	public static List<Float> setupFocusBracketingDistances(float source, float target, int count) {
+		List<Float> focus_distances = new ArrayList<>();
+		float focus_distance_s = source;
+		float focus_distance_e = target;
+		final float max_focus_bracket_distance_c = 0.1f; // 10m
+		focus_distance_s = Math.max(focus_distance_s, max_focus_bracket_distance_c); // since we'll dealing with 1/distance, use Math.max
+		focus_distance_e = Math.max(focus_distance_e, max_focus_bracket_distance_c); // since we'll dealing with 1/distance, use Math.max
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "focus_distance_s: " + focus_distance_s);
+			Log.d(TAG, "focus_distance_e: " + focus_distance_e);
+		}
+		// we want to interpolate linearly in distance, not 1/distance
+		float real_focus_distance_s = 1.0f/focus_distance_s;
+		float real_focus_distance_e = 1.0f/focus_distance_e;
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "real_focus_distance_s: " + real_focus_distance_s);
+			Log.d(TAG, "real_focus_distance_e: " + real_focus_distance_e);
+		}
+		for(int i=0;i<count;i++) {
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "i: " + i);
+			}
+			// for first and last, we still use the real focus distances; for intermediate values, we interpolate
+			// with first/last clamped to max of 10m (to avoid taking reciprocal of 0)
+			float distance;
+			if( i == 0 ) {
+				distance = source;
+			}
+			else if( i == count-1 ) {
+				distance = target;
+			}
+			else {
+				float alpha = ((float)i)/(count-1.0f);
+				float real_distance = (1.0f-alpha)*real_focus_distance_s + alpha*real_focus_distance_e;
+				if( MyDebug.LOG ) {
+					Log.d(TAG, "    alpha: " + alpha);
+					Log.d(TAG, "    real_distance: " + real_distance);
+				}
+				distance = 1.0f/real_distance;
+			}
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "    distance: " + distance);
+			}
+			focus_distances.add(distance);
+		}
+		return focus_distances;
+	}
+
 	private void takePictureBurstBracketing() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "takePictureBurstBracketing");
@@ -4627,6 +4745,7 @@ public class CameraController2 extends CameraController {
 
 			}
 			else {
+				// BURSTTYPE_FOCUS
                 if( MyDebug.LOG )
                     Log.d(TAG, "focus bracketing");
 
@@ -4639,19 +4758,31 @@ public class CameraController2 extends CameraController {
 					test_fake_flash_photo++;
 				}
 
-				// focus bracketing is only supported if LENS_INFO_MINIMUM_FOCUS_DISTANCE is non-null
-				//float min_focus_distance = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-				//float max_focus_distance = 0.0f;
+				stillBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); // just in case
 
-				// initial request is at the current focus distance
-				requests.add( stillBuilder.build() );
+				if( Math.abs(camera_settings.focus_distance - focus_bracketing_source_distance) < 1.0e-5 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "current focus matches source");
+				}
+				else if( Math.abs(camera_settings.focus_distance - focus_bracketing_target_distance) < 1.0e-5 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "current focus matches target");
+				}
+				else {
+					Log.d(TAG, "current focus matches neither source nor target");
+				}
 
-				stillBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-
-				// then focus at infinity
-				stillBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.0f);
-				stillBuilder.setTag(RequestTag.CAPTURE); // set capture tag for last only
-				requests.add( stillBuilder.build() );
+				List<Float> focus_distances = setupFocusBracketingDistances(focus_bracketing_source_distance, focus_bracketing_target_distance, focus_bracketing_n_images);
+				if( focus_bracketing_add_infinity ) {
+					focus_distances.add(0.0f);
+				}
+				for(int i=0;i<focus_distances.size();i++) {
+					stillBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distances.get(i));
+					if( i == focus_distances.size()-1 ) {
+						stillBuilder.setTag(RequestTag.CAPTURE); // set capture tag for last only
+					}
+					requests.add( stillBuilder.build() );
+				}
 			}
 
 			/*

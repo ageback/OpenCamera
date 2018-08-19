@@ -41,6 +41,7 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.ImageView.ScaleType;
 
@@ -50,7 +51,7 @@ import android.widget.ImageView.ScaleType;
 public class PopupView extends LinearLayout {
 	private static final String TAG = "PopupView";
 	public static final float ALPHA_BUTTON_SELECTED = 1.0f;
-	public static final float ALPHA_BUTTON = 0.4f;
+	public static final float ALPHA_BUTTON = 0.6f; // 0.4f tends to be hard to see in bright light
 
 	private int total_width_dp;
 
@@ -135,6 +136,11 @@ public class PopupView extends LinearLayout {
     	else {
         	// make a copy of getSupportedFocusValues() so we can modify it
     		List<String> supported_focus_values = preview.getSupportedFocusValues();
+			MyApplicationInterface.PhotoMode photo_mode = main_activity.getApplicationInterface().getPhotoMode();
+    		if( !preview.isVideo() && photo_mode == MyApplicationInterface.PhotoMode.FocusBracketing ) {
+	            // don't show focus modes in focus bracketing mode (as we'll always run in manual focus mode)
+    			supported_focus_values = null;
+			}
     		if( supported_focus_values != null ) {
             	supported_focus_values = new ArrayList<>(supported_focus_values);
             	// only show appropriate continuous focus mode
@@ -175,6 +181,10 @@ public class PopupView extends LinearLayout {
     			photo_modes.add( getResources().getString(R.string.photo_mode_expo_bracketing) );
     			photo_mode_values.add( MyApplicationInterface.PhotoMode.ExpoBracketing );
     		}
+    		if( main_activity.supportsFocusBracketing() ) {
+    			photo_modes.add( getResources().getString(R.string.photo_mode_focus_bracketing) );
+    			photo_mode_values.add( MyApplicationInterface.PhotoMode.FocusBracketing );
+    		}
     		if( main_activity.supportsFastBurst() ) {
 				photo_modes.add(getResources().getString(R.string.photo_mode_fast_burst));
 				photo_mode_values.add(MyApplicationInterface.PhotoMode.FastBurst);
@@ -188,7 +198,6 @@ public class PopupView extends LinearLayout {
 				// (photo modes not supported for photo snapshop whilst recording video)
 			}
     		else if( photo_modes.size() > 1 ) {
-    			MyApplicationInterface.PhotoMode photo_mode = main_activity.getApplicationInterface().getPhotoMode();
     			String current_mode = null;
     			for(int i=0;i<photo_modes.size() && current_mode==null;i++) {
     				if( photo_mode_values.get(i) == photo_mode ) {
@@ -230,6 +239,8 @@ public class PopupView extends LinearLayout {
     							toast_message = getResources().getString(R.string.photo_mode_standard_full);
     						else if( new_photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing )
     							toast_message = getResources().getString(R.string.photo_mode_expo_bracketing_full);
+    						else if( new_photo_mode == MyApplicationInterface.PhotoMode.FocusBracketing )
+    							toast_message = getResources().getString(R.string.photo_mode_focus_bracketing_full);
     						else if( new_photo_mode == MyApplicationInterface.PhotoMode.FastBurst )
     							toast_message = getResources().getString(R.string.photo_mode_fast_burst_full);
     						else if( new_photo_mode == MyApplicationInterface.PhotoMode.NoiseReduction )
@@ -247,6 +258,9 @@ public class PopupView extends LinearLayout {
 							}
     						else if( new_photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing ) {
         						editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_expo_bracketing");
+    						}
+    						else if( new_photo_mode == MyApplicationInterface.PhotoMode.FocusBracketing ) {
+        						editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_focus_bracketing");
     						}
 							else if( new_photo_mode == MyApplicationInterface.PhotoMode.FastBurst ) {
 								editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_fast_burst");
@@ -482,7 +496,7 @@ public class PopupView extends LinearLayout {
 			if( MyDebug.LOG )
 				Log.d(TAG, "PopupView time 10: " + (System.nanoTime() - debug_time));
 
-			if( main_activity.getApplicationInterface().getPhotoMode() == MyApplicationInterface.PhotoMode.FastBurst ) {
+			if( photo_mode == MyApplicationInterface.PhotoMode.FastBurst ) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "add fast burst options");
 
@@ -566,6 +580,91 @@ public class PopupView extends LinearLayout {
 						return -1;
 					}
 				});
+			}
+			else if( photo_mode == MyApplicationInterface.PhotoMode.FocusBracketing ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "add focus bracketing options");
+
+				final String [] burst_mode_values = getResources().getStringArray(R.array.preference_focus_bracketing_n_images_values);
+				String [] burst_mode_entries = getResources().getStringArray(R.array.preference_focus_bracketing_n_images_entries);
+
+				if( burst_mode_values.length != burst_mode_entries.length ) {
+					Log.e(TAG, "preference_focus_bracketing_n_images_values and preference_focus_bracketing_n_images_entries are different lengths");
+					throw new RuntimeException();
+				}
+
+				String burst_mode_value = sharedPreferences.getString(PreferenceKeys.FocusBracketingNImagesPreferenceKey, "3");
+				burst_n_images_index = Arrays.asList(burst_mode_values).indexOf(burst_mode_value);
+				if( burst_n_images_index == -1 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "can't find burst_mode_value " + burst_mode_value + " in burst_mode_values!");
+					burst_n_images_index = 0;
+				}
+				addArrayOptionsToPopup(Arrays.asList(burst_mode_entries), getResources().getString(R.string.preference_focus_bracketing_n_images), true, false, burst_n_images_index, false, "FOCUS_BRACKETING_N_IMAGES", new ArrayOptionsPopupListener() {
+					private void update() {
+						if( burst_n_images_index == -1 )
+							return;
+						String new_burst_mode_value = burst_mode_values[burst_n_images_index];
+						SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+						SharedPreferences.Editor editor = sharedPreferences.edit();
+						editor.putString(PreferenceKeys.FocusBracketingNImagesPreferenceKey, new_burst_mode_value);
+						editor.apply();
+						if( preview.getCameraController() != null ) {
+							preview.getCameraController().setFocusBracketingNImages(main_activity.getApplicationInterface().getFocusBracketingNImagesPref());
+						}
+					}
+					@Override
+					public int onClickPrev() {
+						if( burst_n_images_index != -1 && burst_n_images_index > 0 ) {
+							burst_n_images_index--;
+							update();
+							return burst_n_images_index;
+						}
+						return -1;
+					}
+					@Override
+					public int onClickNext() {
+						if( burst_n_images_index != -1 && burst_n_images_index < burst_mode_values.length-1 ) {
+							burst_n_images_index++;
+							update();
+							return burst_n_images_index;
+						}
+						return -1;
+					}
+				});
+
+        		//CheckBox checkBox = new CheckBox(main_activity);
+				Switch checkBox = new Switch(main_activity);
+        		checkBox.setText(getResources().getString(R.string.focus_bracketing_add_infinity));
+				{
+					// align the checkbox a bit better
+	        		checkBox.setGravity(Gravity.RIGHT);
+					LayoutParams params = new LayoutParams(
+							LayoutParams.MATCH_PARENT,
+							LayoutParams.MATCH_PARENT
+					);
+					final int right_padding = (int) (20 * scale + 0.5f); // convert dps to pixels
+					params.setMargins(0, 0, right_padding, 0);
+					checkBox.setLayoutParams(params);
+				}
+
+        		boolean add_infinity = sharedPreferences.getBoolean(PreferenceKeys.FocusBracketingAddInfinityPreferenceKey, false);
+				if( add_infinity )
+	        		checkBox.setChecked(add_infinity);
+        		checkBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+					public void onCheckedChanged(CompoundButton buttonView,
+							boolean isChecked) {
+	    				final SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+						SharedPreferences.Editor editor = sharedPreferences.edit();
+						editor.putBoolean(PreferenceKeys.FocusBracketingAddInfinityPreferenceKey, isChecked);
+						editor.apply();
+						if( preview.getCameraController() != null ) {
+							preview.getCameraController().setFocusBracketingAddInfinity(main_activity.getApplicationInterface().getFocusBracketingAddInfinityPref());
+						}
+					}
+        		});
+
+        		this.addView(checkBox);
 			}
 
 			if( preview.isVideo() ) {
