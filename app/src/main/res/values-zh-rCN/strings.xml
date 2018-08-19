@@ -547,4 +547,10 @@
     <string name="no_burst">无连拍</string>
     <string name="preference_show_video_max_amp">显示音频电平表</string>
     <string name="preference_show_video_max_amp_summary">是否在录制视频时显示屏幕音频电平</string>
+    <string name="preference_focus_bracketing_n_images">照片数量</string>
+    <string name="photo_mode_focus_bracketing_full">对焦包围</string>
+    <string name="photo_mode_focus_bracketing">对焦 {}</string>
+    <string name="focus_bracketing_source_distance">对焦包围源距离</string>
+    <string name="focus_bracketing_target_distance">对焦包围hhsf距离</string>
+    <string name="focus_bracketing_add_infinity">添加无限距离</string>
 </resources>
