@@ -141,7 +141,7 @@
         android:padding="8dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/gallery"
-        android:src="@drawable/gallery"
+        android:src="@drawable/baseline_photo_library_white_48"
         android:onClick="clickedGallery"
         />
 
@@ -428,6 +428,7 @@
         android:layout_height="wrap_content"
         android:layout_toLeftOf="@+id/settings"
         android:layout_below="@+id/settings"
+        android:fadeScrollbars="false"
         />
     
     <ScrollView

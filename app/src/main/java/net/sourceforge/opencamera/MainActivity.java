@@ -732,11 +732,15 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		editor.apply();
 	}
 
-	void launchOnlineHelp() {
+	void launchOnlineHelp(String append) {
 		if( MyDebug.LOG )
-			Log.d(TAG, "launchOnlineHelp");
-		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/"));
+			Log.d(TAG, "launchOnlineHelp: " + append);
+		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/"+ append));
 		startActivity(browserIntent);
+	}
+
+	void launchOnlineHelp() {
+		launchOnlineHelp("");
 	}
 
 	// for audio "noise" trigger option
@@ -1983,7 +1987,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	    /*if( MyDebug.LOG )
 			Log.d(TAG, "padding: " + bottom);*/
 	    galleryButton.setImageBitmap(null);
-		galleryButton.setImageResource(R.drawable.gallery);
+		galleryButton.setImageResource(R.drawable.baseline_photo_library_white_48);
 		// workaround for setImageResource also resetting padding, Android bug
 		galleryButton.setPadding(left, top, right, bottom);
 		gallery_bitmap = null;
@@ -3143,11 +3147,17 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 
 			@Override
 			public void onStopTrackingTouch(SeekBar seekBar) {
+				preview.stoppedSettingFocusDistance(is_target_distance);
 			}
 		});
+		setManualFocusSeekBarVisibility(is_target_distance);
+	}
+
+    void setManualFocusSeekBarVisibility(final boolean is_target_distance) {
+		SeekBar focusSeekBar = findViewById(is_target_distance ? R.id.focus_bracketing_target_seekbar : R.id.focus_seekbar);
 		boolean is_visible = preview.getCurrentFocusValue() != null && this.getPreview().getCurrentFocusValue().equals("focus_mode_manual2");
 		if( is_target_distance ) {
-			is_visible = is_visible && (applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.FocusBracketing);
+			is_visible = is_visible && (applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.FocusBracketing) && !preview.isVideo();
 		}
 		final int visibility = is_visible ? View.VISIBLE : View.GONE;
 		focusSeekBar.setVisibility(visibility);
