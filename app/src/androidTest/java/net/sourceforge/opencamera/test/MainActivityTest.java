@@ -6817,6 +6817,14 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		Log.d(TAG, "done clicking take photo");
 		assertTrue(!mPreview.isOnTimer());
 
+		View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
+		View switchVideoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_video);
+		View exposureButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.exposure);
+		View exposureLockButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.exposure_lock);
+		View popupButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.popup);
+		View trashButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.trash);
+		View shareButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.share);
+
 		try {
 			// wait 7s, and test that we've taken the photos by then
 			Thread.sleep(7000);
@@ -6875,6 +6883,14 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 				editor.putBoolean(PreferenceKeys.getTimerBeepPreferenceKey(), false);
 				editor.apply();
 			}
+			assertTrue(switchCameraButton.getVisibility() == View.VISIBLE);
+			assertTrue(switchVideoButton.getVisibility() == View.VISIBLE);
+		    assertTrue(exposureButton.getVisibility() == (mPreview.supportsExposures() ? View.VISIBLE : View.GONE));
+		    assertTrue(exposureLockButton.getVisibility() == (mPreview.supportsExposureLock() ? View.VISIBLE : View.GONE));
+			assertTrue(popupButton.getVisibility() == View.VISIBLE);
+			assertTrue(trashButton.getVisibility() == View.GONE);
+			assertTrue(shareButton.getVisibility() == View.GONE);
+
 		    clickView(takePhotoButton);
 			waitForTakePhoto();
 			Log.d(TAG, "done taking 1st photo");
@@ -6884,12 +6900,22 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			n_new_files = getNFiles(folder) - n_files;
 			Log.d(TAG, "n_new_files: " + n_new_files);
 			assertTrue(n_new_files == 7);
+
 			// wait 2s, should still not have taken another photo
 			Thread.sleep(2000);
 			assertTrue(mPreview.count_cameraTakePicture==7);
 			n_new_files = getNFiles(folder) - n_files;
 			Log.d(TAG, "n_new_files: " + n_new_files);
 			assertTrue(n_new_files == 7);
+			// check GUI has returned to correct state
+			assertTrue(switchCameraButton.getVisibility() == View.VISIBLE);
+			assertTrue(switchVideoButton.getVisibility() == View.VISIBLE);
+		    assertTrue(exposureButton.getVisibility() == (mPreview.supportsExposures() ? View.VISIBLE : View.GONE));
+		    assertTrue(exposureLockButton.getVisibility() == (mPreview.supportsExposureLock() ? View.VISIBLE : View.GONE));
+			assertTrue(popupButton.getVisibility() == View.VISIBLE);
+			assertTrue(trashButton.getVisibility() == View.GONE);
+			assertTrue(shareButton.getVisibility() == View.GONE);
+
 			// wait another 5s, should have taken another photo (need to allow time for the extra auto-focus)
 			Thread.sleep(5000);
 			assertTrue(mPreview.count_cameraTakePicture==8);
@@ -11207,7 +11233,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 0, 9, 193);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 9, 199);
 		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 202);
-		checkHistogramDetails(hdrHistogramDetails, 12, 46, 205);
+		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 205);
+		checkHistogramDetails(hdrHistogramDetails, 12, 44, 209);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg7".
@@ -11747,7 +11774,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		//checkHistogramDetails(hdrHistogramDetails, 0, 88, 252);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 77, 252);
-		checkHistogramDetails(hdrHistogramDetails, 0, 87, 252);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 87, 252);
+		checkHistogramDetails(hdrHistogramDetails, 0, 74, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg20".
@@ -11928,7 +11956,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         //checkHistogramDetails(hdrHistogramDetails, 0, 77, 250);
         //checkHistogramDetails(hdrHistogramDetails, 0, 74, 250);
         //checkHistogramDetails(hdrHistogramDetails, 0, 86, 250);
-        checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
+        //checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
+        checkHistogramDetails(hdrHistogramDetails, 0, 80, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg25".
@@ -12092,7 +12121,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 88, 127, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 88, 127, 255);
+		checkHistogramDetails(hdrHistogramDetails, 92, 134, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg30".
@@ -12138,7 +12168,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 134, 254);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 134, 254);
+		checkHistogramDetails(hdrHistogramDetails, 0, 144, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg31".
@@ -12266,7 +12297,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		});
 
 		//checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
-		checkHistogramDetails(hdrHistogramDetails, 0, 108, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 108, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 114, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg35".
@@ -12291,7 +12323,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 165, 247);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 165, 247);
+		checkHistogramDetails(hdrHistogramDetails, 0, 169, 248);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg36".
@@ -12483,6 +12516,31 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		});
 
 		checkHistogramDetails(hdrHistogramDetails, 0, 49, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg42".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg42() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg42");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg42/IMG_20180822_145152_0.jpg");
+		inputs.add(avg_images_path + "testAvg42/IMG_20180822_145152_1.jpg");
+		inputs.add(avg_images_path + "testAvg42/IMG_20180822_145152_2.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg42_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		checkHistogramDetails(hdrHistogramDetails, 0, 67, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvgtemp".
