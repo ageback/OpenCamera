@@ -553,4 +553,11 @@
     <string name="focus_bracketing_source_distance">对焦包围源距离</string>
     <string name="focus_bracketing_target_distance">对焦包围hhsf距离</string>
     <string name="focus_bracketing_add_infinity">添加无限距离</string>
+    <string name="magnetic_accuracy_title">指南针方向</string>
+    <string name="magnetic_accuracy_info">您的设备的指南针需要校准以提高其准确性。 这可以通过进行8字形运动手机来完成。\n\n当前准确度：</string>
+    <string name="accuracy_unreliable">不可靠</string>
+    <string name="accuracy_low">低</string>
+    <string name="accuracy_medium">中</string>
+    <string name="accuracy_high">高</string>
+    <string name="accuracy_unknown">未知</string>
 </resources>
