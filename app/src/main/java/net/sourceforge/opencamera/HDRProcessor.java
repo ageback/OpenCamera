@@ -1254,8 +1254,11 @@ public class HDRProcessor {
 				int align_x = 0;
 				int align_y = 0;
 				if( !full_align ) {
-					align_width = width/4;
-					align_height = height/4;
+					// need to use /2 rather than /4 to prevent misalignment in testAvg26
+					//align_width = width/4;
+					//align_height = height/4;
+					align_width = width/2;
+					align_height = height/2;
 					align_x = (width - align_width)/2;
 					align_y = (height - align_height)/2;
 					crop_to_centre = false; // no need to crop in autoAlignment, as we're cropping here
@@ -1297,7 +1300,9 @@ public class HDRProcessor {
 				allocations[1] = allocation_new;
 			}
 
-			autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, false, floating_point_align, 1, crop_to_centre, false, full_alignment_width, full_alignment_height, time_s);
+			// need to use try_harder to improve testAvg17, testAvg36
+			//autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, false, floating_point_align, 1, crop_to_centre, false, full_alignment_width, full_alignment_height, time_s);
+			autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, false, floating_point_align, 1, crop_to_centre, true, full_alignment_width, full_alignment_height, time_s);
 			//autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, true, floating_point_align, 1, crop_to_centre, false, full_alignment_width, full_alignment_height, time_s);
 
 			/*
@@ -1400,18 +1405,29 @@ public class HDRProcessor {
 
 		// if changing this, pay close attention to tests testAvg6, testAvg8, testAvg17, testAvg23
 		float limited_iso = Math.min(iso, 400);
+		float wiener_cutoff_factor = 1.0f;
 		if( iso >= 700 ) {
-		    // helps reduce speckles in testAvg17, testAvg23, testAvg33, testAvg38
+		    // helps reduce speckles in testAvg17, testAvg23, testAvg33, testAvg36, testAvg38
 			// using this level for testAvg31 (ISO 609) would increase ghosting
-		    limited_iso = 500;
+		    //limited_iso = 500;
+		    limited_iso = 800;
+			if( iso >= 1100 ) {
+				// helps further reduce speckles in testAvg17, testAvg38
+				// but don't do for iso >= 700 as makes "vicks" text in testAvg23 slightly more blurred
+				wiener_cutoff_factor = 8.0f;
+			}
         }
 		limited_iso = Math.max(limited_iso, 100);
 		float wiener_C = 10.0f * limited_iso;
 		//float wiener_C = 1000.0f;
 		//float wiener_C = 4000.0f;
-		if( MyDebug.LOG )
+		float wiener_C_cutoff = wiener_cutoff_factor * wiener_C;
+		if( MyDebug.LOG ) {
 			Log.d(TAG, "wiener_C: " + wiener_C);
+			Log.d(TAG, "wiener_cutoff_factor: " + wiener_cutoff_factor);
+		}
 		processAvgScript.set_wiener_C(wiener_C);
+		processAvgScript.set_wiener_C_cutoff(wiener_C_cutoff);
 
 		if( MyDebug.LOG )
 			Log.d(TAG, "call processAvgScript");
@@ -1807,7 +1823,6 @@ public class HDRProcessor {
 		// sampling - since we sample every step_size pixels - though there might be some overhead for every extra call
 		// to renderscript that we do). But high step sizes have a risk of producing really bad results if we were
 		// to misidentify cases as needing a large offset.
-		// Update: use a smaller window for noise reduction (when try_harder==false)
 		int max_dim = Math.max(full_width, full_height); // n.b., use the full width and height here, not the mtb_width, height
 		int max_ideal_size = max_dim / (try_harder ? 150 : 300);
 		int initial_step_size = 1;
@@ -1930,6 +1945,11 @@ public class HDRProcessor {
 						Log.d(TAG, "offsets_y is now: " + offsets_y[i]);
 					}
 				}
+			}
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "resultant offsets for image: " + i);
+				Log.d(TAG, "resultant offsets_x: " + offsets_x[i]);
+				Log.d(TAG, "resultant offsets_y: " + offsets_y[i]);
 			}
 		}
 
@@ -2395,14 +2415,14 @@ public class HDRProcessor {
 		return new HistogramInfo(total, mean_brightness, median_brightness, max_brightness);
 	}
 
-	private static int getBrightnessTarget(int brightness, int max_gain_factor, int ideal_brightness) {
+	private static int getBrightnessTarget(int brightness, float max_gain_factor, int ideal_brightness) {
 		if( brightness <= 0 )
 			brightness = 1;
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "max_gain_factor: " + max_gain_factor);
 			Log.d(TAG, "brightness: " + brightness);
 		}
-		int median_target = Math.min(ideal_brightness, max_gain_factor*brightness);
+		int median_target = Math.min(ideal_brightness, (int)(max_gain_factor*brightness));
 		return Math.max(brightness, median_target); // don't make darker
 	}
 
@@ -2423,13 +2443,17 @@ public class HDRProcessor {
 	/** Computes various factors used in the avg_brighten.rs script.
 	 */
 	public static BrightenFactors computeBrightenFactors(int iso, int brightness, int max_brightness) {
-		int max_gain_factor = 4;
+		float max_gain_factor = 4;
 		int ideal_brightness = 119;
-		if( iso <= 120 ) {
+		//if( iso <= 120 ) {
+		if( iso <= 150 ) {
 			// this helps: testAvg12, testAvg21, testAvg35
 			ideal_brightness = 199;
 			// don't want max_gain_factor 4, otherwise we lose variation in grass colour in testAvg42
-			max_gain_factor = 3;
+			// and having max_gain_factor at 1.5 prevents testAvg43, testAvg44 being too bright and oversaturated
+			//max_gain_factor = 3;
+			//max_gain_factor = 2;
+			max_gain_factor = 1.5f;
 		}
 		int brightness_target = getBrightnessTarget(brightness, max_gain_factor, ideal_brightness);
 		//int max_target = Math.min(255, (int)((max_brightness*brightness_target)/(float)brightness + 0.5f) );
@@ -2700,9 +2724,23 @@ public class HDRProcessor {
 			// for bright scenes, local contrast enhancement helps improve the quality of images (especially where we may have both
 			// dark and bright regions, e.g., testAvg12); but for dark scenes, it just blows up the noise too much
 			// keep n_tiles==1 - get too much contrast enhancement with n_tiles==4 e.g. for testAvg34
+			// tests that are better at 25% (median brightness in brackets): testAvg16 (90), testAvg26 (117), testAvg30 (79),
+			//     testAvg43 (55), testAvg44 (82)
+			// tests that are better at 50%: testAvg12 (8), testAvg13 (38), testAvg15 (10), testAvg18 (39), testAvg19 (37)
 			//adjustHistogram(allocation_out, allocation_out, width, height, 0.5f, 4, time_s);
 			//adjustHistogram(allocation_out, allocation_out, width, height, 0.25f, 4, time_s);
-			adjustHistogram(allocation_out, allocation_out, width, height, 0.25f, 1, time_s);
+			//adjustHistogram(allocation_out, allocation_out, width, height, 0.25f, 1, time_s);
+			//adjustHistogram(allocation_out, allocation_out, width, height, 0.5f, 1, time_s);
+			final int median_lo = 60, median_hi = 35;
+			float alpha = (histogramInfo.median_brightness - median_lo) / (float)(median_hi - median_lo);
+			alpha = Math.max(alpha, 0.0f);
+			alpha = Math.min(alpha, 1.0f);
+			float amount = (1.0f-alpha) * 0.25f + alpha * 0.5f;
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "dro alpha: " + alpha);
+				Log.d(TAG, "dro amount: " + amount);
+			}
+			adjustHistogram(allocation_out, allocation_out, width, height, amount, 1, time_s);
 			if( MyDebug.LOG )
 				Log.d(TAG, "### time after adjustHistogram: " + (System.currentTimeMillis() - time_s));
 		}

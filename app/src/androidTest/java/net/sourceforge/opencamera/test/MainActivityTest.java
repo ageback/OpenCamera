@@ -10902,7 +10902,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, -10, 0};
 					//int [] exp_offsets_x = {0, -15, 0};
 					//int [] exp_offsets_y = {0, -11, 0};
-					int [] exp_offsets_x = {0, -12, 0};
+					//int [] exp_offsets_x = {0, -12, 0};
+					//int [] exp_offsets_y = {0, -12, 0};
+					int [] exp_offsets_x = {0, -16, 0};
 					int [] exp_offsets_y = {0, -12, 0};
 					assertTrue(mActivity.getApplicationInterface().getHDRProcessor().sharp_index == 0);
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
@@ -11015,7 +11017,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 21, 177);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 21, 177);
+		checkHistogramDetails(hdrHistogramDetails, 0, 21, 152);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg4".
@@ -11234,7 +11237,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 0, 9, 199);
 		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 202);
 		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 205);
-		checkHistogramDetails(hdrHistogramDetails, 12, 44, 209);
+		//checkHistogramDetails(hdrHistogramDetails, 12, 44, 209);
+		checkHistogramDetails(hdrHistogramDetails, 12, 44, 202);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg7".
@@ -11274,7 +11278,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, 0, 0};
 					//int [] exp_offsets_x = {0, 0, 0};
 					//int [] exp_offsets_y = {0, 0, 0};
-					int [] exp_offsets_x = {0, -4, 0};
+					//int [] exp_offsets_x = {0, -4, 0};
+					//int [] exp_offsets_y = {0, 0, 0};
+					int [] exp_offsets_x = {0, 0, 0};
 					int [] exp_offsets_y = {0, 0, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 					assertTrue(mActivity.getApplicationInterface().getHDRProcessor().sharp_index == 0);
@@ -11479,8 +11485,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, -16, 0};
 					//int [] exp_offsets_x = {0, -4, 0};
 					//int [] exp_offsets_y = {0, -10, 0};
+					//int [] exp_offsets_x = {0, -4, 0};
+					//int [] exp_offsets_y = {0, -8, 0};
 					int [] exp_offsets_x = {0, -4, 0};
-					int [] exp_offsets_y = {0, -8, 0};
+					int [] exp_offsets_y = {0, -12, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 				}
 				else if( index == 4 ) {
@@ -11523,8 +11531,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 					//int [] exp_offsets_y = {0, 6, 0};
 					//int [] exp_offsets_x = {0, 4, 0};
 					//int [] exp_offsets_y = {0, 4, 0};
-					int [] exp_offsets_x = {0, 8, 0};
-					int [] exp_offsets_y = {0, 8, 0};
+					//int [] exp_offsets_x = {0, 8, 0};
+					//int [] exp_offsets_y = {0, 8, 0};
+					int [] exp_offsets_x = {0, 4, 0};
+					int [] exp_offsets_y = {0, 4, 0};
 					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 				}
 				else {
@@ -11562,7 +11572,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		//checkHistogramDetails(hdrHistogramDetails, 0, 30, 254);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 27, 255);
-		checkHistogramDetails(hdrHistogramDetails, 0, 20, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 20, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 17, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg13".
@@ -11619,7 +11630,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
 				if( index == 1 ) {
+					int [] exp_offsets_x = {0, -8, 0};
+					int [] exp_offsets_y = {0, -8, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 					assertTrue(mActivity.getApplicationInterface().getHDRProcessor().sharp_index == 0);
+				}
+				else if( index == 7 ) {
+					int [] exp_offsets_x = {0, 4, 0};
+					int [] exp_offsets_y = {0, 28, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 				}
 			}
 		});
@@ -11708,7 +11727,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
 				if( index == 1 ) {
+					int [] exp_offsets_x = {0, -8, 0};
+					int [] exp_offsets_y = {0, 4, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 					assertTrue(mActivity.getApplicationInterface().getHDRProcessor().sharp_index == 0);
+				}
+				else if( index == 7 ) {
+					int [] exp_offsets_x = {0, 12, 0};
+					int [] exp_offsets_y = {0, 28, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
 				}
 			}
 		});
@@ -11717,7 +11744,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 0, 100, 236);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 92, 234);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 102, 241);
-		checkHistogramDetails(hdrHistogramDetails, 0, 102, 238);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 102, 238);
+		checkHistogramDetails(hdrHistogramDetails, 0, 103, 244);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg18".
@@ -11775,7 +11803,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 0, 88, 252);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 77, 252);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 87, 252);
-		checkHistogramDetails(hdrHistogramDetails, 0, 74, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 74, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 58, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg20".
@@ -11957,7 +11986,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         //checkHistogramDetails(hdrHistogramDetails, 0, 74, 250);
         //checkHistogramDetails(hdrHistogramDetails, 0, 86, 250);
         //checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
-        checkHistogramDetails(hdrHistogramDetails, 0, 80, 254);
+        //checkHistogramDetails(hdrHistogramDetails, 0, 80, 254);
+        checkHistogramDetails(hdrHistogramDetails, 0, 56, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg25".
@@ -12122,7 +12152,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		});
 
 		//checkHistogramDetails(hdrHistogramDetails, 88, 127, 255);
-		checkHistogramDetails(hdrHistogramDetails, 92, 134, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 92, 134, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg30".
@@ -12169,7 +12199,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		});
 
 		//checkHistogramDetails(hdrHistogramDetails, 0, 134, 254);
-		checkHistogramDetails(hdrHistogramDetails, 0, 144, 254);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 144, 254);
+		checkHistogramDetails(hdrHistogramDetails, 0, 107, 254);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg31".
@@ -12298,7 +12329,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		//checkHistogramDetails(hdrHistogramDetails, 0, 86, 255);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 108, 255);
-		checkHistogramDetails(hdrHistogramDetails, 0, 114, 254);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 114, 254);
+		checkHistogramDetails(hdrHistogramDetails, 0, 103, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg35".
@@ -12352,6 +12384,16 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			@Override
 			public void doneProcessAvg(int index) {
 				Log.d(TAG, "doneProcessAvg: " + index);
+				if( index == 1 ) {
+					int [] exp_offsets_x = {0, -12, 0};
+					int [] exp_offsets_y = {0, 0, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
+				else if( index == 3 ) {
+					int [] exp_offsets_x = {0, -28, 0};
+					int [] exp_offsets_y = {0, 0, 0};
+					checkHDROffsets(exp_offsets_x, exp_offsets_y, mActivity.getApplicationInterface().getHDRProcessor().getAvgSampleSize());
+				}
 			}
 		});
 
@@ -12383,7 +12425,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		//checkHistogramDetails(hdrHistogramDetails, 12, 109, 255);
 		//checkHistogramDetails(hdrHistogramDetails, 3, 99, 255);
-		checkHistogramDetails(hdrHistogramDetails, 0, 99, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 99, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 125, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg38".
@@ -12515,7 +12558,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 49, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 49, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 37, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg42".
@@ -12540,7 +12584,83 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 67, 254);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 67, 254);
+		checkHistogramDetails(hdrHistogramDetails, 0, 61, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg43".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg43() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg43");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg43/IMG_20180831_143226_0.jpg");
+		inputs.add(avg_images_path + "testAvg43/IMG_20180831_143226_1.jpg");
+		inputs.add(avg_images_path + "testAvg43/IMG_20180831_143226_2.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg43_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		checkHistogramDetails(hdrHistogramDetails, 0, 69, 253);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg44".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg44() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg44");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg44/IMG_20180830_133917_0.jpg");
+		inputs.add(avg_images_path + "testAvg44/IMG_20180830_133917_1.jpg");
+		inputs.add(avg_images_path + "testAvg44/IMG_20180830_133917_2.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg44_output.jpg", 40, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		checkHistogramDetails(hdrHistogramDetails, 0, 75, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg45".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg45() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg45");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg45/IMG_20180719_133947_0.jpg");
+		inputs.add(avg_images_path + "testAvg45/IMG_20180719_133947_1.jpg");
+		inputs.add(avg_images_path + "testAvg45/IMG_20180719_133947_2.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg45_output.jpg", 100, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		//checkHistogramDetails(hdrHistogramDetails, 0, 75, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvgtemp".
