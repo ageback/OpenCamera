@@ -895,26 +895,25 @@ public class CameraController2 extends CameraController {
 								Log.d(TAG, "need to execute the next capture");
 								Log.d(TAG, "time since start: " + (System.currentTimeMillis() - slow_burst_start_ms));
 							}
-							if( burst_type != BurstType.BURSTTYPE_FOCUS )
-							{
-
-							try {
-								captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
-							}
-							catch(CameraAccessException e) {
-								if( MyDebug.LOG ) {
-									Log.e(TAG, "failed to take next burst");
-									Log.e(TAG, "reason: " + e.getReason());
-									Log.e(TAG, "message: " + e.getMessage());
+							if( burst_type != BurstType.BURSTTYPE_FOCUS ) {
+								try {
+									if( camera != null && captureSession != null ) { // make sure camera wasn't released in the meantime
+										captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
+									}
 								}
-								e.printStackTrace();
-								jpeg_cb = null;
-								if( take_picture_error_cb != null ) {
-									take_picture_error_cb.onError();
-									take_picture_error_cb = null;
+								catch(CameraAccessException e) {
+									if( MyDebug.LOG ) {
+										Log.e(TAG, "failed to take next burst");
+										Log.e(TAG, "reason: " + e.getReason());
+										Log.e(TAG, "message: " + e.getMessage());
+									}
+									e.printStackTrace();
+									jpeg_cb = null;
+									if( take_picture_error_cb != null ) {
+										take_picture_error_cb.onError();
+										take_picture_error_cb = null;
+									}
 								}
-							}
-
 							}
 							else {
 								if( MyDebug.LOG )
@@ -949,8 +948,8 @@ public class CameraController2 extends CameraController {
 									@Override
 									public void run(){
 										if( MyDebug.LOG )
-											Log.d(TAG, "take picture after delay for next expo");
-										if( camera != null ) { // make sure camera wasn't released in the meantime
+											Log.d(TAG, "take picture after delay for next focus bracket");
+										if( camera != null && captureSession != null ) { // make sure camera wasn't released in the meantime
 											try {
 												captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
 											}
@@ -1674,8 +1673,11 @@ public class CameraController2 extends CameraController {
 		try {
 			configs = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 		}
-		catch(IllegalArgumentException e) {
-			// have had crashes from Google Play - unclear what the cause is, but at least fail gracefully
+		catch(IllegalArgumentException | NullPointerException e) {
+			// have had IllegalArgumentException crashes from Google Play - unclear what the cause is, but at least fail gracefully
+			// similarly for NullPointerException - note, these aren't from characteristics being null, but from
+			// com.android.internal.util.Preconditions.checkArrayElementsNotNull (Preconditions.java:395) - all are from
+			// Nexus 7 (2013)s running Android 8.1, but again better to fail gracefully
 			e.printStackTrace();
 			throw new CameraControllerException();
 		}
@@ -6097,20 +6099,23 @@ public class CameraController2 extends CameraController {
 				}
 			}*/
 
-			if( face_detection_listener != null && previewBuilder != null && previewBuilder.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE) != null && previewBuilder.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE) != CaptureRequest.STATISTICS_FACE_DETECT_MODE_OFF ) {
-				Rect sensor_rect = getViewableRect();
-				android.hardware.camera2.params.Face [] camera_faces = result.get(CaptureResult.STATISTICS_FACES);
-				if( camera_faces != null ) {
-					if( camera_faces.length == 0 && last_faces_detected == 0 ) {
-						// no point continually calling the callback if 0 faces detected (same behaviour as CameraController1)
-					}
-					else {
-						last_faces_detected = camera_faces.length;
-						CameraController.Face [] faces = new CameraController.Face[camera_faces.length];
-						for(int i=0;i<camera_faces.length;i++) {
-							faces[i] = convertFromCameraFace(sensor_rect, camera_faces[i]);
+			if( face_detection_listener != null && previewBuilder != null ) {
+				Integer face_detect_mode = previewBuilder.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE);
+				if( face_detect_mode != null && face_detect_mode != CaptureRequest.STATISTICS_FACE_DETECT_MODE_OFF ) {
+					Rect sensor_rect = getViewableRect();
+					android.hardware.camera2.params.Face [] camera_faces = result.get(CaptureResult.STATISTICS_FACES);
+					if( camera_faces != null ) {
+						if( camera_faces.length == 0 && last_faces_detected == 0 ) {
+							// no point continually calling the callback if 0 faces detected (same behaviour as CameraController1)
 						}
-						face_detection_listener.onFaceDetection(faces);
+						else {
+							last_faces_detected = camera_faces.length;
+							CameraController.Face [] faces = new CameraController.Face[camera_faces.length];
+							for(int i=0;i<camera_faces.length;i++) {
+								faces[i] = convertFromCameraFace(sensor_rect, camera_faces[i]);
+							}
+							face_detection_listener.onFaceDetection(faces);
+						}
 					}
 				}
 			}

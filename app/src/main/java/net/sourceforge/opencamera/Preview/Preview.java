@@ -173,6 +173,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 
 	private boolean is_preview_started;
 
+	private OrientationEventListener orientationEventListener;
 	private int current_orientation; // orientation received by onOrientationChanged
 	private int current_rotation; // orientation relative to camera's orientation (used for parameters.setRotation())
 	private boolean has_level_angle;
@@ -1154,6 +1155,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				closeCameraCallback.onClosed();
 			}
 		}
+
+		if( orientationEventListener != null ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "free orientationEventListener");
+			orientationEventListener.disable();
+			orientationEventListener = null;
+		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "closeCamera: total time: " + (System.currentTimeMillis() - debug_time));
 		}
@@ -1537,12 +1545,17 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				Log.d(TAG, "take_photo?: " + take_photo);
 
 			setCameraDisplayOrientation();
-			new OrientationEventListener(activity) {
-				@Override
-				public void onOrientationChanged(int orientation) {
-					Preview.this.onOrientationChanged(orientation);
-				}
-			}.enable();
+			if( orientationEventListener == null ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "create orientationEventListener");
+				orientationEventListener = new OrientationEventListener(activity) {
+					@Override
+					public void onOrientationChanged(int orientation) {
+						Preview.this.onOrientationChanged(orientation);
+					}
+				};
+				orientationEventListener.enable();
+			}
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "openCamera: time after setting orientation: " + (System.currentTimeMillis() - debug_time));
 			}
@@ -3459,11 +3472,11 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	    	new_rotation = (camera_orientation + orientation) % 360;
 	    }
 	    if( new_rotation != current_rotation ) {
-			/*if( MyDebug.LOG ) {
+			if( MyDebug.LOG ) {
 				Log.d(TAG, "    current_orientation is " + current_orientation);
 				Log.d(TAG, "    info orientation is " + camera_orientation);
 				Log.d(TAG, "    set Camera rotation from " + current_rotation + " to " + new_rotation);
-			}*/
+			}
 	    	this.current_rotation = new_rotation;
 	    }
 	}
@@ -3780,13 +3793,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	public String getExposureTimeString(long exposure_time) {
 		double exposure_time_s = exposure_time/1000000000.0;
 		String string;
-		if( exposure_time >= 500000000 ) {
-			// show exposure times of more than 0.5s directly
+		if( exposure_time > 100000000 ) {
+			// show exposure times of more than 0.1s directly
 			string = decimal_format_1dp.format(exposure_time_s) + getResources().getString(R.string.seconds_abbreviation);
 		}
 		else {
 			double exposure_time_r = 1.0/exposure_time_s;
-			string = " 1/" + decimal_format_1dp.format(exposure_time_r) + getResources().getString(R.string.seconds_abbreviation);
+			string = " 1/" + (int)(exposure_time_r + 0.5) + getResources().getString(R.string.seconds_abbreviation);
 		}
 		return string;
 	}
@@ -6282,18 +6295,20 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     
     public long getMinimumExposureTime() {
 		if( MyDebug.LOG )
-			Log.d(TAG, "getMinimumExposureTime");
+			Log.d(TAG, "getMinimumExposureTime: " + min_exposure_time);
     	return this.min_exposure_time;
     }
     
     public long getMaximumExposureTime() {
 		if( MyDebug.LOG )
-			Log.d(TAG, "getMaximumExposureTime");
+			Log.d(TAG, "getMaximumExposureTime: " + max_exposure_time);
 		long max = max_exposure_time;
 		if( applicationInterface.isExpoBracketingPref() || applicationInterface.isFocusBracketingPref() || applicationInterface.isCameraBurstPref() ) {
 			// doesn't make sense to allow exposure times more than 0.5s in these modes
 			max = Math.min(max_exposure_time, 1000000000L/2);
 		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "max: " + max);
     	return max;
     }
     

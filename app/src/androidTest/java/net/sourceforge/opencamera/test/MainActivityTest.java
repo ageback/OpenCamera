@@ -2247,10 +2247,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 	    assertTrue(exposureTimeSeekBar.getVisibility() == (mPreview.supportsExposureTime() ? View.VISIBLE : View.GONE));
 		subTestISOButtonAvailability();
 
-		final int manual_n = 1000; // should match MainActivity.manual_n
+		/*final int manual_n = 1000; // should match MainActivity.manual_n
 	    assertTrue( isoSeekBar.getMax() == manual_n );
 	    if( mPreview.supportsExposureTime() )
-		    assertTrue( exposureTimeSeekBar.getMax() == manual_n );
+		    assertTrue( exposureTimeSeekBar.getMax() == manual_n );*/
 
 		Log.d(TAG, "change ISO to min");
 	    isoSeekBar.setProgress(0);
@@ -2267,7 +2267,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
 		Log.d(TAG, "camera_controller ISO: " + mPreview.getCameraController().getISO());
 		Log.d(TAG, "change ISO to max");
-	    isoSeekBar.setProgress(manual_n);
+	    isoSeekBar.setProgress(isoSeekBar.getMax());
 		this.getInstrumentation().waitForIdleSync();
 		Log.d(TAG, "camera_controller ISO: " + mPreview.getCameraController().getISO());
 		Log.d(TAG, "reported max ISO: " + mPreview.getMaximumISO());
@@ -2276,14 +2276,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		// n.b., currently don't test this on devices with long shutter times (e.g., OnePlus 3T)
 	    if( mPreview.supportsExposureTime() && mPreview.getMaximumExposureTime() < 1000000000 ) {
 			Log.d(TAG, "change exposure time to max");
-		    exposureTimeSeekBar.setProgress(manual_n);
+		    exposureTimeSeekBar.setProgress(exposureTimeSeekBar.getMax());
 			this.getInstrumentation().waitForIdleSync();
 			assertTrue( mPreview.getCameraController().getISO() == mPreview.getMaximumISO() );
 			assertTrue( mPreview.getCameraController().getExposureTime() == mPreview.getMaximumExposureTime() );
 	    }
 	    else {
-            Log.d(TAG, "change exposure time to 1s");
-            mActivity.setProgressSeekbarExponential(exposureTimeSeekBar, mPreview.getMinimumExposureTime(), mPreview.getMaximumExposureTime(), 1000000000);
+            Log.d(TAG, "change exposure time to middle");
+            //mActivity.setProgressSeekbarExponential(exposureTimeSeekBar, mPreview.getMinimumExposureTime(), mPreview.getMaximumExposureTime(), 1000000000);
+		    exposureTimeSeekBar.setProgress(exposureTimeSeekBar.getMax()/2);
             this.getInstrumentation().waitForIdleSync();
             assertTrue( mPreview.getCameraController().getISO() == mPreview.getMaximumISO() );
             assertTrue( mPreview.getCameraController().getExposureTime() != mPreview.getMaximumExposureTime() );
@@ -7684,7 +7685,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		}
 	}
 
-	/** Tests trying to switch camera repeatedly.
+	/** Tests trying to switch camera repeatedly, without waiting for camera to open.
 	 */
 	public void testSwitchCameraRepeat() {
 		Log.d(TAG, "testSwitchCameraRepeat");
@@ -7702,6 +7703,33 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		waitUntilCameraOpened();
 		// n.b., don't check the new camera Id, as it's ill-defined which camera will be open
 		// the main point of this test is to check we don't crash due to opening camera on background thread
+	}
+
+	/* Tests repeatedly switching camera, waiting for camera to reopen each time.
+	 * Guards agains a bug fixed in 1.44 where we would crash due to memory leak in
+	 * OrientationEventListener.enable() (from Preview.cameraOpened()) when called too many times.
+	 */
+	public void testSwitchCameraRepeat2() throws InterruptedException {
+		Log.d(TAG, "testSwitchCameraRepeat2");
+		setToDefault();
+
+		if( mPreview.getCameraControllerManager().getNumberOfCameras() <= 1 ) {
+			return;
+		}
+
+		View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
+		int cameraId = mPreview.getCameraId();
+
+		for(int i=0;i<130;i++) {
+			Log.d(TAG, "i = " + i);
+
+			clickView(switchCameraButton);
+			waitUntilCameraOpened();
+
+			int new_cameraId = mPreview.getCameraId();
+			assertTrue(new_cameraId != cameraId);
+			cameraId = new_cameraId;
+		}
 	}
 
 	/* Tests going to gallery.
@@ -11238,7 +11266,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 202);
 		//checkHistogramDetails(hdrHistogramDetails, 12, 46, 205);
 		//checkHistogramDetails(hdrHistogramDetails, 12, 44, 209);
-		checkHistogramDetails(hdrHistogramDetails, 12, 44, 202);
+		//checkHistogramDetails(hdrHistogramDetails, 12, 44, 202);
+		checkHistogramDetails(hdrHistogramDetails, 5, 16, 190);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg7".
@@ -11328,7 +11357,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		//checkHistogramDetails(hdrHistogramDetails, 0, 10, 60);
 		//checkHistogramDetails(hdrHistogramDetails, 1, 8, 72);
 		//checkHistogramDetails(hdrHistogramDetails, 1, 6, 64);
-		checkHistogramDetails(hdrHistogramDetails, 1, 15, 75);
+		//checkHistogramDetails(hdrHistogramDetails, 1, 15, 75);
+		checkHistogramDetails(hdrHistogramDetails, 1, 16, 78);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg9".
@@ -12116,8 +12146,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 21, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 21, 255);
 		//checkHistogramDetails(hdrHistogramDetails, 0, 18, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 8, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg29".
@@ -12235,7 +12266,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 24, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 24, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 9, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg32".
@@ -12267,7 +12299,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 34, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 34, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 13, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg33".
@@ -12302,7 +12335,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 81, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 81, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 63, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg34".
@@ -12489,7 +12523,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 64, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 64, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 25, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg40".
@@ -12523,7 +12558,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 			}
 		});
 
-		checkHistogramDetails(hdrHistogramDetails, 0, 50, 255);
+		//checkHistogramDetails(hdrHistogramDetails, 0, 50, 255);
+		checkHistogramDetails(hdrHistogramDetails, 0, 19, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvg41".
@@ -12661,6 +12697,36 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		});
 
 		//checkHistogramDetails(hdrHistogramDetails, 0, 75, 255);
+	}
+
+	/** Tests Avg algorithm on test samples "testAvg46".
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public void testAvg46() throws IOException, InterruptedException {
+		Log.d(TAG, "testAvg46");
+
+		setToDefault();
+
+		// list assets
+		List<String> inputs = new ArrayList<>();
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_0.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_1.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_2.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_3.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_4.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_5.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_6.jpg");
+		inputs.add(avg_images_path + "testAvg46/IMG_20180903_203141_7.jpg");
+
+		HistogramDetails hdrHistogramDetails = subTestAvg(inputs, "testAvg46_output.jpg", 1505, new TestAvgCallback() {
+			@Override
+			public void doneProcessAvg(int index) {
+				Log.d(TAG, "doneProcessAvg: " + index);
+			}
+		});
+
+		checkHistogramDetails(hdrHistogramDetails, 0, 30, 255);
 	}
 
 	/** Tests Avg algorithm on test samples "testAvgtemp".
