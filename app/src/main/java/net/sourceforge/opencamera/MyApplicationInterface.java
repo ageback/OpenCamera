@@ -15,6 +15,7 @@ import java.util.TimerTask;
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.CameraController.RawImage;
 import net.sourceforge.opencamera.Preview.ApplicationInterface;
+import net.sourceforge.opencamera.Preview.BasicApplicationInterface;
 import net.sourceforge.opencamera.Preview.Preview;
 import net.sourceforge.opencamera.Preview.VideoProfile;
 import net.sourceforge.opencamera.UI.DrawPreview;
@@ -49,7 +50,7 @@ import android.widget.ImageButton;
 
 /** Our implementation of ApplicationInterface, see there for details.
  */
-public class MyApplicationInterface implements ApplicationInterface {
+public class MyApplicationInterface extends BasicApplicationInterface {
 	private static final String TAG = "MyApplicationInterface";
 
 	// note, okay to change the order of enums in future versions, as getPhotoMode() does not rely on the order for the saved photo mode
@@ -870,6 +871,10 @@ public class MyApplicationInterface implements ApplicationInterface {
     private String getStampGPSFormatPref() {
     	return sharedPreferences.getString(PreferenceKeys.StampGPSFormatPreferenceKey, "preference_stamp_gpsformat_default");
     }
+
+    private String getUnitsDistancePref() {
+    	return sharedPreferences.getString(PreferenceKeys.UnitsDistancePreferenceKey, "preference_units_distance_m");
+	}
     
     private String getTextStampPref() {
     	return sharedPreferences.getString(PreferenceKeys.TextStampPreferenceKey, "");
@@ -1364,6 +1369,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			final String preference_stamp_dateformat = this.getStampDateFormatPref();
 			final String preference_stamp_timeformat = this.getStampTimeFormatPref();
 			final String preference_stamp_gpsformat = this.getStampGPSFormatPref();
+			final String preference_units_distance = this.getUnitsDistancePref();
 			final boolean store_location = getGeotaggingPref();
 			final boolean store_geo_direction = getGeodirectionPref();
 			class SubtitleVideoTimerTask extends TimerTask {
@@ -1413,7 +1419,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					String time_stamp = TextFormatter.getTimeString(preference_stamp_timeformat, current_date);
 					Location location = store_location ? getLocation() : null;
 					double geo_direction = store_geo_direction && main_activity.getPreview().hasGeoDirection() ? main_activity.getPreview().getGeoDirection() : 0.0;
-					String gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, store_location && location!=null, location, store_geo_direction && main_activity.getPreview().hasGeoDirection(), geo_direction);
+					String gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, preference_units_distance, store_location && location!=null, location, store_geo_direction && main_activity.getPreview().hasGeoDirection(), geo_direction);
 					if( MyDebug.LOG ) {
 						Log.d(TAG, "date_stamp: " + date_stamp);
 						Log.d(TAG, "time_stamp: " + time_stamp);
@@ -1857,7 +1863,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			if( MyDebug.LOG )
 				Log.d(TAG, "play beep!");
 			boolean is_last = remaining_time <= 1000;
-			main_activity.playSound(is_last ? R.raw.beep_hi : R.raw.beep);
+			main_activity.getSoundPoolManager().playSound(is_last ? R.raw.beep_hi : R.raw.beep);
 		}
 		if( sharedPreferences.getBoolean(PreferenceKeys.getTimerSpeakPreferenceKey(), false) ) {
 			if( MyDebug.LOG )
@@ -2012,21 +2018,21 @@ public class MyApplicationInterface implements ApplicationInterface {
 	public void requestCameraPermission() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "requestCameraPermission");
-		main_activity.requestCameraPermission();
+		main_activity.getPermissionHandler().requestCameraPermission();
     }
     
     @Override
 	public void requestStoragePermission() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "requestStoragePermission");
-		main_activity.requestStoragePermission();
+		main_activity.getPermissionHandler().requestStoragePermission();
     }
     
     @Override
 	public void requestRecordAudioPermission() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "requestRecordAudioPermission");
-		main_activity.requestRecordAudioPermission();
+		main_activity.getPermissionHandler().requestRecordAudioPermission();
     }
     
     @Override
@@ -2196,7 +2202,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		int image_quality = getSaveImageQualityPref();
 		if( MyDebug.LOG )
 			Log.d(TAG, "image_quality: " + image_quality);
-        boolean do_auto_stabilise = getAutoStabilisePref() && main_activity.getPreview().hasLevelAngle();
+        boolean do_auto_stabilise = getAutoStabilisePref() && main_activity.getPreview().hasLevelAngleStable();
 		double level_angle = do_auto_stabilise ? main_activity.getPreview().getLevelAngle() : 0.0;
 		if( do_auto_stabilise && main_activity.test_have_angle )
 			level_angle = main_activity.test_angle;
@@ -2213,6 +2219,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		String preference_stamp_dateformat = this.getStampDateFormatPref();
 		String preference_stamp_timeformat = this.getStampTimeFormatPref();
 		String preference_stamp_gpsformat = this.getStampGPSFormatPref();
+		String preference_units_distance = this.getUnitsDistancePref();
 		boolean store_location = getGeotaggingPref() && getLocation() != null;
 		Location location = store_location ? getLocation() : null;
 		boolean store_geo_direction = main_activity.getPreview().hasGeoDirection() && getGeodirectionPref();
@@ -2279,7 +2286,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					mirror,
 					current_date,
 					iso,
-					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
 					sample_factor);
@@ -2300,7 +2307,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					mirror,
 					current_date,
 					iso,
-					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
 					sample_factor);

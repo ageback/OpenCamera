@@ -448,6 +448,13 @@
                 android:defaultValue="true"
                 />
 
+            <CheckBoxPreference
+                android:key="preference_show_whats_new"
+                android:title="@string/preference_show_whats_new"
+                android:summary="@string/preference_show_whats_new_summary"
+                android:defaultValue="true"
+                />
+
 			<SwitchPreference
                 android:key="preference_keep_display_on"
                 android:title="@string/preference_keep_display_on"
@@ -510,6 +517,16 @@
 	            />
 
             <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+	        <ListPreference
+	            android:key="preference_nr_save"
+	            android:title="@string/preference_nr_save"
+	            android:summary="@string/preference_nr_save_summary"
+	            android:entries="@array/preference_nr_save_entries"
+	            android:entryValues="@array/preference_nr_save_values"
+	            android:defaultValue="preference_nr_save_no"
+	            />
+
+            <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
 	        <SwitchPreference
 	            android:key="preference_hdr_save_expo"
 	            android:title="@string/preference_hdr_save_expo"
@@ -535,16 +552,6 @@
 	            android:entries="@array/preference_expo_bracketing_stops_entries"
 	            android:entryValues="@array/preference_expo_bracketing_stops_values"
 	            android:defaultValue="2"
-	            />
-
-            <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
-	        <ListPreference
-	            android:key="preference_nr_save"
-	            android:title="@string/preference_nr_save"
-	            android:summary="@string/preference_nr_save_summary"
-	            android:entries="@array/preference_nr_save_entries"
-	            android:entryValues="@array/preference_nr_save_values"
-	            android:defaultValue="preference_nr_save_no"
 	            />
 
 			<ListPreference
@@ -626,6 +633,15 @@
 		            android:defaultValue="preference_stamp_gpsformat_default"
 		            />
 	
+				<ListPreference
+					android:key="preference_units_distance"
+					android:title="@string/preference_units_distance"
+					android:summary="@string/preference_units_distance_summary"
+					android:entries="@array/preference_units_distance_entries"
+					android:entryValues="@array/preference_units_distance_values"
+					android:defaultValue="preference_units_distance_m"
+					/>
+
 		      	<EditTextPreference
 		            android:key="preference_textstamp"
 		            android:title="@string/preference_textstamp"
@@ -888,7 +904,7 @@
 	            android:summary="@string/preference_require_location_summary"
 	            android:defaultValue="false"
 	            />
-		    
+
 	    </PreferenceScreen>
 
         <!--  if we move this to another PreferenceGroup, we should update code for the findPreference() call -->

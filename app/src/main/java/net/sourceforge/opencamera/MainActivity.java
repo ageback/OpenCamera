@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
@@ -32,9 +31,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.media.AudioAttributes;
-import android.media.AudioManager;
-import android.media.SoundPool;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -56,7 +52,6 @@ import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnDismissListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -68,9 +63,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
 import android.util.Log;
-import android.util.SparseIntArray;
 import android.view.Display;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
@@ -89,12 +82,14 @@ import android.widget.ZoomControls;
 
 /** The main Activity for Open Camera.
  */
-public class MainActivity extends Activity implements AudioListener.AudioListenerCallback {
+public class MainActivity extends Activity {
 	private static final String TAG = "MainActivity";
 	private SensorManager mSensorManager;
 	private Sensor mSensorAccelerometer;
 	private Sensor mSensorMagnetic;
 	private MainUI mainUI;
+	private PermissionHandler permissionHandler;
+	private SoundPoolManager soundPoolManager;
 	private ManualSeekbars manualSeekbars;
 	private TextFormatter textFormatter;
 	private MyApplicationInterface applicationInterface;
@@ -113,14 +108,10 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     private final Map<Integer, Bitmap> preloaded_bitmap_resources = new Hashtable<>();
 	private ValueAnimator gallery_save_anim;
 
-    private SoundPool sound_pool;
-	private SparseIntArray sound_ids;
-	
 	private TextToSpeech textToSpeech;
 	private boolean textToSpeechSuccess;
-	
+
 	private AudioListener audio_listener;
-	private int audio_noise_sensitivity = -1;
 	private SpeechRecognizer speechRecognizer;
 	private boolean speechRecognizerIsStarted;
 	
@@ -214,12 +205,14 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			Log.d(TAG, "supports_force_video_4k? " + supports_force_video_4k);
 
 		// set up components
+		permissionHandler = new PermissionHandler(this);
 		mainUI = new MainUI(this);
 		manualSeekbars = new ManualSeekbars();
 		applicationInterface = new MyApplicationInterface(this, savedInstanceState);
 		if( MyDebug.LOG )
 			Log.d(TAG, "onCreate: time after creating application interface: " + (System.currentTimeMillis() - debug_time));
 		textFormatter = new TextFormatter(this);
+		soundPoolManager = new SoundPoolManager(this);
 
 		// determine whether we support Camera2 API
 		initCamera2Support();
@@ -408,11 +401,15 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					Log.d(TAG, "latest_version: " + latest_version);
 				}
 				final boolean whats_new_enabled = false;
+				//final boolean whats_new_enabled = true;
 				if( whats_new_enabled ) {
 					final boolean force_whats_new = false;
 					//final boolean force_whats_new = true; // for testing
+					boolean allow_show_whats_new = sharedPreferences.getBoolean(PreferenceKeys.ShowWhatsNewPreferenceKey, true);
+					if( MyDebug.LOG )
+						Log.d(TAG, "allow_show_whats_new: " + allow_show_whats_new);
 					// don't show What's New if this is the first time the user has run
-					if( has_done_first_time && ( force_whats_new || version_code > latest_version ) ) {
+					if( has_done_first_time && allow_show_whats_new && ( force_whats_new || version_code > latest_version ) ) {
 						AlertDialog.Builder alertDialog = new AlertDialog.Builder(this);
 						alertDialog.setTitle(R.string.whats_new);
 						alertDialog.setMessage(R.string.whats_new_text);
@@ -429,8 +426,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 						alertDialog.show();
 					}
 				}
-				// we set the latest_version whether or not the dialog is shown - if we showed the irst time dialog, we don't
-				// want to then show the What's New dialog next time we run!
+				// We set the latest_version whether or not the dialog is shown - if we showed the first time dialog, we don't
+				// want to then show the What's New dialog next time we run! Similarly if the user had disabled showing the dialog,
+				// but then enables it, we still shouldn't show the dialog until the new time Open Camera upgrades.
 				SharedPreferences.Editor editor = sharedPreferences.edit();
 				editor.putInt(PreferenceKeys.LatestVersionPreferenceKey, version_code);
 				editor.apply();
@@ -744,92 +742,10 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		launchOnlineHelp("");
 	}
 
-	// for audio "noise" trigger option
-	private int last_level = -1;
-	private long time_quiet_loud = -1;
-	private long time_last_audio_trigger_photo = -1;
-
-	/** Listens to audio noise and decides when there's been a "loud" noise to trigger taking a photo.
-	 */
-	public void onAudio(int level) {
-		boolean audio_trigger = false;
-		/*if( level > 150 ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "loud noise!: " + level);
-			audio_trigger = true;
-		}*/
-
-		if( last_level == -1 ) {
-			last_level = level;
-			return;
-		}
-		int diff = level - last_level;
-		
-		if( MyDebug.LOG )
-			Log.d(TAG, "noise_sensitivity: " + audio_noise_sensitivity);
-
-		if( diff > audio_noise_sensitivity ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "got louder!: " + last_level + " to " + level + " , diff: " + diff);
-			time_quiet_loud = System.currentTimeMillis();
-			if( MyDebug.LOG )
-				Log.d(TAG, "    time: " + time_quiet_loud);
-		}
-		else if( diff < -audio_noise_sensitivity && time_quiet_loud != -1 ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "got quieter!: " + last_level + " to " + level + " , diff: " + diff);
-			long time_now = System.currentTimeMillis();
-			long duration = time_now - time_quiet_loud;
-			if( MyDebug.LOG ) {
-				Log.d(TAG, "stopped being loud - was loud since :" + time_quiet_loud);
-				Log.d(TAG, "    time_now: " + time_now);
-				Log.d(TAG, "    duration: " + duration);
-			}
-			if( duration < 1500 ) {
-				if( MyDebug.LOG )
-					Log.d(TAG, "audio_trigger set");
-				audio_trigger = true;
-			}
-			time_quiet_loud = -1;
-		}
-		else {
-			if( MyDebug.LOG )
-				Log.d(TAG, "audio level: " + last_level + " to " + level + " , diff: " + diff);
-		}
-
-		last_level = level;
-
-		if( audio_trigger ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "audio trigger");
-			// need to run on UI thread so that this function returns quickly (otherwise we'll have lag in processing the audio)
-			// but also need to check we're not currently taking a photo or on timer, so we don't repeatedly queue up takePicture() calls, or cancel a timer
-			long time_now = System.currentTimeMillis();
-			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-			boolean want_audio_listener = sharedPreferences.getString(PreferenceKeys.AudioControlPreferenceKey, "none").equals("noise");
-			if( time_last_audio_trigger_photo != -1 && time_now - time_last_audio_trigger_photo < 5000 ) {
-				// avoid risk of repeatedly being triggered - as well as problem of being triggered again by the camera's own "beep"!
-				if( MyDebug.LOG )
-					Log.d(TAG, "ignore loud noise due to too soon since last audio triggerred photo:" + (time_now - time_last_audio_trigger_photo));
-			}
-			else if( !want_audio_listener ) {
-				// just in case this is a callback from an AudioListener before it's been freed (e.g., if there's a loud noise when exiting settings after turning the option off
-				if( MyDebug.LOG )
-					Log.d(TAG, "ignore loud noise due to audio listener option turned off");
-			}
-			else {
-				if( MyDebug.LOG )
-					Log.d(TAG, "audio trigger from loud noise");
-				time_last_audio_trigger_photo = time_now;
-				audioTrigger();
-			}
-		}
-	}
-	
 	/* Audio trigger - either loud sound, or speech recognition.
 	 * This performs some additional checks before taking a photo.
 	 */
-	private void audioTrigger() {
+	void audioTrigger() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "ignore audio trigger due to popup open");
 		if( popupIsOpen() ) {
@@ -1114,9 +1030,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 
         initSpeechRecognizer();
         initLocation();
-        initSound();
-    	loadSound(R.raw.beep);
-    	loadSound(R.raw.beep_hi);
+        soundPoolManager.initSound();
+    	soundPoolManager.loadSound(R.raw.beep);
+    	soundPoolManager.loadSound(R.raw.beep_hi);
 
 		mainUI.layoutUI();
 
@@ -1167,7 +1083,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         freeSpeechRecognizer();
         applicationInterface.getLocationSupplier().freeLocationListeners();
 		applicationInterface.getGyroSensor().stopRecording();
-		releaseSound();
+		soundPoolManager.releaseSound();
 		applicationInterface.clearLastImages(); // this should happen when pausing the preview, but call explicitly just to be safe
 		applicationInterface.getDrawPreview().clearGhostImage();
 		preview.onPause();
@@ -3419,8 +3335,12 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     public Preview getPreview() {
     	return this.preview;
     }
-    
-    public MainUI getMainUI() {
+
+	public PermissionHandler getPermissionHandler() {
+		return permissionHandler;
+	}
+
+	public MainUI getMainUI() {
     	return this.mainUI;
     }
     
@@ -3431,7 +3351,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	public TextFormatter getTextFormatter() {
 		return this.textFormatter;
 	}
-    
+
+	SoundPoolManager getSoundPoolManager() {
+    	return this.soundPoolManager;
+	}
+
     public LocationSupplier getLocationSupplier() {
     	return this.applicationInterface.getLocationSupplier();
     }
@@ -3674,11 +3598,13 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	private void startAudioListener() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "startAudioListener");
-		audio_listener = new AudioListener(this);
+		MyAudioTriggerListenerCallback callback = new MyAudioTriggerListenerCallback(this);
+		audio_listener = new AudioListener(callback);
 		if( audio_listener.status() ) {
 			audio_listener.start();
 			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 			String sensitivity_pref = sharedPreferences.getString(PreferenceKeys.AudioNoiseControlSensitivityPreferenceKey, "0");
+			int audio_noise_sensitivity;
 			switch(sensitivity_pref) {
 				case "3":
 					audio_noise_sensitivity = 50;
@@ -3700,6 +3626,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					audio_noise_sensitivity = 100;
 					break;
 			}
+			callback.setAudioNoiseSensitivity(audio_noise_sensitivity);
 			mainUI.audioControlStarted();
 		}
 		else {
@@ -3869,74 +3796,14 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         }
 	}
 	
-	private void initLocation() {
+	void initLocation() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "initLocation");
         if( !applicationInterface.getLocationSupplier().setupLocationListener() ) {
     		if( MyDebug.LOG )
     			Log.d(TAG, "location permission not available, so request permission");
-    		requestLocationPermission();
+    		permissionHandler.requestLocationPermission();
         }
-	}
-	
-	@SuppressWarnings("deprecation")
-	private void initSound() {
-		if( sound_pool == null ) {
-    		if( MyDebug.LOG )
-    			Log.d(TAG, "create new sound_pool");
-	        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
-	        	AudioAttributes audio_attributes = new AudioAttributes.Builder()
-	        		.setLegacyStreamType(AudioManager.STREAM_SYSTEM)
-	        		.setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-	        		.build();
-	        	sound_pool = new SoundPool.Builder()
-	        		.setMaxStreams(1)
-	        		.setAudioAttributes(audio_attributes)
-        			.build();
-	        }
-	        else {
-				sound_pool = new SoundPool(1, AudioManager.STREAM_SYSTEM, 0);
-	        }
-			sound_ids = new SparseIntArray();
-		}
-	}
-	
-	private void releaseSound() {
-        if( sound_pool != null ) {
-    		if( MyDebug.LOG )
-    			Log.d(TAG, "release sound_pool");
-            sound_pool.release();
-        	sound_pool = null;
-    		sound_ids = null;
-        }
-	}
-	
-	// must be called before playSound (allowing enough time to load the sound)
-	private void loadSound(int resource_id) {
-		if( sound_pool != null ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "loading sound resource: " + resource_id);
-			int sound_id = sound_pool.load(this, resource_id, 1);
-			if( MyDebug.LOG )
-				Log.d(TAG, "    loaded sound: " + sound_id);
-			sound_ids.put(resource_id, sound_id);
-		}
-	}
-	
-	// must call loadSound first (allowing enough time to load the sound)
-	void playSound(int resource_id) {
-		if( sound_pool != null ) {
-			if( sound_ids.indexOfKey(resource_id) < 0 ) {
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "resource not loaded: " + resource_id);
-			}
-			else {
-				int sound_id = sound_ids.get(resource_id);
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "play sound: " + sound_id);
-				sound_pool.play(sound_id, 1.0f, 1.0f, 0, 0, 1);
-			}
-		}
 	}
 	
 	@SuppressWarnings("deprecation")
@@ -3946,274 +3813,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         }
 	}
 
-	// Android 6+ permission handling:
-	
-	final private int MY_PERMISSIONS_REQUEST_CAMERA = 0;
-	final private int MY_PERMISSIONS_REQUEST_STORAGE = 1;
-	final private int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 2;
-	final private int MY_PERMISSIONS_REQUEST_LOCATION = 3;
-
-	/** Show a "rationale" to the user for needing a particular permission, then request that permission again
-	 *  once they close the dialog.
-	 */
-	@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
-	private void showRequestPermissionRationale(final int permission_code) {
-		if( MyDebug.LOG )
-			Log.d(TAG, "showRequestPermissionRational: " + permission_code);
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		boolean ok = true;
-		String [] permissions = null;
-		int message_id = 0;
-		if( permission_code == MY_PERMISSIONS_REQUEST_CAMERA ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for camera permission");
-			permissions = new String[]{Manifest.permission.CAMERA};
-			message_id = R.string.permission_rationale_camera;
-		}
-		else if( permission_code == MY_PERMISSIONS_REQUEST_STORAGE ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for storage permission");
-			permissions = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE};
-			message_id = R.string.permission_rationale_storage;
-		}
-		else if( permission_code == MY_PERMISSIONS_REQUEST_RECORD_AUDIO ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for record audio permission");
-			permissions = new String[]{Manifest.permission.RECORD_AUDIO};
-			message_id = R.string.permission_rationale_record_audio;
-		}
-		else if( permission_code == MY_PERMISSIONS_REQUEST_LOCATION ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for location permission");
-			permissions = new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION};
-			message_id = R.string.permission_rationale_location;
-		}
-		else {
-			if( MyDebug.LOG )
-				Log.e(TAG, "showRequestPermissionRational unknown permission_code: " + permission_code);
-			ok = false;
-		}
-
-		if( ok ) {
-			final String [] permissions_f = permissions;
-			new AlertDialog.Builder(this)
-			.setTitle(R.string.permission_rationale_title)
-			.setMessage(message_id)
-			.setIcon(android.R.drawable.ic_dialog_alert)
-        	.setPositiveButton(android.R.string.ok, null)
-			.setOnDismissListener(new OnDismissListener() {
-				public void onDismiss(DialogInterface dialog) {
-					if( MyDebug.LOG )
-						Log.d(TAG, "requesting permission...");
-					ActivityCompat.requestPermissions(MainActivity.this, permissions_f, permission_code); 
-				}
-			}).show();
-		}
-	}
-
-	void requestCameraPermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestCameraPermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_CAMERA);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting camera permission...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, MY_PERMISSIONS_REQUEST_CAMERA);
-        }
-    }
-
-	void requestStoragePermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestStoragePermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_STORAGE);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting storage permission...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, MY_PERMISSIONS_REQUEST_STORAGE);
-        }
-    }
-
-	void requestRecordAudioPermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestRecordAudioPermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting record audio permission...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
-        }
-    }
-
-	private void requestLocationPermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestLocationPermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION) ||
-				ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_LOCATION);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting loacation permissions...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, MY_PERMISSIONS_REQUEST_LOCATION);
-        }
-    }
-
 	@Override
 	public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "onRequestPermissionsResult: requestCode " + requestCode);
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		switch( requestCode ) {
-	        case MY_PERMISSIONS_REQUEST_CAMERA:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "camera permission granted");
-	            	preview.retryOpenCamera();
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "camera permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	            	// Open Camera doesn't need to do anything: the camera will remain closed
-	            }
-	            return;
-	        }
-	        case MY_PERMISSIONS_REQUEST_STORAGE:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "storage permission granted");
-	            	preview.retryOpenCamera();
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "storage permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	            	// Open Camera doesn't need to do anything: the camera will remain closed
-	            }
-	            return;
-	        }
-	        case MY_PERMISSIONS_REQUEST_RECORD_AUDIO:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "record audio permission granted");
-	        		// no need to do anything
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "record audio permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	        		// no need to do anything
-	        		// note that we don't turn off record audio option, as user may then record video not realising audio won't be recorded - best to be explicit each time
-	            }
-	            return;
-	        }
-	        case MY_PERMISSIONS_REQUEST_LOCATION:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "location permission granted");
-	                initLocation();
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "location permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	        		// for location, seems best to turn the option back off
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "location permission not available, so switch location off");
-		    		preview.showToast(null, R.string.permission_location_not_available);
-					SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
-					SharedPreferences.Editor editor = settings.edit();
-					editor.putBoolean(PreferenceKeys.LocationPreferenceKey, false);
-					editor.apply();
-	            }
-	            return;
-	        }
-	        default:
-	        {
-	    		if( MyDebug.LOG )
-	    			Log.e(TAG, "unknown requestCode " + requestCode);
-	        }
-	    }
+		permissionHandler.onRequestPermissionsResult(requestCode, grantResults);
 	}
 
 	// for testing:
