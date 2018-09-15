@@ -567,4 +567,14 @@
     <string name="preference_units_distance_summary">用于照片标记和视频字幕 %s 的GPS高度</string>
     <string name="preference_show_whats_new">显示“有何更新”对话框</string>
     <string name="preference_show_whats_new_summary">是否在应用程序更新时显示有关新功能和改进的信息</string>
+    <string name="preference_edge_mode">边缘模式算法</string>
+    <string name="noise_reduction_mode_default">默认</string>
+    <string name="noise_reduction_mode_off">关闭</string>
+    <string name="noise_reduction_mode_minimal">最小</string>
+    <string name="noise_reduction_mode_fast">快速</string>
+    <string name="noise_reduction_mode_high_quality">高质量</string>
+    <string name="preference_screen_processing_settings">正在处理设置...</string>
+    <string name="preference_noise_reduction_mode">降噪算法</string>
+    <string name="preference_noise_reduction_mode_summary">相机驱动程序应该使用的算法来应用降噪。 降噪算法试图通过去除捕获过程中添加的过多噪声来改善图像质量，尤其是在黑暗条件下。（请注意，这与降噪照片模式无关，实际上在NR照片模式下会忽略此设置。）%s</string>
+    <string name="preference_edge_mode_summary">相机驱动程序应该用于应用边缘增强的算法。 边缘增强可提高捕获图像的清晰度和细节。（在NR照片模式下忽略此设置。）%s</string>
 </resources>
