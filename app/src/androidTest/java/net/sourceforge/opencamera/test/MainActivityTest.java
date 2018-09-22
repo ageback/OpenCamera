@@ -185,6 +185,13 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 				getInstrumentation().callActivityOnPause(mActivity);
 				Log.d(TAG, "resume...");
 				getInstrumentation().callActivityOnResume(mActivity);
+				/*Handler handler = new Handler();
+				handler.postDelayed(new Runnable() {
+					public void run() {
+						Log.d(TAG, "resume...");
+						getInstrumentation().callActivityOnResume(mActivity);
+					}
+				}, 500);*/
 			}
 		});
 		// need to wait for UI code to finish before leaving
@@ -6677,6 +6684,49 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		}
 	}
 
+	/* Tests layout bug with popup menu.
+	 * Note, in practice this doesn't seem to reproduce the problem, but keep the test anyway.
+	 */
+	public void testPopupLayout() throws InterruptedException {
+		Log.d(TAG, "testPopupLayout");
+		setToDefault();
+
+	    for(int i=0;i<50;i++) {
+            View popup_container = mActivity.findViewById(net.sourceforge.opencamera.R.id.popup_container);
+            View popupButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.popup);
+            final float scale = mActivity.getResources().getDisplayMetrics().density;
+            int max_width = (int) (280 * scale + 0.5f); // convert dps to pixels;
+
+			Thread.sleep(400);
+
+	    	// open popup
+			assertTrue(!mActivity.popupIsOpen());
+			clickView(popupButton);
+			while( !mActivity.popupIsOpen() ) {
+			}
+
+			// check popup width is not larger than expected
+			int popup_container_width = popup_container.getWidth();
+			Log.d(TAG, "i = : " + i);
+			Log.d(TAG, "    popup_container_width: " + popup_container_width);
+			Log.d(TAG, "    max_width: " + max_width);
+			assertTrue(popup_container_width <= max_width);
+
+			/*View settingsButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.settings);
+			Log.d(TAG, "about to click settings");
+			clickView(settingsButton);
+			Log.d(TAG, "done clicking settings");
+			this.getInstrumentation().waitForIdleSync();*/
+
+			if( i % 10 == 0 ) {
+				restart();
+			}
+			else {
+				pauseAndResume();
+			}
+		}
+	}
+
 	/* Tests to do with video and popup menu.
 	 */
 	private void subTestVideoPopup(boolean on_timer) {
@@ -8493,6 +8543,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 		Log.d(TAG, "testHDRRestart");
 		setToDefault();
 		assertTrue( mActivity.getApplicationInterface().getPhotoMode() == MyApplicationInterface.PhotoMode.Standard );
+
+		if( !mActivity.supportsHDR() ) {
+			return;
+		}
 
 		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
 		SharedPreferences.Editor editor = settings.edit();
