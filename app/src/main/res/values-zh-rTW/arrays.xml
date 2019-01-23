@@ -71,62 +71,6 @@
         <item>120</item>
         <item>300</item>
     </string-array>
-    <string-array name="preference_burst_mode_entries">
-        <item>關閉</item>
-        <item>2x</item>
-        <item>3x</item>
-        <item>4x</item>
-        <item>5x</item>
-        <item>10x</item>
-        <item>無限</item>
-    </string-array>
-    <string-array name="preference_burst_mode_values">
-        <item>1</item>
-        <item>2</item>
-        <item>3</item>
-        <item>4</item>
-        <item>5</item>
-        <item>10</item>
-        <item>unlimited</item>
-    </string-array>
-    <string-array name="preference_burst_interval_entries">
-        <item>無延遲</item>
-        <item>1秒</item>
-        <item>2秒</item>
-        <item>3秒</item>
-        <item>5秒</item>
-        <item>10秒</item>
-        <item>15秒</item>
-        <item>20秒</item>
-        <item>30秒</item>
-        <item>1分</item>
-        <item>2分</item>
-        <item>5分</item>
-        <item>10分</item>
-        <item>20分</item>
-		<item>30分</item>
-		<item>1小時</item>
-		<item>2小時</item>
-    </string-array>
-    <string-array name="preference_burst_interval_values">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-        <item>3</item>
-        <item>5</item>
-        <item>10</item>
-        <item>15</item>
-        <item>20</item>
-        <item>30</item>
-        <item>60</item>
-        <item>120</item>
-        <item>300</item>
-        <item>600</item>
-        <item>1200</item>
-        <item>1800</item>
-        <item>3600</item>
-        <item>7200</item>
-    </string-array>
     <string-array name="preference_preview_size_entries">
         <item>最大預覽大小</item>
         <item>符合照片大小（所見即所得）</item>
@@ -170,14 +114,6 @@
     <string-array name="preference_rotate_preview_values">
         <item>0</item>
         <item>180</item>
-    </string-array>
-    <string-array name="preference_ui_placement_entries">
-        <item>左手使用者介面</item>
-        <item>右手使用者介面</item>
-    </string-array>
-    <string-array name="preference_ui_placement_values">
-        <item>ui_left</item>
-        <item>ui_right</item>
     </string-array>
     <string-array name="preference_immersive_mode_entries">
         <item>關閉</item>
@@ -234,32 +170,6 @@
         <item>preference_grid_golden_triangle_1</item>
         <item>preference_grid_golden_triangle_2</item>
         <item>preference_grid_diagonals</item>
-    </string-array>
-    <string-array name="preference_crop_guide_entries">
-        <item>無</item>
-        <item>1 (1:1)</item>
-        <item>1.25 (5:4)</item>
-        <item>1.33 (4:3)</item>
-        <item>1.4 (7:4)</item>
-        <item>1.5 (3:2)</item>
-        <item>1.78 (16:9)</item>
-        <item>1.85 (37:20)</item>
-        <item>2.33 (21:9)</item>
-        <item>2.35 (47:20)</item>
-        <item>2.4 (12:5)</item>
-    </string-array>
-    <string-array name="preference_crop_guide_values">
-        <item>crop_guide_none</item>
-        <item>crop_guide_1</item>
-        <item>crop_guide_1.25</item>
-        <item>crop_guide_1.33</item>
-        <item>crop_guide_1.4</item>
-        <item>crop_guide_1.5</item>
-        <item>crop_guide_1.78</item>
-        <item>crop_guide_1.85</item>
-        <item>crop_guide_2.33</item>
-        <item>crop_guide_2.35</item>
-        <item>crop_guide_2.4</item>
     </string-array>
     <string-array name="preference_stamp_entries">
         <item>不標記</item>

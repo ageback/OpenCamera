@@ -42,67 +42,67 @@ public class UnitTest {
 
 		String location_string = LocationSupplier.locationToDMS(0.0);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°0'0\""));
+		assertEquals("0°0'0\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(0.0000306);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°0'0\""));
+		assertEquals("0°0'0\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(0.000306);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°0'1\""));
+		assertEquals("0°0'1\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(0.00306);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°0'11\""));
+		assertEquals("0°0'11\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(0.9999);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°59'59\""));
+		assertEquals("0°59'59\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(1.7438);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("1°44'37\""));
+		assertEquals("1°44'37\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(53.000137);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("53°0'0\""));
+		assertEquals("53°0'0\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(147.00938);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("147°0'33\""));
+		assertEquals("147°0'33\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-0.0);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°0'0\""));
+		assertEquals("0°0'0\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-0.0000306);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("0°0'0\""));
+		assertEquals("0°0'0\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-0.000306);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("-0°0'1\""));
+		assertEquals("-0°0'1\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-0.00306);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("-0°0'11\""));
+		assertEquals("-0°0'11\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-0.9999);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("-0°59'59\""));
+		assertEquals("-0°59'59\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-1.7438);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("-1°44'37\""));
+		assertEquals("-1°44'37\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-53.000137);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("-53°0'0\""));
+		assertEquals("-53°0'0\"", location_string);
 
 		location_string = LocationSupplier.locationToDMS(-147.00938);
 		Log.d(TAG, "location_string: " + location_string);
-		assertTrue(location_string.equals("-147°0'33\""));
+		assertEquals("-147°0'33\"", location_string);
 	}
 
 	@Test
@@ -217,11 +217,11 @@ public class UnitTest {
 		for(int i=0;i<exp_video_quality.size();i++) {
 			Log.d(TAG, "expected video quality: " + exp_video_quality.get(i));
 		}
-		assertTrue( video_quality.size() == exp_video_quality.size() );
+		assertEquals(video_quality.size(), exp_video_quality.size());
 		for(int i=0;i<video_quality.size();i++) {
 			String quality = video_quality.get(i);
 			String exp_quality = exp_video_quality.get(i);
-			assertTrue(quality.equals(exp_quality));
+			assertEquals(quality, exp_quality);
 		}
 	}
 
@@ -409,29 +409,29 @@ public class UnitTest {
 
 		CameraController.Size photo_size1 = Preview.getOptimalVideoPictureSize(sizes, 16.0f/9.0f, max_video_size1);
 		Log.d(TAG, "photo_size1: " + photo_size1.width + " x " + photo_size1.height);
-		assertTrue( photo_size1.equals(new CameraController.Size(3840, 2160)) );
+		assertEquals(new CameraController.Size(3840, 2160), photo_size1);
 
 		CameraController.Size photo_size1b = Preview.getOptimalVideoPictureSize(sizes, 1.0f, max_video_size1);
 		Log.d(TAG, "photo_size1b: " + photo_size1b.width + " x " + photo_size1b.height);
-		assertTrue( photo_size1b.equals(new CameraController.Size(1728, 1728)) );
+		assertEquals(new CameraController.Size(1728, 1728), photo_size1b);
 
 		CameraController.Size photo_size1c = Preview.getOptimalVideoPictureSize(sizes, 4.0f/3.0f, max_video_size1);
 		Log.d(TAG, "photo_size1c: " + photo_size1c.width + " x " + photo_size1c.height);
-		assertTrue( photo_size1c.equals(new CameraController.Size(1440, 1080)) );
+		assertEquals(new CameraController.Size(1440, 1080), photo_size1c);
 
 		CameraController.Size max_video_size2 = new CameraController.Size(1920, 1080);
 
 		CameraController.Size photo_size2 = Preview.getOptimalVideoPictureSize(sizes, 16.0f/9.0f, max_video_size2);
 		Log.d(TAG, "photo_size2: " + photo_size2.width + " x " + photo_size2.height);
-		assertTrue( photo_size2.equals(new CameraController.Size(1920, 1080)) );
+		assertEquals(new CameraController.Size(1920, 1080), photo_size2);
 
 		CameraController.Size photo_size2b = Preview.getOptimalVideoPictureSize(sizes, 1.0f, max_video_size2);
 		Log.d(TAG, "photo_size2b: " + photo_size2b.width + " x " + photo_size2b.height);
-		assertTrue( photo_size2b.equals(new CameraController.Size(1440, 1080)) );
+		assertEquals(new CameraController.Size(1440, 1080), photo_size2b);
 
 		CameraController.Size photo_size2c = Preview.getOptimalVideoPictureSize(sizes, 4.0f/3.0f, max_video_size2);
 		Log.d(TAG, "photo_size2c: " + photo_size2c.width + " x " + photo_size2c.height);
-		assertTrue( photo_size2c.equals(new CameraController.Size(1440, 1080)) );
+		assertEquals(new CameraController.Size(1440, 1080), photo_size2c);
 
 	}
 
@@ -498,7 +498,7 @@ public class UnitTest {
 
 	}
 
-	private class float4 {
+	private static class float4 {
 		final float r, g, b, a;
 
 		float4(float r, float g, float b, float a) {
@@ -617,7 +617,7 @@ public class UnitTest {
 		// If any of these tests fail due to changes to HDRProcessor, consider that we might want to update the values tested in
 		// computeBrightenFactors(), rather than simply updating the expected results, to preserve what the test is meant to test.
 
-		HDRProcessor.BrightenFactors brighten_factors = HDRProcessor.computeBrightenFactors(1600, 20, 170);
+		HDRProcessor.BrightenFactors brighten_factors = HDRProcessor.computeBrightenFactors(1600, 1000000000L/12, 20, 170);
 		assertEquals(1.5f, brighten_factors.gain, 1.0e-5f);
 		assertEquals(8.0f, brighten_factors.low_x, 0.1f);
 		assertEquals(255.5f, brighten_factors.mid_x, 1.0e-5f);
@@ -625,7 +625,7 @@ public class UnitTest {
 
 		// this checks for stability - we change the inputs so we enter "use piecewise function with gain and gamma", but
 		// we should not significantly change the values of gain or low_x, and gamma should be close to 1
-		brighten_factors = HDRProcessor.computeBrightenFactors(1600, 20, 171);
+		brighten_factors = HDRProcessor.computeBrightenFactors(1600, 1000000000L/12, 20, 171);
 		assertEquals(1.5f, brighten_factors.gain, 1.0e-5f);
 		assertEquals(8.0f, brighten_factors.low_x, 0.1f);
 		assertEquals(136.0f, brighten_factors.mid_x, 0.5f);

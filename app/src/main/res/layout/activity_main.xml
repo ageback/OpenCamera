@@ -21,7 +21,7 @@
         android:src="@drawable/take_photo_selector"
         android:onClick="clickedTakePhoto"
         android:layout_centerVertical="true"
-		android:background="@null"
+        android:background="@null"
         />
 
     <ImageButton
@@ -35,6 +35,8 @@
         android:onClick="clickedSwitchCamera"
         android:layout_above="@+id/take_photo"
         android:background="@drawable/circle_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         />
 
     <ImageButton
@@ -51,6 +53,7 @@
         android:visibility="gone"
         />
 
+    <!-- alpha of 0.5 flags up Google Play prelaunch warning about contrast ratio too low (2.92; should be at least 3)-->
     <ImageButton
         android:id="@+id/switch_video"
         android:layout_width="60dp"
@@ -59,7 +62,7 @@
         android:scaleType="fitCenter"
         android:contentDescription="@string/switch_to_video"
         android:src="@drawable/take_video"
-        android:alpha="0.5"
+        android:alpha="0.55"
         android:onClick="clickedSwitchVideo"
         android:layout_below="@+id/take_photo"
         android:background="@null"
@@ -136,89 +139,190 @@
 
     <ImageButton
         android:id="@+id/gallery"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="8dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/gallery"
         android:src="@drawable/baseline_photo_library_white_48"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedGallery"
         />
 
     <ImageButton
         android:id="@+id/settings"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/action_settings"
         android:src="@drawable/settings"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedSettings"
         />
 
     <ImageButton
         android:id="@+id/popup"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/action_popup"
         android:src="@drawable/popup"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedPopupSettings"
         />
     
     <ImageButton
-        android:id="@+id/exposure_lock"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:padding="10dp"
-        android:scaleType="fitCenter"
-        android:contentDescription="@string/exposure_lock"
-        android:src="@drawable/exposure_unlocked"
-        android:onClick="clickedExposureLock"
-        />
-
-    <ImageButton
         android:id="@+id/exposure"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/exposure"
         android:src="@drawable/ic_exposure_white_48dp"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedExposure"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/exposure_lock"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/exposure_lock"
+        android:src="@drawable/exposure_unlocked"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedExposureLock"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/white_balance_lock"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/white_balance_lock"
+        android:src="@drawable/white_balance_unlocked"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedWhiteBalanceLock"
+        android:visibility="gone"
         />
 
     <!--<ImageButton
         android:id="@+id/switch_video"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/switch_to_video"
         android:src="@drawable/switch_video"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedSwitchVideo"
         />-->
 
     <!--<ImageButton
         android:id="@+id/switch_camera"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/switch_to_front_camera"
         android:src="@drawable/switch_camera"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedSwitchCamera"
         />-->
 
     <ImageButton
+        android:id="@+id/text_stamp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/preference_textstamp_summary"
+        android:src="@drawable/baseline_text_fields_white_48"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedTextStamp"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/stamp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/stamp_enable"
+        android:src="@drawable/ic_text_format_white_48dp"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedStamp"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/auto_level"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/auto_level_enable"
+        android:src="@drawable/auto_stabilise_icon"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedAutoLevel"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/face_detection"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/face_detection_enable"
+        android:src="@drawable/ic_face_white_48dp"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedFaceDetection"
+        android:visibility="gone"
+        />
+
+    <ImageButton
         android:id="@+id/audio_control"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/audio_control_start"
         android:src="@drawable/ic_mic_white_48dp"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedAudioControl"
         android:visibility="gone"
         />
@@ -226,24 +330,30 @@
     <!-- should be at left-most -->
     <ImageButton
         android:id="@+id/trash"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/trash"
         android:src="@drawable/trash"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedTrash"
         android:visibility="gone"
         />
 
     <ImageButton
         android:id="@+id/share"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
         android:padding="10dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/share"
         android:src="@drawable/share"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:onClick="clickedShare"
         android:visibility="gone"
         />
@@ -334,7 +444,7 @@
 
             <ZoomControls
                 android:id="@+id/exposure_seekbar_zoom"
-                android:contentDescription="@string/exposure_compensation"
+                android:contentDescription="@string/exposure_compensation_zoom"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
@@ -378,7 +488,7 @@
             <!-- alpha set as workaround for Android 7 bug where seekbar doesn't show when rotated -->
             <SeekBar
                 android:id="@+id/exposure_time_seekbar"
-                android:contentDescription="@string/exposure"
+                android:contentDescription="@string/exposure_shutter_speed"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_below="@+id/exposure_time_seekbar_text"

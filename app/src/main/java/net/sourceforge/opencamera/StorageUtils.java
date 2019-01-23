@@ -41,6 +41,7 @@ public class StorageUtils {
 
     static final int MEDIA_TYPE_IMAGE = 1;
     static final int MEDIA_TYPE_VIDEO = 2;
+    static final int MEDIA_TYPE_PREFS = 3;
 
 	private final Context context;
 	private final MyApplicationInterface applicationInterface;
@@ -255,6 +256,30 @@ public class StorageUtils {
     	}
 	}
 
+	/** Wrapper for broadcastFile, when we only have a Uri (e.g., for SAF)
+	 */
+    public File broadcastUri(final Uri uri, final boolean is_new_picture, final boolean is_new_video, final boolean set_last_scanned) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "broadcastUri: " + uri);
+		File real_file = getFileFromDocumentUriSAF(uri, false);
+		if( MyDebug.LOG )
+			Log.d(TAG, "real_file: " + real_file);
+		if( real_file != null ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "broadcast file");
+			//Uri media_uri = broadcastFileRaw(real_file, current_date, location);
+			//announceUri(media_uri, is_new_picture, is_new_video);
+			broadcastFile(real_file, is_new_picture, is_new_video, set_last_scanned);
+			return real_file;
+		}
+		else {
+			if( MyDebug.LOG )
+				Log.d(TAG, "announce SAF uri");
+			announceUri(uri, is_new_picture, is_new_video);
+		}
+		return null;
+	}
+
     boolean isUsingSAF() {
     	// check Android version just to be safe
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
@@ -284,6 +309,10 @@ public class StorageUtils {
 		return Uri.parse(folder_name);
     }
 
+    File getSettingsFolder() {
+        return new File(context.getExternalFilesDir(null), "backups");
+   }
+
     // valid if whether or not isUsingSAF()
     // but note that if isUsingSAF(), this may return null - it can't be assumed that there is a File corresponding to the SAF Uri
 	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -307,7 +336,7 @@ public class StorageUtils {
 	}
 
 	// only valid if !isUsingSAF()
-	public static File getImageFolder(String folder_name) {
+	private static File getImageFolder(String folder_name) {
 		File file;
 		if( folder_name.length() > 0 && folder_name.lastIndexOf('/') == folder_name.length()-1 ) {
 			// ignore final '/' character
@@ -386,12 +415,19 @@ public class StorageUtils {
 					file = new File(filename);
                 }
                 else {
-					final Uri contentUri = ContentUris.withAppendedId(
-							Uri.parse("content://downloads/public_downloads"), Long.parseLong(id));
+					try {
+						final Uri contentUri = ContentUris.withAppendedId(
+								Uri.parse("content://downloads/public_downloads"), Long.parseLong(id));
 
-					String filename = getDataColumn(contentUri, null, null);
-					if( filename != null )
-						file = new File(filename);
+						String filename = getDataColumn(contentUri, null, null);
+						if( filename != null )
+							file = new File(filename);
+					}
+					catch(NumberFormatException e) {
+						// have had crashes from Google Play from Long.parseLong(id)
+						Log.e(TAG,"failed to parse id: " + id);
+						e.printStackTrace();
+					}
 				}
 			}
 			else {
@@ -456,6 +492,9 @@ public class StorageUtils {
 				return cursor.getString(column_index);
 			}
 		}
+		catch(IllegalArgumentException e) {
+			e.printStackTrace();
+		}
 		finally {
 			if (cursor != null)
 				cursor.close();
@@ -483,12 +522,19 @@ public class StorageUtils {
 		switch (type) {
 			case MEDIA_TYPE_IMAGE: {
 				String prefix = sharedPreferences.getString(PreferenceKeys.getSavePhotoPrefixPreferenceKey(), "IMG_");
-				mediaFilename = prefix + timeStamp + suffix + index + "." + extension;
+				mediaFilename = prefix + timeStamp + suffix + index + extension;
 				break;
 			}
 			case MEDIA_TYPE_VIDEO: {
 				String prefix = sharedPreferences.getString(PreferenceKeys.getSaveVideoPrefixPreferenceKey(), "VID_");
-				mediaFilename = prefix + timeStamp + suffix + index + "." + extension;
+				mediaFilename = prefix + timeStamp + suffix + index + extension;
+				break;
+			}
+			case MEDIA_TYPE_PREFS: {
+				// good to use a prefix that sorts before IMG_ and VID_: annoyingly when using SAF, it doesn't seem possible to
+				// only show the xml files, and it always defaults to sorting alphabetically...
+				String prefix = "BACKUP_OC_";
+				mediaFilename = prefix + timeStamp + suffix + index + extension;
 				break;
 			}
 			default:
@@ -499,27 +545,59 @@ public class StorageUtils {
 		}
         return mediaFilename;
     }
-    
-    // only valid if !isUsingSAF()
-    @SuppressLint("SimpleDateFormat")
-	File createOutputMediaFile(int type, String suffix, String extension, Date current_date) throws IOException {
-    	File mediaStorageDir = getImageFolder();
 
-        // Create the storage directory if it does not exist
-        if( !mediaStorageDir.exists() ) {
-            if( !mediaStorageDir.mkdirs() ) {
-        		if( MyDebug.LOG )
-        			Log.e(TAG, "failed to create directory");
+    // only valid if !isUsingSAF()
+	File createOutputMediaFile(int type, String suffix, String extension, Date current_date) throws IOException {
+        File mediaStorageDir = getImageFolder();
+        return createOutputMediaFile(mediaStorageDir, type, suffix, extension, current_date);
+    }
+
+    /** Create the folder if it does not exist.
+     */
+    void createFolderIfRequired(File folder) throws IOException {
+        if( !folder.exists() ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "create directory: " + folder);
+            if( !folder.mkdirs() ) {
+                Log.e(TAG, "failed to create directory");
         		throw new IOException();
             }
-            broadcastFile(mediaStorageDir, false, false, false);
+            broadcastFile(folder, false, false, false);
         }
+    }
+
+    // only valid if !isUsingSAF()
+    @SuppressLint("SimpleDateFormat")
+	File createOutputMediaFile(File mediaStorageDir, int type, String suffix, String extension, Date current_date) throws IOException {
+        createFolderIfRequired(mediaStorageDir);
 
         // Create a media file name
         File mediaFile = null;
         for(int count=0;count<100;count++) {
-        	String mediaFilename = createMediaFilename(type, suffix, count, extension, current_date);
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator + mediaFilename);
+        	/*final boolean use_burst_folder = true;
+        	if( use_burst_folder ) {
+				String burstFolderName = createMediaFilename(type, "", count, "", current_date);
+				File burstFolder = new File(mediaStorageDir.getPath() + File.separator + burstFolderName);
+				if( !burstFolder.exists() ) {
+					if( !burstFolder.mkdirs() ) {
+						if( MyDebug.LOG )
+							Log.e(TAG, "failed to create burst sub-directory");
+						throw new IOException();
+					}
+					broadcastFile(burstFolder, false, false, false);
+				}
+
+				SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+				String prefix = sharedPreferences.getString(PreferenceKeys.getSavePhotoPrefixPreferenceKey(), "IMG_");
+				//String mediaFilename = prefix + suffix + "." + extension;
+				String suffix_alt = suffix.substring(1);
+				String mediaFilename = suffix_alt + prefix + suffix_alt + "BURST" + "." + extension;
+				mediaFile = new File(burstFolder.getPath() + File.separator + mediaFilename);
+			}
+			else*/ {
+				String mediaFilename = createMediaFilename(type, suffix, count, "." + extension, current_date);
+				mediaFile = new File(mediaStorageDir.getPath() + File.separator + mediaFilename);
+			}
             if( !mediaFile.exists() ) {
             	break;
             }
@@ -582,14 +660,37 @@ public class StorageUtils {
 		String mimeType;
 		switch (type) {
 			case MEDIA_TYPE_IMAGE:
-				if (extension.equals("dng")) {
-					mimeType = "image/dng";
-					//mimeType = "image/x-adobe-dng";
-				} else
-					mimeType = "image/jpeg";
+				switch (extension) {
+					case "dng":
+						mimeType = "image/dng";
+						//mimeType = "image/x-adobe-dng";
+						break;
+					case "webp":
+						mimeType = "image/webp";
+						break;
+					case "png":
+						mimeType = "image/png";
+						break;
+					default:
+						mimeType = "image/jpeg";
+						break;
+				}
 				break;
 			case MEDIA_TYPE_VIDEO:
-				mimeType = "video/mp4";
+				switch( extension ) {
+					case "3gp":
+						mimeType = "video/3gpp";
+						break;
+					case "webm":
+						mimeType = "video/webm";
+						break;
+					default:
+						mimeType = "video/mp4";
+						break;
+				}
+				break;
+			case MEDIA_TYPE_PREFS:
+				mimeType = "text/xml";
 				break;
 			default:
 				// throw exception as this is a programming error
@@ -598,7 +699,7 @@ public class StorageUtils {
 				throw new RuntimeException();
 		}
 		// note that DocumentsContract.createDocument will automatically append to the filename if it already exists
-		String mediaFilename = createMediaFilename(type, suffix, 0, extension, current_date);
+		String mediaFilename = createMediaFilename(type, suffix, 0, "." + extension, current_date);
 		return createOutputFileSAF(mediaFilename, mimeType);
     }
 
@@ -639,8 +740,11 @@ public class StorageUtils {
 		final int column_data_c = 2; // full path and filename, including extension
 		final int column_orientation_c = 3; // for images only
 		String [] projection = video ? new String[] {VideoColumns._ID, VideoColumns.DATE_TAKEN, VideoColumns.DATA} : new String[] {ImageColumns._ID, ImageColumns.DATE_TAKEN, ImageColumns.DATA, ImageColumns.ORIENTATION};
-		// for images, we need to search for JPEG and RAW, to support RAW only mode (even if we're not currently in that mode, it may be that previously the user did take photos in RAW only mode)
-		String selection = video ? "" : ImageColumns.MIME_TYPE + "='image/jpeg' OR " + ImageColumns.MIME_TYPE + "='image/x-adobe-dng'";
+		// for images, we need to search for JPEG/etc and RAW, to support RAW only mode (even if we're not currently in that mode, it may be that previously the user did take photos in RAW only mode)
+		String selection = video ? "" : ImageColumns.MIME_TYPE + "='image/jpeg' OR " +
+				ImageColumns.MIME_TYPE + "='image/webp' OR " +
+				ImageColumns.MIME_TYPE + "='image/png' OR " +
+				ImageColumns.MIME_TYPE + "='image/x-adobe-dng'";
 		String order = video ? VideoColumns.DATE_TAKEN + " DESC," + VideoColumns._ID + " DESC" : ImageColumns.DATE_TAKEN + " DESC," + ImageColumns._ID + " DESC";
 		Cursor cursor = null;
 		try {
@@ -678,7 +782,7 @@ public class StorageUtils {
 				}
 				while( cursor.moveToNext() );
 				if( found ) {
-					// make sure we prefer JPEG if there's a JPEG version of this image
+					// make sure we prefer JPEG/etc (non RAW) if there's a JPEG/etc version of this image
 					// this is because we want to support RAW only and JPEG+RAW modes
 					String path = cursor.getString(column_data_c);
 					if( MyDebug.LOG )
@@ -686,9 +790,9 @@ public class StorageUtils {
 					// path may be null on Android 4.4, see above!
 					if( path != null && path.toLowerCase(Locale.US).endsWith(".dng") ) {
 						if( MyDebug.LOG )
-							Log.d(TAG, "try to find a JPEG version of the DNG");
+							Log.d(TAG, "try to find a non-RAW version of the DNG");
 						int dng_pos = cursor.getPosition();
-						boolean found_jpeg = false;
+						boolean found_non_raw = false;
 						String path_without_ext = path.toLowerCase(Locale.US);
 						if( path_without_ext.indexOf(".") > 0 )
 							path_without_ext = path_without_ext.substring(0, path_without_ext.lastIndexOf("."));
@@ -707,17 +811,29 @@ public class StorageUtils {
 								Log.d(TAG, "next_path_without_ext: " + next_path_without_ext);
 							if( !path_without_ext.equals(next_path_without_ext) )
 								break;
-							// so we've found another file with matching filename - is it a JPEG?
+							// so we've found another file with matching filename - is it a JPEG/etc?
 							if( next_path.toLowerCase(Locale.US).endsWith(".jpg") ) {
 								if( MyDebug.LOG )
 									Log.d(TAG, "found equivalent jpeg");
-								found_jpeg = true;
+								found_non_raw = true;
+								break;
+							}
+							else if( next_path.toLowerCase(Locale.US).endsWith(".webp") ) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "found equivalent webp");
+								found_non_raw = true;
+								break;
+							}
+							else if( next_path.toLowerCase(Locale.US).endsWith(".png") ) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "found equivalent png");
+								found_non_raw = true;
 								break;
 							}
 						}
-						if( !found_jpeg ) {
+						if( !found_non_raw ) {
 							if( MyDebug.LOG )
-								Log.d(TAG, "can't find equivalent jpeg");
+								Log.d(TAG, "can't find equivalent jpeg/etc");
 							cursor.moveToPosition(dng_pos);
 						}
 					}

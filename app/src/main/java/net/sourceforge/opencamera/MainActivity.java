@@ -11,6 +11,7 @@ import net.sourceforge.opencamera.UI.ManualSeekbars;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Hashtable;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
@@ -63,6 +65,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.Display;
 import android.view.GestureDetector;
@@ -75,6 +78,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
@@ -89,6 +93,7 @@ public class MainActivity extends Activity {
 	private Sensor mSensorMagnetic;
 	private MainUI mainUI;
 	private PermissionHandler permissionHandler;
+	private SettingsManager settingsManager;
 	private SoundPoolManager soundPoolManager;
 	private ManualSeekbars manualSeekbars;
 	private TextFormatter textFormatter;
@@ -107,6 +112,7 @@ public class MainActivity extends Activity {
     private boolean screen_is_locked; // whether screen is "locked" - this is Open Camera's own lock to guard against accidental presses, not the standard Android lock
     private final Map<Integer, Bitmap> preloaded_bitmap_resources = new Hashtable<>();
 	private ValueAnimator gallery_save_anim;
+    private boolean last_continuous_fast_burst; // whether the last photo operation was a continuous_fast_burst
 
 	private TextToSpeech textToSpeech;
 	private boolean textToSpeechSuccess;
@@ -119,7 +125,9 @@ public class MainActivity extends Activity {
 
 	private final ToastBoxer switch_video_toast = new ToastBoxer();
     private final ToastBoxer screen_locked_toast = new ToastBoxer();
+    private final ToastBoxer stamp_toast = new ToastBoxer();
     private final ToastBoxer changed_auto_stabilise_toast = new ToastBoxer();
+    private final ToastBoxer white_balance_lock_toast = new ToastBoxer();
 	private final ToastBoxer exposure_lock_toast = new ToastBoxer();
 	private final ToastBoxer audio_control_toast = new ToastBoxer();
 	private boolean block_startup_toast = false; // used when returning from Settings/Popup - if we're displaying a toast anyway, don't want to display the info toast too
@@ -133,6 +141,7 @@ public class MainActivity extends Activity {
 
     private static final int CHOOSE_SAVE_FOLDER_SAF_CODE = 42;
     private static final int CHOOSE_GHOST_IMAGE_SAF_CODE = 43;
+    private static final int CHOOSE_LOAD_SETTINGS_SAF_CODE = 44;
 
 	// for testing; must be volatile for test project reading the state
 	public boolean is_test; // whether called from OpenCamera.test testing
@@ -141,6 +150,8 @@ public class MainActivity extends Activity {
 	public volatile boolean test_have_angle;
 	public volatile float test_angle;
 	public volatile String test_last_saved_image;
+	public static boolean test_force_supports_camera2;
+	public volatile String test_save_settings_file;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -206,6 +217,7 @@ public class MainActivity extends Activity {
 
 		// set up components
 		permissionHandler = new PermissionHandler(this);
+		settingsManager = new SettingsManager(this);
 		mainUI = new MainUI(this);
 		manualSeekbars = new ManualSeekbars();
 		applicationInterface = new MyApplicationInterface(this, savedInstanceState);
@@ -216,6 +228,12 @@ public class MainActivity extends Activity {
 
 		// determine whether we support Camera2 API
 		initCamera2Support();
+
+		if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN ) {
+			// no point having talkback care about this - and (hopefully) avoid Google Play pre-launch accessibility warnings
+			View container = findViewById(R.id.hide_container);
+			container.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+		}
 
 		// set up window flags for normal operation
         setWindowFlagsForCamera();
@@ -293,6 +311,9 @@ public class MainActivity extends Activity {
 	    View zoomSeekbar = findViewById(R.id.zoom_seekbar);
 		zoomSeekbar.setVisibility(View.INVISIBLE);
 
+		// initialise state of on-screen icons
+		mainUI.updateOnScreenIcons();
+
 		// listen for orientation event change
 	    orientationEventListener = new OrientationEventListener(this) {
 			@Override
@@ -302,6 +323,33 @@ public class MainActivity extends Activity {
         };
 		if( MyDebug.LOG )
 			Log.d(TAG, "onCreate: time after setting orientation event listener: " + (System.currentTimeMillis() - debug_time));
+
+		// set up take photo long click
+        takePhotoButton.setOnLongClickListener(new View.OnLongClickListener() {
+			@Override
+			public boolean onLongClick(View v) {
+				return longClickedTakePhoto();
+			}
+        });
+        // set up on touch listener so we can detect if we've released from a long click
+        takePhotoButton.setOnTouchListener(new View.OnTouchListener() {
+			// the suppressed warning ClickableViewAccessibility suggests calling view.performClick for ACTION_UP, but this
+			// results in an additional call to clickedTakePhoto() - that is, if there is no long press, we get two calls to
+			// clickedTakePhoto instead one one; and if there is a long press, we get one call to clickedTakePhoto where
+			// there should be none.
+			@SuppressLint("ClickableViewAccessibility")
+			@Override
+			public boolean onTouch(View view, MotionEvent motionEvent) {
+				if( motionEvent.getAction() == MotionEvent.ACTION_UP ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "takePhotoButton ACTION_UP");
+					takePhotoButtonLongClickCancelled();
+					if( MyDebug.LOG )
+						Log.d(TAG, "takePhotoButton ACTION_UP done");
+				}
+				return false;
+			}
+		});
 
 		// set up gallery button long click
         View galleryButton = findViewById(R.id.gallery);
@@ -314,7 +362,7 @@ public class MainActivity extends Activity {
 			}
         });
 		if( MyDebug.LOG )
-			Log.d(TAG, "onCreate: time after setting gallery long click listener: " + (System.currentTimeMillis() - debug_time));
+			Log.d(TAG, "onCreate: time after setting long click listeners: " + (System.currentTimeMillis() - debug_time));
 
 		// listen for gestures
         gestureDetector = new GestureDetector(this, new MyGestureDetector());
@@ -406,9 +454,9 @@ public class MainActivity extends Activity {
 					// whats_new_version is the version code that the What's New text is written for. Normally it will equal the
 					// current release (version_code), but it some cases we may want to leave it unchanged.
 					// E.g., we have a "What's New" for 1.44 (64), but then push out a quick fix for 1.44.1 (65). We don't want to
-					// show the dialog again to people who alreaddy received 1.44 (64), but we still want to show the dialog to people
+					// show the dialog again to people who already received 1.44 (64), but we still want to show the dialog to people
 					// upgrading from earlier versions.
-					int whats_new_version = 64; // 1.44
+					int whats_new_version = 67; // 1.45
 					whats_new_version = Math.min(whats_new_version, version_code); // whats_new_version should always be <= version_code, but just in case!
 					if( MyDebug.LOG ) {
 						Log.d(TAG, "whats_new_version: " + whats_new_version);
@@ -642,26 +690,40 @@ public class MainActivity extends Activity {
 			Log.d(TAG, "initCamera2Support");
     	supports_camera2 = false;
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
+        	// originally we allowed Camera2 if all cameras support at least LIMITED
+        	// as of 1.45, we allow Camera2 if at least one camera supports at least LIMITED - this
+			// is to support devices that might have a camera with LIMITED or better support, but
+			// also a LEGACY camera
         	CameraControllerManager2 manager2 = new CameraControllerManager2(this);
-        	supports_camera2 = true;
+        	supports_camera2 = false;
 			int n_cameras = manager2.getNumberOfCameras();
         	if( n_cameras == 0 ) {
         		if( MyDebug.LOG )
         			Log.d(TAG, "Camera2 reports 0 cameras");
             	supports_camera2 = false;
         	}
-        	for(int i=0;i<n_cameras && supports_camera2;i++) {
-        		if( !manager2.allowCamera2Support(i) ) {
+        	for(int i=0;i<n_cameras && !supports_camera2;i++) {
+        		if( manager2.allowCamera2Support(i) ) {
         			if( MyDebug.LOG )
-        				Log.d(TAG, "camera " + i + " doesn't have limited or full support for Camera2 API");
-                	supports_camera2 = false;
+        				Log.d(TAG, "camera " + i + " has at least limited support for Camera2 API");
+                	supports_camera2 = true;
         		}
         	}
         }
+
+        //test_force_supports_camera2 = true; // test
+        if( test_force_supports_camera2 ) {
+			if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "forcing supports_camera2");
+				supports_camera2 = true;
+			}
+		}
+
 		if( MyDebug.LOG )
 			Log.d(TAG, "supports_camera2? " + supports_camera2);
 	}
-	
+
 	private void preloadIcons(int icons_id) {
 		long debug_time = 0;
 		if( MyDebug.LOG ) {
@@ -715,7 +777,8 @@ public class MainActivity extends Activity {
 		preloaded_bitmap_resources.clear();
 	    if( textToSpeech != null ) {
 	    	// http://stackoverflow.com/questions/4242401/tts-error-leaked-serviceconnection-android-speech-tts-texttospeech-solved
-	        Log.d(TAG, "free textToSpeech");
+			if( MyDebug.LOG )
+		        Log.d(TAG, "free textToSpeech");
 	    	textToSpeech.stop();
 	    	textToSpeech.shutdown();
 	    	textToSpeech = null;
@@ -741,15 +804,17 @@ public class MainActivity extends Activity {
 		editor.apply();
 	}
 
-	void launchOnlineHelp(String append) {
+	static String getOnlineHelpUrl(String append) {
 		if( MyDebug.LOG )
-			Log.d(TAG, "launchOnlineHelp: " + append);
-		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/"+ append));
-		startActivity(browserIntent);
+			Log.d(TAG, "getOnlineHelpUrl: " + append);
+		return "https://opencamera.sourceforge.io/"+ append;
 	}
 
 	void launchOnlineHelp() {
-		launchOnlineHelp("");
+		if( MyDebug.LOG )
+			Log.d(TAG, "launchOnlineHelp");
+		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(getOnlineHelpUrl("")));
+		startActivity(browserIntent);
 	}
 
 	/* Audio trigger - either loud sound, or speech recognition.
@@ -1090,7 +1155,7 @@ public class MainActivity extends Activity {
         	e.printStackTrace();
 		}
         freeAudioListener(false);
-        freeSpeechRecognizer();
+        stopSpeechRecognizer();
         applicationInterface.getLocationSupplier().freeLocationListeners();
 		applicationInterface.getGyroSensor().stopRecording();
 		soundPoolManager.releaseSound();
@@ -1117,7 +1182,35 @@ public class MainActivity extends Activity {
 			Log.d(TAG, "waitUntilImageQueueEmpty");
         applicationInterface.getImageSaver().waitUntilDone();
     }
-    
+
+    private boolean longClickedTakePhoto() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "longClickedTakePhoto");
+		// need to check whether fast burst is supported (including for the current resolution),
+		// in case we're in Standard photo mode
+		if( supportsFastBurst() ) {
+			CameraController.Size current_size = preview.getCurrentPictureSize();
+			if( current_size != null && current_size.supports_burst ) {
+				MyApplicationInterface.PhotoMode photo_mode = applicationInterface.getPhotoMode();
+				if( photo_mode == MyApplicationInterface.PhotoMode.Standard ||
+						photo_mode == MyApplicationInterface.PhotoMode.FastBurst ) {
+					this.takePicturePressed(false, true);
+					return true;
+				}
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.d(TAG, "fast burst not supported for this resolution");
+			}
+		}
+		else {
+			if( MyDebug.LOG )
+				Log.d(TAG, "fast burst not supported");
+		}
+		// return false, so a regular click will still be triggered when the user releases the touch
+		return false;
+	}
+
     public void clickedTakePhoto(View view) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clickedTakePhoto");
@@ -1141,7 +1234,121 @@ public class MainActivity extends Activity {
 		}
 	}
 
-    public void clickedAudioControl(View view) {
+	public void clickedTextStamp(View view) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clickedTextStamp");
+		this.closePopup();
+
+		AlertDialog.Builder alertDialog = new AlertDialog.Builder(this);
+		alertDialog.setTitle(R.string.preference_textstamp);
+
+		final EditText editText = new EditText(this);
+		editText.setText(applicationInterface.getTextStampPref());
+		alertDialog.setView(editText);
+		alertDialog.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+			@Override
+			public void onClick(DialogInterface dialogInterface, int i) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "custom text stamp clicked okay");
+
+				String custom_text = editText.getText().toString();
+				SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+				SharedPreferences.Editor editor = sharedPreferences.edit();
+				editor.putString(PreferenceKeys.TextStampPreferenceKey, custom_text);
+				editor.apply();
+
+				mainUI.updateTextStampIcon();
+			}
+		});
+		alertDialog.setNegativeButton(android.R.string.cancel, null);
+
+		final AlertDialog alert = alertDialog.create();
+		alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+			@Override
+			public void onDismiss(DialogInterface arg0) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "custom stamp text dialog dismissed");
+		        setWindowFlagsForCamera();
+				showPreview(true);
+			}
+		});
+
+		showPreview(false);
+		setWindowFlagsForSettings();
+		showAlert(alert);
+	}
+
+	public void clickedStamp(View view) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clickedStamp");
+
+		this.closePopup();
+
+		boolean value = applicationInterface.getStampPref().equals("preference_stamp_yes");
+		value = !value;
+		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		SharedPreferences.Editor editor = sharedPreferences.edit();
+		editor.putString(PreferenceKeys.StampPreferenceKey, value ? "preference_stamp_yes" : "preference_stamp_no");
+		editor.apply();
+
+		mainUI.updateStampIcon();
+        applicationInterface.getDrawPreview().updateSettings();
+		preview.showToast(stamp_toast, value ? R.string.stamp_enabled : R.string.stamp_disabled);
+	}
+
+	public void clickedAutoLevel(View view) {
+		clickedAutoLevel();
+	}
+
+	public void clickedAutoLevel() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clickedAutoLevel");
+		boolean value = applicationInterface.getAutoStabilisePref();
+		value = !value;
+
+		final SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		SharedPreferences.Editor editor = sharedPreferences.edit();
+		editor.putBoolean(PreferenceKeys.AutoStabilisePreferenceKey, value);
+		editor.apply();
+
+		boolean done_dialog = false;
+		if( value ) {
+			boolean done_auto_stabilise_info = sharedPreferences.contains(PreferenceKeys.AutoStabiliseInfoPreferenceKey);
+			if( !done_auto_stabilise_info ) {
+				mainUI.showInfoDialog(R.string.preference_auto_stabilise, R.string.auto_stabilise_info, PreferenceKeys.AutoStabiliseInfoPreferenceKey);
+				done_dialog = true;
+			}
+		}
+
+		if( !done_dialog ) {
+			String message = getResources().getString(R.string.preference_auto_stabilise) + ": " + getResources().getString(value ? R.string.on : R.string.off);
+			preview.showToast(this.getChangedAutoStabiliseToastBoxer(), message);
+		}
+
+		mainUI.updateAutoLevelIcon();
+		applicationInterface.getDrawPreview().updateSettings(); // because we cache the auto-stabilise setting
+		this.closePopup();
+	}
+
+	public void clickedFaceDetection(View view) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clickedFaceDetection");
+
+		this.closePopup();
+
+		boolean value = applicationInterface.getFaceDetectionPref();
+		value = !value;
+		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		SharedPreferences.Editor editor = sharedPreferences.edit();
+		editor.putBoolean(PreferenceKeys.FaceDetectionPreferenceKey, value);
+		editor.apply();
+
+		mainUI.updateFaceDetectionIcon();
+		preview.showToast(stamp_toast, value ? R.string.face_detection_enabled : R.string.face_detection_disabled);
+		preview.reopenCamera();
+	}
+
+	public void clickedAudioControl(View view) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clickedAudioControl");
 		// check hasAudioControl just in case!
@@ -1159,11 +1366,23 @@ public class MainActivity extends Activity {
             	speechRecognizerStopped();
         	}
         	else {
-		    	preview.showToast(audio_control_toast, R.string.speech_recognizer_started);
-            	Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            	intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en_US"); // since we listen for "cheese", ensure this works even for devices with different language settings
-            	speechRecognizer.startListening(intent);
-            	speechRecognizerStarted();
+        		boolean has_audio_permission = true;
+				if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
+					// we restrict the checks to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
+					if( MyDebug.LOG )
+						Log.d(TAG, "check for record audio permission");
+					if( ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ) {
+						if( MyDebug.LOG )
+							Log.d(TAG, "record audio permission not available");
+						applicationInterface.requestRecordAudioPermission();
+						has_audio_permission = false;
+					}
+				}
+				if( has_audio_permission ) {
+					preview.showToast(audio_control_toast, R.string.speech_recognizer_started);
+					startSpeechRecognizerIntent();
+					speechRecognizerStarted();
+				}
         	}
         }
         else if( audio_control.equals("noise") ){
@@ -1171,11 +1390,20 @@ public class MainActivity extends Activity {
         		freeAudioListener(false);
         	}
         	else {
-		    	preview.showToast(audio_control_toast, R.string.audio_listener_started);
         		startAudioListener();
         	}
         }
     }
+
+    private void startSpeechRecognizerIntent() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "startSpeechRecognizerIntent");
+		if( speechRecognizer != null ) {
+			Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+			intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en_US"); // since we listen for "cheese", ensure this works even for devices with different language settings
+			speechRecognizer.startListening(intent);
+		}
+	}
     
     private void speechRecognizerStarted() {
 		if( MyDebug.LOG )
@@ -1247,6 +1475,14 @@ public class MainActivity extends Activity {
 		}
     }
 
+	public void clickedWhiteBalanceLock(View view) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "clickedWhiteBalanceLock");
+    	this.preview.toggleWhiteBalanceLock();
+    	mainUI.updateWhiteBalanceLockIcon();
+		preview.showToast(white_balance_lock_toast, preview.isWhiteBalanceLocked() ? R.string.white_balance_locked : R.string.white_balance_unlocked);
+	}
+
     public void clickedExposure(View view) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clickedExposure");
@@ -1257,8 +1493,7 @@ public class MainActivity extends Activity {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clickedExposureLock");
     	this.preview.toggleExposureLock();
-	    ImageButton exposureLockButton = findViewById(R.id.exposure_lock);
-		exposureLockButton.setImageResource(preview.isExposureLocked() ? R.drawable.exposure_locked : R.drawable.exposure_unlocked);
+    	mainUI.updateExposureLockIcon();
 		preview.showToast(exposure_lock_toast, preview.isExposureLocked() ? R.string.exposure_locked : R.string.exposure_unlocked);
     }
     
@@ -1298,12 +1533,14 @@ public class MainActivity extends Activity {
 	class PreferencesListener implements SharedPreferences.OnSharedPreferenceChangeListener {
 		private static final String TAG = "PreferencesListener";
 
-		private boolean any; // whether any changes that require update have been made since startListening()
+		private boolean any_significant_change; // whether any changes that require updateForSettings have been made since startListening()
+		private boolean any_change; // whether any changes that require updateForSettings have been made since startListening()
 
 		void startListening() {
 			if( MyDebug.LOG )
 				Log.d(TAG, "startListening");
-			any = false;
+			any_significant_change = false;
+			any_change = false;
 
 			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
 			// n.b., registerOnSharedPreferenceChangeListener warns that we must keep a reference to the listener (which
@@ -1322,6 +1559,9 @@ public class MainActivity extends Activity {
 		public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
 			if( MyDebug.LOG )
 				Log.d(TAG, "onSharedPreferenceChanged: " + key);
+
+			any_change = true;
+
 			switch( key ) {
 				// we whitelist preferences where we're sure that we don't need to call updateForSettings() if they've changed
 				case "preference_timer":
@@ -1382,13 +1622,17 @@ public class MainActivity extends Activity {
 				default:
 					if( MyDebug.LOG )
 						Log.d(TAG, "this change does require update");
-					any = true;
+					any_significant_change = true;
 					break;
 			}
 		}
 
-		boolean anyChanges() {
-			return any;
+		boolean anyChange() {
+			return any_change;
+		}
+
+		boolean anySignificantChange() {
+			return any_significant_change;
 		}
 	}
     
@@ -1422,6 +1666,8 @@ public class MainActivity extends Activity {
 		bundle.putInt("iso_range_min", this.preview.getMinimumISO());
 		bundle.putInt("iso_range_max", this.preview.getMaximumISO());
 		bundle.putBoolean("supports_exposure_time", this.preview.supportsExposureTime());
+		bundle.putBoolean("supports_exposure_lock", this.preview.supportsExposureLock());
+		bundle.putBoolean("supports_white_balance_lock", this.preview.supportsWhiteBalanceLock());
 		bundle.putLong("exposure_time_min", this.preview.getMinimumExposureTime());
 		bundle.putLong("exposure_time_max", this.preview.getMaximumExposureTime());
 		bundle.putBoolean("supports_white_balance_temperature", this.preview.supportsWhiteBalanceTemperature());
@@ -1539,7 +1785,9 @@ public class MainActivity extends Activity {
 			bundle.putStringArray("video_quality", video_quality_arr);
 			bundle.putStringArray("video_quality_string", video_quality_string_arr);
 
-			String video_quality_preference_key = PreferenceKeys.getVideoQualityPreferenceKey(this.preview.getCameraId(), this.preview.fpsIsHighSpeed(fps_value));
+			boolean is_high_speed = this.preview.fpsIsHighSpeed(fps_value);
+			bundle.putBoolean("video_is_high_speed", is_high_speed);
+			String video_quality_preference_key = PreferenceKeys.getVideoQualityPreferenceKey(this.preview.getCameraId(), is_high_speed);
 			if( MyDebug.LOG )
 				Log.d(TAG, "video_quality_preference_key: " + video_quality_preference_key);
 			bundle.putString("video_quality_preference_key", video_quality_preference_key);
@@ -1576,24 +1824,38 @@ public class MainActivity extends Activity {
 			// with Camera2, we know what frame rates are supported
 			int [] candidate_fps = {15, 24, 25, 30, 60, 96, 100, 120, 240};
 			List<Integer> video_fps = new ArrayList<>();
+			List<Boolean> video_fps_high_speed = new ArrayList<>();
 			for(int fps : candidate_fps) {
-				if( this.preview.getVideoQualityHander().videoSupportsFrameRateHighSpeed(fps) ||
-						this.preview.getVideoQualityHander().videoSupportsFrameRate(fps) ) {
+				if( preview.fpsIsHighSpeed("" + fps) ) {
 					video_fps.add(fps);
+					video_fps_high_speed.add(true);
+				}
+				else if( this.preview.getVideoQualityHander().videoSupportsFrameRate(fps) ) {
+					video_fps.add(fps);
+					video_fps_high_speed.add(false);
 				}
 			}
 			int [] video_fps_array = new int[video_fps.size()];
-			int i=0;
-			for(Integer fps : video_fps) {
-				video_fps_array[i++] = fps;
+			for(int i=0;i<video_fps.size();i++) {
+				video_fps_array[i] = video_fps.get(i);
 			}
 			bundle.putIntArray("video_fps", video_fps_array);
+			boolean [] video_fps_high_speed_array = new boolean[video_fps_high_speed.size()];
+			for(int i=0;i<video_fps_high_speed.size();i++) {
+				video_fps_high_speed_array[i] = video_fps_high_speed.get(i);
+			}
+			bundle.putBooleanArray("video_fps_high_speed", video_fps_high_speed_array);
 		}
 		else {
 			// with old API, we don't know what frame rates are supported, so we make it up and let the user try
 			// probably shouldn't allow 120fps, but we did in the past, and there may be some devices where this did work?
 			int [] video_fps = {15, 24, 25, 30, 60, 96, 100, 120};
 			bundle.putIntArray("video_fps", video_fps);
+			boolean [] video_fps_high_speed_array = new boolean[video_fps.length];
+			for(int i=0;i<video_fps.length;i++) {
+				video_fps_high_speed_array[i] = false; // no concept of high speed frame rates in old API
+			}
+			bundle.putBooleanArray("video_fps_high_speed", video_fps_high_speed_array);
 		}
 		
 		putBundleExtra(bundle, "flash_values", this.preview.getSupportedFlashValues());
@@ -1693,17 +1955,43 @@ public class MainActivity extends Activity {
 			Log.d(TAG, "updateForSettings: time after check need_reopen: " + (System.currentTimeMillis() - debug_time));
 		}
 
-		mainUI.layoutUI(); // needed in case we've changed left/right handed UI
+		mainUI.layoutUI(); // needed in case we've changed UI placement; or in "top" mode, if we've enabled/disabled on-screen UI icons
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "updateForSettings: time after layoutUI: " + (System.currentTimeMillis() - debug_time));
 		}
+
+		// ensure icons invisible if disabling them from showing from the Settings
+		// (if enabling them, we'll make the icon visible later on)
+		if( !mainUI.showExposureLockIcon() ) {
+			View button = findViewById(R.id.exposure_lock);
+			button.setVisibility(View.GONE);
+		}
+		if( !mainUI.showWhiteBalanceLockIcon() ) {
+			View button = findViewById(R.id.white_balance_lock);
+			button.setVisibility(View.GONE);
+		}
+		if( !mainUI.showTextStampIcon() ) {
+			View button = findViewById(R.id.text_stamp);
+			button.setVisibility(View.GONE);
+		}
+		if( !mainUI.showStampIcon() ) {
+			View button = findViewById(R.id.stamp);
+			button.setVisibility(View.GONE);
+		}
+		if( !mainUI.showAutoLevelIcon() ) {
+			View button = findViewById(R.id.auto_level);
+			button.setVisibility(View.GONE);
+		}
+		if( !mainUI.showFaceDetectionIcon() ) {
+			View button = findViewById(R.id.face_detection);
+			button.setVisibility(View.GONE);
+		}
 		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 		if( sharedPreferences.getString(PreferenceKeys.AudioControlPreferenceKey, "none").equals("none") ) {
-			// ensure icon is invisible if switching from audio control enabled to disabled
-			// (if enabling it, we'll make the icon visible later on)
 			View speechRecognizerButton = findViewById(R.id.audio_control);
 			speechRecognizerButton.setVisibility(View.GONE);
 		}
+
         initSpeechRecognizer(); // in case we've enabled or disabled speech recognizer
 		initLocation(); // in case we've enabled or disabled GPS
 		if( MyDebug.LOG ) {
@@ -1776,12 +2064,22 @@ public class MainActivity extends Activity {
 		// to avoid reading the preferences in every single frame).
 		applicationInterface.getDrawPreview().updateSettings();
 
-		if( preferencesListener.anyChanges() ) {
+		if( preferencesListener.anyChange() ) {
+			// in case face detection etc enabled/disabled in settings:
+			mainUI.updateOnScreenIcons();
+		}
+
+		if( preferencesListener.anySignificantChange() ) {
 			updateForSettings();
 		}
 		else {
 			if( MyDebug.LOG )
 				Log.d(TAG, "no need to call updateForSettings() for changes made to preferences");
+			if( preferencesListener.anyChange() ) {
+				// however we should still destroy cached popup, in case UI settings need to be kept in
+				// sync (e.g., changing the Repeat Mode)
+				mainUI.destroyPopup();
+			}
 		}
 	}
 
@@ -1961,18 +2259,30 @@ public class MainActivity extends Activity {
 		magnetic_accuracy_dialog = null; // if the magnetic accuracy was opened, it must have been closed now
     }
     
+    private void setWindowFlagsForSettings() {
+		setWindowFlagsForSettings(true);
+    }
+
     /** Sets the window flags for when the settings window is open.
-     */
-    public void setWindowFlagsForSettings() {
+	 * @param set_lock_protect If true, then window flags will be set to protect by screen lock, no
+	 *                         matter what the preference setting
+	 *                         PreferenceKeys.getShowWhenLockedPreferenceKey() is set to. This
+	 *                         should be true for the Settings window, and anything else that might
+	 *                         need protecting. But some callers use this method for opening other
+	 *                         things (such as info dialogs).
+	 */
+	public void setWindowFlagsForSettings(boolean set_lock_protect) {
 		if( MyDebug.LOG )
-			Log.d(TAG, "setWindowFlagsForSettings");
+			Log.d(TAG, "setWindowFlagsForSettings: " + set_lock_protect);
 		// allow screen rotation
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
 
 		// revert to standard screen blank behaviour
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        // settings should still be protected by screen lock
-		showWhenLocked(false);
+        if( set_lock_protect ) {
+			// settings should still be protected by screen lock
+			showWhenLocked(false);
+		}
 
 		{
 	        WindowManager.LayoutParams layout = getWindow().getAttributes();
@@ -2395,6 +2705,28 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Opens the Storage Access Framework dialog to select a file for loading settings.
+     * @param from_preferences Whether called from the Preferences
+     */
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    void openLoadSettingsChooserDialogSAF(boolean from_preferences) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "openLoadSettingsChooserDialogSAF: " + from_preferences);
+		this.saf_dialog_from_preferences = from_preferences;
+		Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/xml"); // note that application/xml doesn't work (can't select the xml files)!
+        try {
+			startActivityForResult(intent, CHOOSE_LOAD_SETTINGS_SAF_CODE);
+        }
+        catch(ActivityNotFoundException e) {
+            // see https://stackoverflow.com/questions/34021039/action-open-document-not-working-on-miui/34045627
+			preview.showToast(null, R.string.open_files_saf_exception_generic);
+            Log.e(TAG, "ActivityNotFoundException from startActivityForResult");
+            e.printStackTrace();
+        }
+    }
+
     /** Call when the SAF save history has been updated.
      *  This is only public so we can call from testing.
      * @param save_folder The new SAF save folder Uri.
@@ -2538,6 +2870,39 @@ public class MainActivity extends Activity {
 				showPreview(true);
             }
 			break;
+		case CHOOSE_LOAD_SETTINGS_SAF_CODE:
+            if( resultCode == RESULT_OK && resultData != null ) {
+	            Uri fileUri = resultData.getData();
+				if( MyDebug.LOG )
+					Log.d(TAG, "returned single fileUri: " + fileUri);
+				// persist permission just in case?
+	    		final int takeFlags = resultData.getFlags()
+	    	            & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+	    	            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+				try {
+					/*if( true )
+						throw new SecurityException(); // test*/
+					// Check for the freshest data.
+					getContentResolver().takePersistableUriPermission(fileUri, takeFlags);
+
+					settingsManager.loadSettings(fileUri);
+				}
+				catch(SecurityException e) {
+					Log.e(TAG, "SecurityException failed to take permission");
+					e.printStackTrace();
+					preview.showToast(null, R.string.restore_settings_failed);
+				}
+			}
+	        else {
+	    		if( MyDebug.LOG )
+	    			Log.d(TAG, "SAF dialog cancelled");
+	        }
+
+            if( !saf_dialog_from_preferences ) {
+				setWindowFlagsForCamera();
+				showPreview(true);
+            }
+			break;
 		}
     }
 
@@ -2592,7 +2957,11 @@ public class MainActivity extends Activity {
 			Log.d(TAG, "openFolderChooserDialog");
 		showPreview(false);
 		setWindowFlagsForSettings();
+
+		File start_folder = getStorageUtils().getImageFolder();
+
 		FolderChooserDialog fragment = new MyFolderChooserDialog();
+		fragment.setStartFolder(start_folder);
 		// use commitAllowingStateLoss() instead of fragment.show(), does to "java.lang.IllegalStateException: Can not perform this action after onSaveInstanceState" crash seen on Google Play
 		// see https://stackoverflow.com/questions/14262312/java-lang-illegalstateexception-can-not-perform-this-action-after-onsaveinstanc
 		//fragment.show(getFragmentManager(), "FOLDER_FRAGMENT");
@@ -2804,15 +3173,22 @@ public class MainActivity extends Activity {
 			}
 		}
 
-		this.takePicturePressed(photo_snapshot);
+		this.takePicturePressed(photo_snapshot, false);
     }
+
+	/** Returns whether the last photo operation was a continuous fast burst.
+	 */
+	boolean lastContinuousFastBurst() {
+		return this.last_continuous_fast_burst;
+	}
 
 	/**
 	 * @param photo_snapshot If true, then the user has requested taking a photo whilst video
 	 *                       recording. If false, either take a photo or start/stop video depending
 	 *                       on the current mode.
+	 * @param continuous_fast_burst If true, then start a continuous fast burst.
 	 */
-	void takePicturePressed(boolean photo_snapshot) {
+	void takePicturePressed(boolean photo_snapshot, boolean continuous_fast_burst) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "takePicturePressed");
 
@@ -2824,7 +3200,8 @@ public class MainActivity extends Activity {
 			applicationInterface.setNextPanoramaPoint();
 		}
 
-    	this.preview.takePicturePressed(photo_snapshot);
+		this.last_continuous_fast_burst = continuous_fast_burst;
+    	this.preview.takePicturePressed(photo_snapshot, continuous_fast_burst);
 	}
     
     /** Lock the screen - this is Open Camera's own lock to guard against accidental presses,
@@ -3058,6 +3435,8 @@ public class MainActivity extends Activity {
 						/*int min_iso = preview.getMinimumISO();
 						int max_iso = preview.getMaximumISO();
 						int iso = (int)exponentialScaling(frac, min_iso, max_iso);*/
+						// n.b., important to update even if fromUser==false (e.g., so this works when user changes ISO via clicking
+						// the ISO buttons rather than moving the slider directly, see MainUI.setupExposureUI())
 						preview.setISO( manualSeekbars.getISO(progress) );
 						mainUI.updateSelectedISOButton();
 					}
@@ -3147,16 +3526,15 @@ public class MainActivity extends Activity {
 		if( MyDebug.LOG )
 			Log.d(TAG, "cameraSetup: time after setting up exposure: " + (System.currentTimeMillis() - debug_time));
 
+		// On-screen icons such as exposure lock, white balance lock, face detection etc are made visible if necessary in
+		// MainUI.showGUI()
+		// However still nee to update visibility of icons where visibility depends on camera setup - e.g., exposure button
+		// not supported for high speed video frame rates - see testTakeVideoFPSHighSpeedManual().
 		View exposureButton = findViewById(R.id.exposure);
 	    exposureButton.setVisibility(supportsExposureButton() && !mainUI.inImmersiveMode() ? View.VISIBLE : View.GONE);
 
-	    ImageButton exposureLockButton = findViewById(R.id.exposure_lock);
-	    exposureLockButton.setVisibility(preview.supportsExposureLock() && !mainUI.inImmersiveMode() ? View.VISIBLE : View.GONE);
-	    if( preview.supportsExposureLock() ) {
-			exposureLockButton.setImageResource(preview.isExposureLocked() ? R.drawable.exposure_locked : R.drawable.exposure_unlocked);
-	    }
-		if( MyDebug.LOG )
-			Log.d(TAG, "cameraSetup: time after setting exposure lock button: " + (System.currentTimeMillis() - debug_time));
+		// need to update some icons, e.g., white balance and exposure lock due to them being turned off when pause/resuming
+		mainUI.updateOnScreenIcons();
 
 	    mainUI.setPopupIcon(); // needed so that the icon is set right even if no flash mode is set when starting up camera (e.g., switching to front camera with no flash)
 		if( MyDebug.LOG )
@@ -3182,6 +3560,9 @@ public class MainActivity extends Activity {
 		focusSeekBar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 		ManualSeekbars.setProgressSeekbarScaled(focusSeekBar, 0.0, preview.getMinimumFocusDistance(), is_target_distance ? preview.getCameraController().getFocusBracketingTargetDistance() : preview.getCameraController().getFocusDistance());
 		focusSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+			private boolean has_saved_zoom;
+			private int saved_zoom_factor;
+
 			@Override
 			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
 				double frac = progress/(double)focusSeekBar.getMax();
@@ -3192,10 +3573,31 @@ public class MainActivity extends Activity {
 
 			@Override
 			public void onStartTrackingTouch(SeekBar seekBar) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "manual focus seekbar: onStartTrackingTouch");
+				has_saved_zoom = false;
+				if( preview.supportsZoom() ) {
+					int focus_assist = applicationInterface.getFocusAssistPref();
+					if( focus_assist > 0 ) {
+						has_saved_zoom = true;
+						saved_zoom_factor = preview.getCameraController().getZoom();
+						if( MyDebug.LOG )
+							Log.d(TAG, "zoom by " + focus_assist + " for focus assist, zoom factor was: " + saved_zoom_factor);
+						int new_zoom_factor = preview.getScaledZoomFactor(focus_assist);
+						preview.getCameraController().setZoom(new_zoom_factor);
+					}
+				}
 			}
 
 			@Override
 			public void onStopTrackingTouch(SeekBar seekBar) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "manual focus seekbar: onStopTrackingTouch");
+				if( has_saved_zoom ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "unzoom for focus assist, zoom factor was: " + saved_zoom_factor);
+					preview.getCameraController().setZoom(saved_zoom_factor);
+				}
 				preview.stoppedSettingFocusDistance(is_target_distance);
 			}
 		});
@@ -3269,17 +3671,22 @@ public class MainActivity extends Activity {
     }
     
     public boolean supportsExpoBracketing() {
+		if( applicationInterface.isImageCaptureIntent() )
+			return false; // don't support expo bracketing mode if called from image capture intent
 		return preview.supportsExpoBracketing();
     }
 
     public boolean supportsFocusBracketing() {
+		if( applicationInterface.isImageCaptureIntent() )
+			return false; // don't support focus bracketing mode if called from image capture intent
 		return preview.supportsFocusBracketing();
     }
 
     public boolean supportsFastBurst() {
+		if( applicationInterface.isImageCaptureIntent() )
+			return false; // don't support burst mode if called from image capture intent
 		// require 512MB just to be safe, due to the large number of images that may be created
 		return( preview.usingCamera2API() && large_heap_memory >= 512 && preview.supportsBurst() );
-		//return false; // currently blocked for release
 	}
 
     public boolean supportsNoiseReduction() {
@@ -3362,10 +3769,18 @@ public class MainActivity extends Activity {
 		return permissionHandler;
 	}
 
+	public SettingsManager getSettingsManager() {
+		return settingsManager;
+	}
+
 	public MainUI getMainUI() {
     	return this.mainUI;
     }
-    
+
+    public ManualSeekbars getManualSeekbars() {
+    	return this.manualSeekbars;
+	}
+
     public MyApplicationInterface getApplicationInterface() {
     	return this.applicationInterface;
     }
@@ -3417,6 +3832,12 @@ public class MainActivity extends Activity {
 		boolean video_high_speed = preview.isVideoHighSpeed();
 		if( preview.isVideo() ) {
 			VideoProfile profile = preview.getVideoProfile();
+
+			String extension_string = profile.fileExtension;
+			if( !profile.fileExtension.equals("mp4") ) {
+				simple = false;
+			}
+
 			String bitrate_string;
 			if( profile.videoBitRate >= 10000000 )
 				bitrate_string = profile.videoBitRate/1000000 + "Mbps";
@@ -3429,8 +3850,9 @@ public class MainActivity extends Activity {
 				simple = false;
 			}
 
-			int capture_rate = (int)(profile.videoCaptureRate+0.5);
-			toast_string = getResources().getString(R.string.video) + ": " + profile.videoFrameWidth + "x" + profile.videoFrameHeight + ", " + capture_rate + getResources().getString(R.string.fps) + (video_high_speed ? " [" + getResources().getString(R.string.high_speed) + "]" : "") + ", " + bitrate_string;
+			double capture_rate = profile.videoCaptureRate;
+			String capture_rate_string = (capture_rate < 9.5f) ? new DecimalFormat("#0.###").format(capture_rate) : "" + (int)(profile.videoCaptureRate+0.5);
+			toast_string = getResources().getString(R.string.video) + ": " + profile.videoFrameWidth + "x" + profile.videoFrameHeight + ", " + capture_rate_string + getResources().getString(R.string.fps) + (video_high_speed ? " [" + getResources().getString(R.string.high_speed) + "]" : "") + ", " + bitrate_string + " (" + extension_string + ")";
 
 			String fps_value = applicationInterface.getVideoFPSPref();
 			if( !fps_value.equals("default") || video_high_speed ) {
@@ -3466,8 +3888,15 @@ public class MainActivity extends Activity {
 			}
 			long max_filesize = applicationInterface.getVideoMaxFileSizeUserPref();
 			if( max_filesize != 0 ) {
-				long max_filesize_mb = max_filesize/(1024*1024);
-				toast_string += "\n" + getResources().getString(R.string.max_filesize) +": " + max_filesize_mb + getResources().getString(R.string.mb_abbreviation);
+				toast_string += "\n" + getResources().getString(R.string.max_filesize) +": ";
+				if( max_filesize >= 1024*1024*1024 ) {
+					long max_filesize_gb = max_filesize/(1024*1024*1024);
+					toast_string += max_filesize_gb + getResources().getString(R.string.gb_abbreviation);
+				}
+				else {
+					long max_filesize_mb = max_filesize/(1024*1024);
+					toast_string += max_filesize_mb + getResources().getString(R.string.mb_abbreviation);
+				}
 				simple = false;
 			}
 			if( applicationInterface.getVideoFlashPref() && preview.supportsFlash() ) {
@@ -3548,24 +3977,30 @@ public class MainActivity extends Activity {
 				simple = false;
 			}
 		}
-		String scene_mode = camera_controller.getSceneMode();
-    	if( scene_mode != null && !scene_mode.equals(CameraController.SCENE_MODE_DEFAULT) ) {
-    		toast_string += "\n" + getResources().getString(R.string.scene_mode) + ": " + mainUI.getEntryForSceneMode(scene_mode);
-			simple = false;
-    	}
-		String white_balance = camera_controller.getWhiteBalance();
-    	if( white_balance != null && !white_balance.equals(CameraController.WHITE_BALANCE_DEFAULT) ) {
-    		toast_string += "\n" + getResources().getString(R.string.white_balance) + ": " + mainUI.getEntryForWhiteBalance(white_balance);
-			if( white_balance.equals("manual") && preview.supportsWhiteBalanceTemperature() ) {
-				toast_string += " " + camera_controller.getWhiteBalanceTemperature();
+		try {
+			String scene_mode = camera_controller.getSceneMode();
+			String white_balance = camera_controller.getWhiteBalance();
+			String color_effect = camera_controller.getColorEffect();
+			if( scene_mode != null && !scene_mode.equals(CameraController.SCENE_MODE_DEFAULT) ) {
+				toast_string += "\n" + getResources().getString(R.string.scene_mode) + ": " + mainUI.getEntryForSceneMode(scene_mode);
+				simple = false;
 			}
-			simple = false;
-    	}
-		String color_effect = camera_controller.getColorEffect();
-    	if( color_effect != null && !color_effect.equals(CameraController.COLOR_EFFECT_DEFAULT) ) {
-    		toast_string += "\n" + getResources().getString(R.string.color_effect) + ": " + mainUI.getEntryForColorEffect(color_effect);
-			simple = false;
-    	}
+			if( white_balance != null && !white_balance.equals(CameraController.WHITE_BALANCE_DEFAULT) ) {
+				toast_string += "\n" + getResources().getString(R.string.white_balance) + ": " + mainUI.getEntryForWhiteBalance(white_balance);
+				if( white_balance.equals("manual") && preview.supportsWhiteBalanceTemperature() ) {
+					toast_string += " " + camera_controller.getWhiteBalanceTemperature();
+				}
+				simple = false;
+			}
+			if( color_effect != null && !color_effect.equals(CameraController.COLOR_EFFECT_DEFAULT) ) {
+				toast_string += "\n" + getResources().getString(R.string.color_effect) + ": " + mainUI.getEntryForColorEffect(color_effect);
+				simple = false;
+			}
+		}
+		catch(RuntimeException e) {
+			// catch runtime error from camera_controller old API from camera.getParameters()
+			e.printStackTrace();
+		}
 		String lock_orientation = applicationInterface.getLockOrientationPref();
 		if( !lock_orientation.equals("none") ) {
 			String [] entries_array = getResources().getStringArray(R.array.preference_lock_orientation_entries);
@@ -3624,9 +4059,23 @@ public class MainActivity extends Activity {
 	private void startAudioListener() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "startAudioListener");
+		if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
+			// we restrict the checks to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
+			if( MyDebug.LOG )
+				Log.d(TAG, "check for record audio permission");
+			if( ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "record audio permission not available");
+				applicationInterface.requestRecordAudioPermission();
+				return;
+			}
+		}
+
 		MyAudioTriggerListenerCallback callback = new MyAudioTriggerListenerCallback(this);
 		audio_listener = new AudioListener(callback);
 		if( audio_listener.status() ) {
+			preview.showToast(audio_control_toast, R.string.audio_listener_started);
+
 			audio_listener.start();
 			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 			String sensitivity_pref = sharedPreferences.getString(PreferenceKeys.AudioNoiseControlSensitivityPreferenceKey, "0");
@@ -3646,6 +4095,9 @@ public class MainActivity extends Activity {
 					break;
 				case "-2":
 					audio_noise_sensitivity = 200;
+					break;
+				case "-3":
+					audio_noise_sensitivity = 400;
 					break;
 				default:
 					// default
@@ -3675,33 +4127,92 @@ public class MainActivity extends Activity {
 	        if( speechRecognizer != null ) {
 	        	speechRecognizerIsStarted = false;
 	        	speechRecognizer.setRecognitionListener(new RecognitionListener() {
+	        		private void restart() {
+						if( MyDebug.LOG )
+							Log.d(TAG, "RecognitionListener: restart");
+						Handler handler = new Handler();
+						handler.postDelayed(new Runnable() {
+							public void run() {
+								startSpeechRecognizerIntent();
+							}
+						}, 250);
+
+						/*freeSpeechRecognizer();
+						Handler handler = new Handler();
+						handler.postDelayed(new Runnable() {
+							public void run() {
+								initSpeechRecognizer();
+								startSpeechRecognizerIntent();
+					        	speechRecognizerIsStarted = true;
+							}
+						}, 500);*/
+					}
+
 					@Override
 					public void onBeginningOfSpeech() {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onBeginningOfSpeech");
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 					}
 
 					@Override
 					public void onBufferReceived(byte[] buffer) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onBufferReceived");
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 					}
 
 					@Override
 					public void onEndOfSpeech() {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onEndOfSpeech");
-			        	speechRecognizerStopped();
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
+			        	//speechRecognizerStopped();
+						restart();
 					}
 
 					@Override
 					public void onError(int error) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onError: " + error);
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 						if( error != SpeechRecognizer.ERROR_NO_MATCH ) {
 							// we sometime receive ERROR_NO_MATCH straight after listening starts
 							// it seems that the end is signalled either by ERROR_SPEECH_TIMEOUT or onEndOfSpeech()
-				        	speechRecognizerStopped();
+							//speechRecognizerStopped();
+							/*if( error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "RecognitionListener: ERROR_RECOGNIZER_BUSY");
+								freeSpeechRecognizer();
+
+								Handler handler = new Handler();
+								handler.postDelayed(new Runnable() {
+									public void run() {
+										initSpeechRecognizer();
+										startSpeechRecognizerIntent();
+							        	speechRecognizerIsStarted = true;
+									}
+								}, 500);
+							}
+							else*/ {
+								restart();
+							}
 						}
 					}
 
@@ -3709,24 +4220,43 @@ public class MainActivity extends Activity {
 					public void onEvent(int eventType, Bundle params) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onEvent");
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 					}
 
 					@Override
 					public void onPartialResults(Bundle partialResults) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onPartialResults");
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 					}
 
 					@Override
 					public void onReadyForSpeech(Bundle params) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onReadyForSpeech");
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 					}
 
 					public void onResults(Bundle results) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "RecognitionListener: onResults");
-			        	speechRecognizerStopped();
+						if( !speechRecognizerIsStarted ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "...but speech recognition already stopped");
+							return;
+						}
 						ArrayList<String> list = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
 						boolean found = false;
 						final String trigger = "cheese";
@@ -3763,6 +4293,7 @@ public class MainActivity extends Activity {
 					public void onRmsChanged(float rmsdB) {
 					}
 	        	});
+
 				if( !mainUI.inImmersiveMode() ) {
 		    	    View speechRecognizerButton = findViewById(R.id.audio_control);
 		    	    speechRecognizerButton.setVisibility(View.VISIBLE);
@@ -3771,28 +4302,34 @@ public class MainActivity extends Activity {
 		}
 		else if( speechRecognizer != null && !want_speech_recognizer ) {
 			if( MyDebug.LOG )
-				Log.d(TAG, "free existing SpeechRecognizer");
-			freeSpeechRecognizer();
+				Log.d(TAG, "stop existing SpeechRecognizer");
+			stopSpeechRecognizer();
 		}
 	}
 	
 	private void freeSpeechRecognizer() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "freeSpeechRecognizer");
+		speechRecognizer.cancel();
+		try {
+			speechRecognizer.destroy();
+		}
+		catch(IllegalArgumentException e) {
+			// reported from Google Play - unclear why this happens, but might as well catch
+			Log.e(TAG, "exception destroying speechRecognizer");
+			e.printStackTrace();
+		}
+		speechRecognizer = null;
+	}
+
+	private void stopSpeechRecognizer() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "stopSpeechRecognizer");
 		if( speechRecognizer != null ) {
         	speechRecognizerStopped();
     	    View speechRecognizerButton = findViewById(R.id.audio_control);
     	    speechRecognizerButton.setVisibility(View.GONE);
-			speechRecognizer.cancel();
-			try {
-				speechRecognizer.destroy();
-			}
-			catch(IllegalArgumentException e) {
-				// reported from Google Play - unclear why this happens, but might as well catch
-				Log.e(TAG, "exception destroying speechRecognizer");
-				e.printStackTrace();
-			}
-			speechRecognizer = null;
+    	    freeSpeechRecognizer();
 		}
 	}
 	
@@ -3844,6 +4381,24 @@ public class MainActivity extends Activity {
 		if( MyDebug.LOG )
 			Log.d(TAG, "onRequestPermissionsResult: requestCode " + requestCode);
 		permissionHandler.onRequestPermissionsResult(requestCode, grantResults);
+	}
+
+	public void restartOpenCamera() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "restartOpenCamera");
+		this.waitUntilImageQueueEmpty();
+		// see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
+		Intent i = this.getBaseContext().getPackageManager().getLaunchIntentForPackage( this.getBaseContext().getPackageName() );
+		i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+		startActivity(i);
+	}
+
+	public void takePhotoButtonLongClickCancelled() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "takePhotoButtonLongClickCancelled");
+		if( preview.getCameraController() != null && preview.getCameraController().isContinuousBurstInProgress() ) {
+			preview.getCameraController().stopContinuousBurst();
+		}
 	}
 
 	// for testing:

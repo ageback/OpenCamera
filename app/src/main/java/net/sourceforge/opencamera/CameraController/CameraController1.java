@@ -4,6 +4,7 @@ import net.sourceforge.opencamera.MyDebug;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 
@@ -294,7 +295,15 @@ public class CameraController1 extends CameraController {
 	public CameraFeatures getCameraFeatures() throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "getCameraFeatures()");
-	    Camera.Parameters parameters = this.getParameters();
+	    Camera.Parameters parameters;
+	    try {
+			parameters = this.getParameters();
+		}
+		catch(RuntimeException e) {
+			Log.e(TAG, "failed to get camera parameters");
+	    	e.printStackTrace();
+	    	throw new CameraControllerException();
+		}
 	    CameraFeatures camera_features = new CameraFeatures();
 		camera_features.is_zoom_supported = parameters.isZoomSupported();
 		if( camera_features.is_zoom_supported ) {
@@ -331,6 +340,9 @@ public class CameraController1 extends CameraController {
 			// with CameraController1 anyway
 			camera_features.picture_sizes.add(new CameraController.Size(camera_size.width, camera_size.height));
 		}
+		// sizes are usually already sorted from high to low, but sort just in case
+		// note some devices do have sizes in a not fully sorted order (e.g., Nokia 8)
+		Collections.sort(camera_features.picture_sizes, new CameraController.SizeSorter());
 
         //camera_features.supported_flash_modes = parameters.getSupportedFlashModes(); // Android format
         List<String> supported_flash_modes = parameters.getSupportedFlashModes(); // Android format
@@ -341,6 +353,8 @@ public class CameraController1 extends CameraController {
 		camera_features.max_num_focus_areas = parameters.getMaxNumFocusAreas();
 
         camera_features.is_exposure_lock_supported = parameters.isAutoExposureLockSupported();
+
+        camera_features.is_white_balance_lock_supported = parameters.isAutoWhiteBalanceLockSupported();
 
         camera_features.is_video_stabilization_supported = parameters.isVideoStabilizationSupported();
 
@@ -364,6 +378,8 @@ public class CameraController1 extends CameraController {
 		for(Camera.Size camera_size : camera_video_sizes) {
 			camera_features.video_sizes.add(new CameraController.Size(camera_size.width, camera_size.height));
 		}
+		// sizes are usually already sorted from high to low, but sort just in case
+		Collections.sort(camera_features.video_sizes, new CameraController.SizeSorter());
 
 		List<Camera.Size> camera_preview_sizes = parameters.getSupportedPreviewSizes();
 		camera_features.preview_sizes = new ArrayList<>();
@@ -766,12 +782,33 @@ public class CameraController1 extends CameraController {
 	}
 
 	@Override
+	public BurstType getBurstType() {
+	    return want_expo_bracketing ? BurstType.BURSTTYPE_EXPO : BurstType.BURSTTYPE_NONE;
+    }
+
+	@Override
 	public void setBurstNImages(int burst_requested_n_images) {
 		// not supported
 	}
 
 	@Override
-	public void setBurstForNoiseReduction(boolean burst_for_noise_reduction) {
+	public void setBurstForNoiseReduction(boolean burst_for_noise_reduction, boolean noise_reduction_low_light) {
+		// not supported
+	}
+
+	@Override
+	public boolean isContinuousBurstInProgress() {
+		// not supported
+		return false;
+	}
+
+	@Override
+	public void stopContinuousBurst() {
+		// not supported
+	}
+
+	@Override
+	public void stopFocusBracketingBurst() {
 		// not supported
 	}
 
@@ -814,6 +851,21 @@ public class CameraController1 extends CameraController {
 		// not supported for CameraController1
 		return false;
 	}
+
+    @Override
+    public boolean isCapturingBurst() {
+        return getBurstTotal() > 1 && getNBurstTaken() < getBurstTotal();
+    }
+
+    @Override
+	public int getNBurstTaken() {
+		return pending_burst_images.size();
+	}
+
+    @Override
+    public int getBurstTotal() {
+        return n_burst;
+    }
 
 	@Override
 	public void setOptimiseAEForDRO(boolean optimise_ae_for_dro) {
@@ -1221,17 +1273,34 @@ public class CameraController1 extends CameraController {
 		}
 	}
 
+	@Override
 	public void setAutoExposureLock(boolean enabled) {
 		Camera.Parameters parameters = this.getParameters();
 		parameters.setAutoExposureLock(enabled);
     	setCameraParameters(parameters);
 	}
-	
+
+	@Override
 	public boolean getAutoExposureLock() {
 		Camera.Parameters parameters = this.getParameters();
 		if( !parameters.isAutoExposureLockSupported() )
 			return false;
 		return parameters.getAutoExposureLock();
+	}
+
+	@Override
+	public void setAutoWhiteBalanceLock(boolean enabled) {
+		Camera.Parameters parameters = this.getParameters();
+		parameters.setAutoWhiteBalanceLock(enabled);
+		setCameraParameters(parameters);
+	}
+
+	@Override
+	public boolean getAutoWhiteBalanceLock() {
+		Camera.Parameters parameters = this.getParameters();
+		if( !parameters.isAutoWhiteBalanceLockSupported() )
+			return false;
+		return parameters.getAutoWhiteBalanceLock();
 	}
 
 	public void setRotation(int rotation) {

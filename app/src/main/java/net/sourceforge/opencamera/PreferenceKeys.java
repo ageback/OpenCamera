@@ -45,6 +45,8 @@ public class PreferenceKeys {
     	return "focus_value_" + cameraId + "_" + is_video;
     }
 
+	public static final String FocusAssistPreferenceKey = "preference_focus_assist";
+
     public static String getResolutionPreferenceKey(int cameraId) {
     	return "camera_resolution_" + cameraId;
     }
@@ -53,6 +55,8 @@ public class PreferenceKeys {
     	return "video_quality_" + cameraId + (high_speed ? "_highspeed" : "");
     }
     
+	public static final String ImageFormatPreferenceKey = "preference_image_format";
+
 	public static final String IsVideoPreferenceKey = "is_video";
 
 	public static final String ExposurePreferenceKey = "preference_exposure";
@@ -69,7 +73,7 @@ public class PreferenceKeys {
 
 	public static final String EdgeModePreferenceKey = "preference_edge_mode";
 
-	public static final String NoiseReductionModePreferenceKey = "preference_noise_reduction_mode";
+	public static final String CameraNoiseReductionModePreferenceKey = "preference_noise_reduction_mode"; // n.b., this is for the Camera driver noise reduction mode, not Open Camera's NR photo mode
 
 	public static final String ISOPreferenceKey = "preference_iso";
 
@@ -102,6 +106,8 @@ public class PreferenceKeys {
 	public static final String PhotoModePreferenceKey = "preference_photo_mode";
 
 	public static final String HDRSaveExpoPreferenceKey = "preference_hdr_save_expo";
+
+	public static final String HDRContrastEnhancementPreferenceKey = "preference_hdr_contrast_enhancement";
 
 	public static final String NRSaveExpoPreferenceKey = "preference_nr_save";
 
@@ -205,6 +211,18 @@ public class PreferenceKeys {
 
 	public static final String ShowTakePhotoPreferenceKey = "preference_show_take_photo";
 
+	public static final String ShowFaceDetectionPreferenceKey = "preference_show_face_detection";
+
+	public static final String ShowAutoLevelPreferenceKey = "preference_show_auto_level";
+
+	public static final String ShowStampPreferenceKey = "preference_show_stamp";
+
+	public static final String ShowTextStampPreferenceKey = "preference_show_textstamp";
+
+	public static final String ShowWhiteBalanceLockPreferenceKey = "preference_show_white_balance_lock";
+
+	public static final String ShowExposureLockPreferenceKey = "preference_show_exposure_lock";
+
 	public static final String ShowZoomPreferenceKey = "preference_show_zoom";
 
 	public static final String ShowISOPreferenceKey = "preference_show_iso";
@@ -248,7 +266,9 @@ public class PreferenceKeys {
     public static String getForceVideo4KPreferenceKey() {
     	return "preference_force_video_4k";
     }
-    
+
+    public static final String VideoFormatPreferenceKey = "preference_video_output_format";
+
     public static String getVideoBitratePreferenceKey() {
     	return "preference_video_bitrate";
     }

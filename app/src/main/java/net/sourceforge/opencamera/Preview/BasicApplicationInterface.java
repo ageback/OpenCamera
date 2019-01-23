@@ -76,7 +76,7 @@ public abstract class BasicApplicationInterface implements ApplicationInterface 
 	}
 
 	@Override
-	public String getNoiseReductionModePref() {
+	public String getCameraNoiseReductionModePref() {
 		return CameraController.NOISE_REDUCTION_MODE_DEFAULT;
 	}
 
@@ -118,6 +118,11 @@ public abstract class BasicApplicationInterface implements ApplicationInterface 
 	@Override
 	public boolean getForce4KPref() {
 		return false;
+	}
+
+	@Override
+	public String getRecordVideoOutputFormatPref() {
+		return "preference_video_output_format_default";
 	}
 
 	@Override
@@ -274,6 +279,11 @@ public abstract class BasicApplicationInterface implements ApplicationInterface 
 	}
 
 	@Override
+	public boolean imageQueueWouldBlock(boolean has_raw, int n_jpegs) {
+		return false;
+	}
+
+	@Override
 	public long getExposureTimePref() {
 		return CameraController.EXPOSURE_TIME_DEFAULT;
 	}
@@ -326,6 +336,11 @@ public abstract class BasicApplicationInterface implements ApplicationInterface 
 	@Override
 	public boolean getBurstForNoiseReduction() {
 		return false;
+	}
+
+    @Override
+    public NRModePref getNRModePref() {
+		return NRModePref.NRMODE_NORMAL;
 	}
 
 	@Override

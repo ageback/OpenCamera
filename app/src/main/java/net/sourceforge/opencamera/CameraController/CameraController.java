@@ -38,11 +38,14 @@ public abstract class CameraController {
 	public static final String ISO_DEFAULT = "auto";
 	public static final long EXPOSURE_TIME_DEFAULT = 1000000000L/30; // note, responsibility of callers to check that this is within the valid min/max range
 
+	public static final int N_IMAGES_NR_DARK = 8;
+	public static final int N_IMAGES_NR_DARK_LOW_LIGHT = 15;
+
 	// for testing:
 	int count_camera_parameters_exception;
 	public int count_precapture_timeout;
 	public boolean test_wait_capture_result; // whether to test delayed capture result in Camera2 API
-	public volatile int test_capture_results; // for Camera2 API, how many capture requests completed with RequestTag.CAPTURE
+	public volatile int test_capture_results; // for Camera2 API, how many capture requests completed with RequestTagType.CAPTURE
 	public volatile int test_fake_flash_focus; // for Camera2 API, records torch turning on for fake flash during autofocus
 	public volatile int test_fake_flash_precapture; // for Camera2 API, records torch turning on for fake flash during precapture
 	public volatile int test_fake_flash_photo; // for Camera2 API, records torch turning on for fake flash for photo capture
@@ -63,6 +66,7 @@ public abstract class CameraController {
 		public int max_num_focus_areas;
 		public float minimum_focus_distance;
 		public boolean is_exposure_lock_supported;
+		public boolean is_white_balance_lock_supported;
 		public boolean is_video_stabilization_supported;
 		public boolean is_photo_video_recording_supported;
 		public boolean supports_white_balance_temperature;
@@ -135,7 +139,9 @@ public abstract class CameraController {
 		}
 	}
 
-    // Android docs and FindBugs recommend that Comparators also be Serializable
+	/* Sorts resolutions from highest to lowest, by area.
+	 * Android docs and FindBugs recommend that Comparators also be Serializable
+	 */
 	public static class SizeSorter implements Comparator<Size>, Serializable {
 		private static final long serialVersionUID = 5802214721073718212L;
 
@@ -232,6 +238,10 @@ public abstract class CameraController {
 		 * (for flash_frontscreen_auto it will only be called if the scene is considered dark enough to require the screen flash).
 		 * The screen flash can be removed when or after onCompleted() is called.
 		 */
+		/* This is called for when burst mode is BURSTTYPE_FOCUS or BURSTTYPE_CONTINUOUS, to ask whether it's safe to take
+		 * n_jpegs extra images, or whether to wait.
+		 */
+		boolean imageQueueWouldBlock(int n_jpegs);
 		void onFrontScreenTurnOn();
 	}
 	
@@ -346,9 +356,11 @@ public abstract class CameraController {
 		BURSTTYPE_NONE, // no burst
 		BURSTTYPE_EXPO, // enable expo bracketing mode
 		BURSTTYPE_FOCUS, // enable focus bracketing mode;
-		BURSTTYPE_NORMAL // take a regular burst
+		BURSTTYPE_NORMAL, // take a regular burst
+		BURSTTYPE_CONTINUOUS // as BURSTTYPE_NORMAL, but bursts will fire continually until stopContinuousBurst() is called.
 	}
 	public abstract void setBurstType(BurstType new_burst_type);
+	public abstract BurstType getBurstType();
 	/** Only relevant if setBurstType() is also called with BURSTTYPE_NORMAL. Sets the number of
 	 *  images to take in the burst.
 	 */
@@ -357,7 +369,10 @@ public abstract class CameraController {
 	 *  called with burst_for_noise_reduction, then the number of burst images, and other settings,
 	 *  will be set for noise reduction mode (and setBurstNImages() is ignored).
 	 */
-	public abstract void setBurstForNoiseReduction(boolean burst_for_noise_reduction);
+	public abstract void setBurstForNoiseReduction(boolean burst_for_noise_reduction, boolean noise_reduction_low_light);
+	public abstract boolean isContinuousBurstInProgress();
+	public abstract void stopContinuousBurst();
+	public abstract void stopFocusBracketingBurst();
 	/** Only relevant if setBurstType() is also called with BURSTTYPE_EXPO. Sets the number of
 	 *  images to take in the expo burst.
 	 * @param n_images Must be an odd number greater than 1.
@@ -368,6 +383,17 @@ public abstract class CameraController {
 	public abstract void setExpoBracketingStops(double stops);
 	public abstract void setUseExpoFastBurst(boolean use_expo_fast_burst);
 	public abstract boolean isBurstOrExpo();
+    /** If true, then the camera controller is currently capturing a burst of images.
+     */
+    public abstract boolean isCapturingBurst();
+    /** If isCapturingBurst() is true, then this returns the number of images in the current burst
+     *  captured so far.
+     */
+	public abstract int getNBurstTaken();
+    /** If isCapturingBurst() is true, then this returns the total number of images in the current
+     *  burst if known. If not known (e.g., for continuous burst mode), returns 0.
+     */
+	public abstract int getBurstTotal();
 	/** If optimise_ae_for_dro is true, then this is a hint that if in auto-exposure mode and flash/torch
 	 *  is not on, the CameraController should try to optimise for a DRO (dynamic range optimisation) mode.
 	 */
@@ -440,6 +466,8 @@ public abstract class CameraController {
 	public abstract void setRecordingHint(boolean hint);
 	public abstract void setAutoExposureLock(boolean enabled);
 	public abstract boolean getAutoExposureLock();
+	public abstract void setAutoWhiteBalanceLock(boolean enabled);
+	public abstract boolean getAutoWhiteBalanceLock();
 	public abstract void setRotation(int rotation);
 	public abstract void setLocationInfo(Location location);
 	public abstract void removeLocationInfo();

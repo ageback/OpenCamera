@@ -109,7 +109,7 @@ browsers -->
 <li>Handy remote controls: timer (with optional voice countdown), auto-repeat mode (with configurable delay).</li>
 <li>Option to take photo remotely by making a noise (e.g., voice, whistle), or by voice command "cheese".</li>
 <li>Configurable volume keys.</li>
-<li>Optimise GUI for left or right-handed users.</li>
+<li>Configurable user interface.</li>
 <li>Zoom via multi-touch gesture and single-touch control.</li>
 <li>Option to lock orientation to portrait or landscape for photo or video. Upside-down preview option for use with attachable lenses.</li>
 <li>Choice of save folder (including support for Storage Access Framework).</li>
@@ -121,8 +121,8 @@ browsers -->
 <li>Support for (some) external microphones.</li>
 <li>Widget to automatically take a photo after launching.</li>
 <li>Support for <a href="help.html#hdr">HDR</a> (with auto-alignment and ghost removal) and Exposure Bracketing.</li>
-<li>Support for Camera2 API: manual focus distance; manual ISO; manual exposure time; manual white balance temperature; burst mode; RAW (DNG) files; slow motion video.</li>
-<li>Noise reduction and Dynamic range optimisation modes for better quality photos.</li>
+<li>Support for Camera2 API: manual focus distance (with optional focus assist); manual ISO; manual exposure time; manual white balance temperature; burst mode; RAW (DNG) files; slow motion video.</li>
+<li>Noise reduction (including low light night mode) and Dynamic range optimisation modes for better quality photos.</li>
 <li>Focus bracketing mode.</li>
 <li>Support for <a href="https://play.google.com/store/apps/details?id=com.miband2.mibandselfie">Mi Band 2 &amp; Amazfit Selfie</a>.</li>
 <li>Small file size.</li>
@@ -154,9 +154,34 @@ Google Play, on your device's Settings (usually under Security).</li>
 <hr>
 <p>Open Camera is completely free, however if you wish you can show your appreciation and support future development by purchasing
 <a href="https://play.google.com/store/apps/details?id=harman.mark.donation">my donation app from Google Play</a>.
-You can also donate through Paypal:</p>
 
-<p><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=2WCE756ZME9JG&lc=GB&item_name=Open%20Camera%20donation&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHostedGuest"><img src="https://www.paypalobjects.com/en_US/GB/i/btn/btn_donateCC_LG.gif" title="Donate to Open Camera development"></a></p>
+<p>You can also donate through Paypal, simply click the "Buy Now" button, and enter the amount you wish to donate:</p>
+
+<!--<p><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=2WCE756ZME9JG&lc=GB&item_name=Open%20Camera%20donation&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHostedGuest"><img src="https://www.paypalobjects.com/en_US/GB/i/btn/btn_donateCC_LG.gif" title="Donate to Open Camera development"></a></p>-->
+
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="hosted_button_id" value="S2TF5UGTV7F9A">
+<input type="image" src="https://www.paypalobjects.com/en_US/GB/i/btn/btn_buynowCC_LG.gif" border="0" name="submit" alt="PayPal – The safer, easier way to pay online!">
+<img alt="" border="0" src="https://www.paypalobjects.com/en_GB/i/scr/pixel.gif" width="1" height="1">
+</form>
+
+<p>...or you can also set up a regular donation:</p>
+
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="hosted_button_id" value="ZYBUX88DNQXV2">
+<table>
+<tr><td><input type="hidden" name="on0" value=""></td></tr><tr><td><select name="os0">
+	<option value="Donation">Donation : $1.00 USD - monthly</option>
+	<option value="Donation">Donation : $2.00 USD - monthly</option>
+	<option value="Donation">Donation : $5.00 USD - monthly</option>
+</select> </td></tr>
+</table>
+<input type="hidden" name="currency_code" value="USD">
+<input type="image" src="https://www.paypalobjects.com/en_US/GB/i/btn/btn_subscribeCC_LG.gif" border="0" name="submit" alt="PayPal – The safer, easier way to pay online!">
+<img alt="" border="0" src="https://www.paypalobjects.com/en_GB/i/scr/pixel.gif" width="1" height="1">
+</form>
 
 <p>(Paypal account not required, supports debit or credit card)<!--, or Bitcoin <b>1KZm8bKwTY8kSpqEmHZ2pBWeC6aFCs7zxG</b>-->.
 Thanks!</p>
@@ -217,7 +242,7 @@ your wedding etc :)</p>
 <li>Changing icons for pause/resume video by Johan Ejdemark ( johanejdemark AT hotmail DOT com).</li>
 <li>Azerbaijani translation by Eldost ( l-dost AT mail DOT ru ).</li>
 <li>Brazilian tranlation by Kaio Duarte.</li>
-<li>Chinese Simplified translation by Michael Lu ( yeskky AT gmail DOT com ).</li>
+<li>Chinese Simplified translation by Michael Lu ( yeskky AT gmail DOT com ) and tumuyan ( tumuyan AT gmail DOT com ).</li>
 <li>Chinese Traditional translation by You-Cheng Hsieh ( yochenhsieh AT gmail DOT com ).</li>
 <li>Belarusian translation by Zmicer Turok.</li>
 <li>Czech translation by <a href="http://jaroslavsvoboda.eu">Jaroslav Svoboda</a> ( multi DOT flexi AT gmail DOT com ).</li>
@@ -236,13 +261,14 @@ your wedding etc :)</p>
 <li>Spanish translation by <a href="https://play.google.com/store/apps/developer?id=Mario+Sanoguera">Mario Sanoguera</a> ( sanogueralorenzo AT gmail DOT com ), <a href="https://forum.xda-developers.com/member.php?u=6302705">Sebastian05067</a> and Gonzalo Prieto Vega.</li>
 <li>Turkish translation by Serdar Erkoc ( serdarerkoc2004 AT yahoo DOT com ).</li>
 <li>Ukranian translation by <a href="https://sourceforge.net/u/olexn13/">Olexandr</a>.</li>
+<li>Vietnamese translation by Khánh Trần ( crhanh AT gmail DOT com ).</li>
 <li>Earlier versions (pre-Material Design) have an icon/logo by Cosmin Saveanu ( <a href="http://aboutfoto.wordpress.com/">http://aboutfoto.wordpress.com/</a> ).</li>
 </ul>
 
 <p><a name="privacy"></a><b>Privacy policy</b></p>
 
 <p>Google Play requires me to disclose that Open Camera will record camera sensor and microphone data, which is used for the purpose
-of taking photos and recording videos.</p>
+of taking photos and recording videos. Microphone permission is also used for the optional "Audio control" options.</p>
 
 <p>Open Camera requires permission to "access photos, media and files on your devices", as this permission is required for Android to
 save resultant photos and videos to your device.</p>
@@ -294,13 +320,16 @@ Also see <i>"Can I use the Open Camera source code in my app?"</i> under the <a 
 <!--<li>App icon/logo, take_photo.png, take_photo_pressed.png from <a href="https://www.iconfinder.com/icons/81087/mb_photo_icon#size=128">https://www.iconfinder.com/&#8203;icons/81087/&#8203;mb_photo_icon#size=128</a> , by Yankoa - http://yankoa.deviantart.com/ , under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</li>-->
 <li>take_video.png, take_video_pressed.png from <a href="https://www.iconfinder.com/icons/81197/mb_rec_video_icon#size=128">https://www.iconfinder.com/&#8203;icons/81197/&#8203;mb_rec_video_icon#size=128</a> , by Yankoa - http://yankoa.deviantart.com/ , under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</li>
 <!--<li>trash.png from <a href="https://www.iconfinder.com/icons/115789/trash_icon#size=128">https://www.iconfinder.com/&#8203;icons/115789/&#8203;trash_icon#size=128</a> , by Designmodo, under <a href="http://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</li>-->
-<li>baseline_photo_library_white_48.png, flash_auto.png, flash_off.png, flash_on.png, ic_burst_mode_white_48dp.png,
-    ic_exposure_white_48dp.png, ic_face_white_48dp.png, ic_fast_forward_white_48dp.png, ic_gps_fixed_white_48dp.png,
+<li>baseline_folder_open_white_48.png, baseline_photo_library_white_48.png, baseline_text_fields_white_48.png,
+    baseline_text_fields_red_48.png,
+    flash_auto.png, flash_off.png, flash_on.png,
+    ic_burst_mode_white_48dp.png,
+    ic_exposure_white_48dp.png, ic_face_red_48dp.png, ic_face_white_48dp.png, ic_fast_forward_white_48dp.png, ic_gps_fixed_white_48dp.png,
     ic_gps_off_white_48dp.png, ic_hdr_on_white_48dp.png, ic_help_outline_white_48dp.png, ic_info_outline_white_48dp.png,
     ic_mic_off_white_48dp.png, ic_mic_red_48dp.png, ic_mic_white_48dp.png, ic_more_horiz_white_48dp.png,
     ic_pause_circle_outline_white_48dp.png, ic_play_circle_outline_white_48dp.png, ic_photo_camera_white_48dp.png,
     ic_photo_size_select_large_white_48dp.png, ic_power_settings_new_white_48dp.png, ic_save_white_48dp.png,
-    ic_slow_motion_video_white_48dp.png, ic_text_format_white_48dp.png, ic_timelapse_white_48dp.png, ic_timer_white_48dp.png,
+    ic_slow_motion_video_white_48dp.png, ic_text_format_red_48dp.png, ic_text_format_white_48dp.png, ic_timelapse_white_48dp.png, ic_timer_white_48dp.png,
     ic_touch_app_white_48dp.png, ic_videocam_white_48dp.png, popup*.png, settings.png, share.png, switch_camera.png,
     trash.png - from
     <a href="https://developer.android.com/design/downloads/index.html">https://developer.android.com/&#8203;design/downloads/index.html</a> / <a href="https://github.com/google/material-design-icons/">https://github.com/google/material-design-icons/</a> / <a href="https://design.google.com/icons/">https://design.google.com/icons/</a>,

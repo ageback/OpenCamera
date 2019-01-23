@@ -10,10 +10,10 @@ import net.sourceforge.opencamera.Preview.Preview;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -22,10 +22,8 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Handler;
 import android.preference.PreferenceManager;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,9 +49,19 @@ public class PopupView extends LinearLayout {
 	public static final float ALPHA_BUTTON_SELECTED = 1.0f;
 	public static final float ALPHA_BUTTON = 0.6f; // 0.4f tends to be hard to see in bright light
 
+	private static final float button_text_size_dip = 12.0f;
+	private static final float title_text_size_dip = 17.0f;
+	private static final float standard_text_size_dip = 16.0f;
+	private static final float arrow_text_size_dip = 16.0f;
+	private static final float arrow_button_w_dp = 60.0f;
+	private static final float arrow_button_h_dp = 48.0f; // should be at least 48.0 (Google Play's prelaunch warnings)
+	private final int arrow_button_w;
+	private final int arrow_button_h;
+
 	private int total_width_dp;
 
 	private int picture_size_index = -1;
+	private int nr_mode_index = -1;
 	private int burst_n_images_index = -1;
 	private int video_size_index = -1;
 	private int video_capture_rate_index = -1;
@@ -72,28 +80,24 @@ public class PopupView extends LinearLayout {
 		this.setOrientation(LinearLayout.VERTICAL);
 
 		final float scale = getResources().getDisplayMetrics().density;
-		total_width_dp = 280;
-		{
-			Activity activity = (Activity)this.getContext();
-			Display display = activity.getWindowManager().getDefaultDisplay();
-			// ensure we have display for landscape orientation (even if we ever allow Open Camera
-			DisplayMetrics outMetrics = new DisplayMetrics();
-			display.getMetrics(outMetrics);
 
-			// normally we should always have heightPixels < widthPixels, but good not to assume we're running in landscape orientation
-			int smaller_dim = Math.min(outMetrics.widthPixels, outMetrics.heightPixels);
-			// the smaller dimension should limit the width, due to when held in portrait
-			int dpHeight = (int)(smaller_dim / scale);
-			if( MyDebug.LOG ) {
-    			Log.d(TAG, "display size: " + outMetrics.widthPixels + " x " + outMetrics.heightPixels);
-				Log.d(TAG, "dpHeight: " + dpHeight);
-			}
-			dpHeight -= 50; // allow space for the icons at top/right of screen
-			if( total_width_dp > dpHeight )
-				total_width_dp = dpHeight;
+		arrow_button_w = (int) (arrow_button_w_dp * scale + 0.5f); // convert dps to pixels
+		arrow_button_h = (int) (arrow_button_h_dp * scale + 0.5f); // convert dps to pixels
+
+		final MainActivity main_activity = (MainActivity)this.getContext();
+
+		boolean small_screen = false;
+		total_width_dp = 280;
+		int max_width_dp = main_activity.getMainUI().getMaxHeightDp(false);
+		if( total_width_dp > max_width_dp ) {
+			total_width_dp = max_width_dp;
+			small_screen = true;
 		}
-		if( MyDebug.LOG )
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "max_width_dp: " + max_width_dp);
 			Log.d(TAG, "total_width_dp: " + total_width_dp);
+			Log.d(TAG, "small_screen: " + small_screen);
+		}
 
 		/*{
 			int total_width = (int) (total_width_dp * scale + 0.5f); // convert dps to pixels;
@@ -105,7 +109,6 @@ public class PopupView extends LinearLayout {
 			this.setLayoutParams(params);
 		}*/
 
-		final MainActivity main_activity = (MainActivity)this.getContext();
 		final Preview preview = main_activity.getPreview();
 		if( MyDebug.LOG )
 			Log.d(TAG, "PopupView time 2: " + (System.nanoTime() - debug_time));
@@ -250,9 +253,66 @@ public class PopupView extends LinearLayout {
 			if( MyDebug.LOG )
 				Log.d(TAG, "PopupView time 7: " + (System.nanoTime() - debug_time));
 
-        	if( main_activity.supportsAutoStabilise() ) {
+			if( !preview.isVideo() && photo_mode == MyApplicationInterface.PhotoMode.NoiseReduction ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "add noise reduction options");
+
+				final String [] nr_mode_values = getResources().getStringArray(R.array.preference_nr_mode_values);
+				String [] nr_mode_entries = getResources().getStringArray(R.array.preference_nr_mode_entries);
+
+				if( nr_mode_values.length != nr_mode_entries.length ) {
+					Log.e(TAG, "preference_nr_mode_values and preference_nr_mode_entries are different lengths");
+					throw new RuntimeException();
+				}
+
+				//String nr_mode_value = sharedPreferences.getString(PreferenceKeys.NRModePreferenceKey, "preference_nr_mode_normal");
+				String nr_mode_value = main_activity.getApplicationInterface().getNRMode();
+				nr_mode_index = Arrays.asList(nr_mode_values).indexOf(nr_mode_value);
+				if( nr_mode_index == -1 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "can't find nr_mode_value " + nr_mode_value + " in nr_mode_values!");
+					nr_mode_index = 0;
+				}
+				addArrayOptionsToPopup(Arrays.asList(nr_mode_entries), getResources().getString(R.string.preference_nr_mode), true, true, nr_mode_index, false, "NR_MODE", new ArrayOptionsPopupListener() {
+					private void update() {
+						if( nr_mode_index == -1 )
+							return;
+						String new_nr_mode_value = nr_mode_values[nr_mode_index];
+						SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+						SharedPreferences.Editor editor = sharedPreferences.edit();
+						//editor.putString(PreferenceKeys.NRModePreferenceKey, new_nr_mode_value);
+						main_activity.getApplicationInterface().setNRMode(new_nr_mode_value);
+						editor.apply();
+						if( preview.getCameraController() != null ) {
+							preview.setupBurstMode();
+						}
+					}
+					@Override
+					public int onClickPrev() {
+						if( nr_mode_index != -1 && nr_mode_index > 0 ) {
+							nr_mode_index--;
+							update();
+							return nr_mode_index;
+						}
+						return -1;
+					}
+					@Override
+					public int onClickNext() {
+						if( nr_mode_index != -1 && nr_mode_index < nr_mode_values.length-1 ) {
+							nr_mode_index++;
+							update();
+							return nr_mode_index;
+						}
+						return -1;
+					}
+				});
+			}
+
+        	if( main_activity.supportsAutoStabilise() && !main_activity.getMainUI().showAutoLevelIcon() ) {
+				// don't show auto-stabilise checkbox on popup if there's an on-screen icon
         		CheckBox checkBox = new CheckBox(main_activity);
         		checkBox.setText(getResources().getString(R.string.preference_auto_stabilise));
+				checkBox.setTextSize(TypedValue.COMPLEX_UNIT_DIP, standard_text_size_dip);
         		checkBox.setTextColor(Color.WHITE);
 				{
 					// align the checkbox a bit better
@@ -271,26 +331,7 @@ public class PopupView extends LinearLayout {
         		checkBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
 					public void onCheckedChanged(CompoundButton buttonView,
 							boolean isChecked) {
-	    				final SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
-						SharedPreferences.Editor editor = sharedPreferences.edit();
-						editor.putBoolean(PreferenceKeys.AutoStabilisePreferenceKey, isChecked);
-						editor.apply();
-
-						boolean done_dialog = false;
-	            		if( isChecked ) {
-	            			boolean done_auto_stabilise_info = sharedPreferences.contains(PreferenceKeys.AutoStabiliseInfoPreferenceKey);
-	            			if( !done_auto_stabilise_info ) {
-	            				main_activity.getMainUI().showInfoDialog(R.string.preference_auto_stabilise, R.string.auto_stabilise_info, PreferenceKeys.AutoStabiliseInfoPreferenceKey);
-		        	    		done_dialog = true;
-	            			}
-	                    }
-
-	            		if( !done_dialog ) {
-	            			String message = getResources().getString(R.string.preference_auto_stabilise) + ": " + getResources().getString(isChecked ? R.string.on : R.string.off);
-	            			preview.showToast(main_activity.getChangedAutoStabiliseToastBoxer(), message);
-	            		}
-						main_activity.getApplicationInterface().getDrawPreview().updateSettings(); // because we cache the auto-stabilise setting
-						main_activity.closePopup(); // don't need to destroy popup
+						main_activity.clickedAutoLevel();
 					}
         		});
 
@@ -302,8 +343,10 @@ public class PopupView extends LinearLayout {
 			if( !preview.isVideo() ) {
 				// only show photo resolutions in photo mode - even if photo snapshots whilst recording video is supported, the
 				// resolutions for that won't match what the user has requested for photo mode resolutions
-				final List<CameraController.Size> picture_sizes = preview.getSupportedPictureSizes(true);
-				//picture_size_index = preview.getCurrentPictureSizeIndex();
+				final List<CameraController.Size> picture_sizes = new ArrayList<>(preview.getSupportedPictureSizes(true));
+				// take a copy so that we can reorder
+				// picture_sizes is sorted high to low, but we want to order low to high
+				Collections.reverse(picture_sizes);
 				picture_size_index = -1;
 				CameraController.Size current_picture_size = preview.getCurrentPictureSize();
 				final List<String> picture_size_strings = new ArrayList<>();
@@ -383,6 +426,11 @@ public class PopupView extends LinearLayout {
 					// fall back to unfiltered list
 					video_sizes = preview.getVideoQualityHander().getSupportedVideoQuality();
 				}
+				// take a copy so that we can reorder
+				video_sizes = new ArrayList<>(video_sizes);
+				// video_sizes is sorted high to low, but we want to order low to high
+				Collections.reverse(video_sizes);
+
 				final List<String> video_sizes_f = video_sizes;
 				video_size_index = 0; // default to largest
 				for(int i=0;i<video_sizes.size();i++) {
@@ -490,8 +538,8 @@ public class PopupView extends LinearLayout {
 					burst_mode_values_l.add( all_burst_mode_values[i] );
 					burst_mode_entries_l.add( all_burst_mode_entries[i] );
 				}
-				final String [] burst_mode_values = burst_mode_values_l.toArray(new String[burst_mode_values_l.size()]);
-				final String [] burst_mode_entries = burst_mode_entries_l.toArray(new String[burst_mode_entries_l.size()]);
+				final String [] burst_mode_values = burst_mode_values_l.toArray(new String[0]);
+				final String [] burst_mode_entries = burst_mode_entries_l.toArray(new String[0]);
 
 				String burst_mode_value = sharedPreferences.getString(PreferenceKeys.FastBurstNImagesPreferenceKey, "5");
 				burst_n_images_index = Arrays.asList(burst_mode_values).indexOf(burst_mode_value);
@@ -653,6 +701,16 @@ public class PopupView extends LinearLayout {
 					addArrayOptionsToPopup(capture_rate_str, getResources().getString(R.string.preference_video_capture_rate), true, false, video_capture_rate_index, false, "VIDEOCAPTURERATE", new ArrayOptionsPopupListener() {
 						private int old_video_capture_rate_index = video_capture_rate_index;
 
+						final Handler handler = new Handler();
+						final Runnable update_runnable = new Runnable() {
+							@Override
+							public void run() {
+								if (MyDebug.LOG)
+									Log.d(TAG, "update settings due to resolution change");
+								main_activity.updateForSettings("", true); // keep the popupview open
+							}
+						};
+
 						private void update() {
 							if( video_capture_rate_index == -1 )
 								return;
@@ -661,6 +719,7 @@ public class PopupView extends LinearLayout {
 							SharedPreferences.Editor editor = sharedPreferences.edit();
 							editor.putFloat(PreferenceKeys.getVideoCaptureRatePreferenceKey(preview.getCameraId()), new_capture_rate_value);
 							editor.apply();
+
 							float old_capture_rate_value = capture_rate_values.get(old_video_capture_rate_index);
 							boolean old_slow_motion = (old_capture_rate_value < 1.0f-1.0e-5f);
 							boolean new_slow_motion = (new_capture_rate_value < 1.0f-1.0e-5f);
@@ -687,7 +746,14 @@ public class PopupView extends LinearLayout {
 							}
 							old_video_capture_rate_index = video_capture_rate_index;
 
-							main_activity.updateForSettings(toast_message, keep_popup);
+    						if( keep_popup ) {
+								// make it easier to scroll through the list of resolutions without a pause each time
+								handler.removeCallbacks(update_runnable);
+								handler.postDelayed(update_runnable, 400);
+							}
+							else {
+								main_activity.updateForSettings(toast_message, keep_popup);
+							}
 						}
 						@Override
 						public int onClickPrev() {
@@ -721,7 +787,8 @@ public class PopupView extends LinearLayout {
 					Log.d(TAG, "can't find timer_value " + timer_value + " in timer_values!");
 				timer_index = 0;
     		}
-    		addArrayOptionsToPopup(Arrays.asList(timer_entries), getResources().getString(R.string.preference_timer), true, false, timer_index, false, "TIMER", new ArrayOptionsPopupListener() {
+    		// title_in_options should be false for small screens: e.g., problems with pt-rBR or pt-rPT on 4.5" screens or less, see https://sourceforge.net/p/opencamera/discussion/photography/thread/3aa940c636/
+    		addArrayOptionsToPopup(Arrays.asList(timer_entries), getResources().getString(R.string.preference_timer), !small_screen, false, timer_index, false, "TIMER", new ArrayOptionsPopupListener() {
     			private void update() {
     				if( timer_index == -1 )
     					return;
@@ -762,7 +829,9 @@ public class PopupView extends LinearLayout {
 					Log.d(TAG, "can't find repeat_mode_value " + repeat_mode_value + " in repeat_mode_values!");
 				repeat_mode_index = 0;
     		}
-    		addArrayOptionsToPopup(Arrays.asList(repeat_mode_entries), getResources().getString(R.string.preference_burst_mode), true, false, repeat_mode_index, false, "REPEAT_MODE", new ArrayOptionsPopupListener() {
+    		// title_in_options should be false for small screens: e.g., problems with pt-rBR or pt-rPT on 4.5" screens or less, see https://sourceforge.net/p/opencamera/discussion/photography/thread/3aa940c636/
+    		// set title_in_options_first_only to true, as displaying "Repeat: Unlimited" can be too long in some languages, e.g., Vietnamese (vi)
+    		addArrayOptionsToPopup(Arrays.asList(repeat_mode_entries), getResources().getString(R.string.preference_burst_mode), !small_screen, true, repeat_mode_index, false, "REPEAT_MODE", new ArrayOptionsPopupListener() {
     			private void update() {
     				if( repeat_mode_index == -1 )
     					return;
@@ -1000,7 +1069,7 @@ public class PopupView extends LinearLayout {
 			}
 
 			main_activity.getApplicationInterface().getDrawPreview().updateSettings(); // because we cache the photomode
-			main_activity.updateForSettings(toast_message);
+			main_activity.updateForSettings(toast_message); // need to setup the camera again, as options may change (e.g., required burst mode, or whether RAW is allowed in this mode)
 			main_activity.getMainUI().destroyPopup(); // need to recreate popup for new selection
 		}
 	}
@@ -1210,13 +1279,13 @@ public class PopupView extends LinearLayout {
         		}
         		else {
         			Button button = new Button(context);
-        			button.setBackgroundColor(Color.TRANSPARENT); // workaround for Android 6 crash!
+        			button.setBackgroundColor(Color.TRANSPARENT); // workaround for Android 6 crash! Also looks nicer anyway...
         			view = button;
 					buttons.add(view);
         			ll2.addView(view);
 
         			button.setText(button_string);
-        			button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12.0f);
+        			button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, button_text_size_dip);
         			button.setTextColor(Color.WHITE);
         			// need 0 padding so we have enough room to display text for ISO buttons, when there are 6 ISO settings
         			final int padding = (int) (0 * scale + 0.5f); // convert dps to pixels
@@ -1229,7 +1298,7 @@ public class PopupView extends LinearLayout {
     			params.width = button_width;
     			// be careful of making the height too smaller, as harder to touch buttons; remember that this also affects the
 				// ISO buttons on exposure panel, and not just the main popup!
-    			params.height = (int) (50 * scale + 0.5f); // convert dps to pixels
+    			params.height = (int) (55 * scale + 0.5f); // convert dps to pixels
     			view.setLayoutParams(params);
 
     			view.setContentDescription(button_string);
@@ -1310,6 +1379,7 @@ public class PopupView extends LinearLayout {
 		text_view.setText(title + ":");
 		text_view.setTextColor(Color.WHITE);
 		text_view.setGravity(Gravity.CENTER);
+		text_view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, title_text_size_dip);
 		text_view.setTypeface(null, Typeface.BOLD);
 		//text_view.setBackgroundColor(Color.GRAY); // debug
     	this.addView(text_view);
@@ -1353,10 +1423,11 @@ public class PopupView extends LinearLayout {
 			final MainActivity main_activity = (MainActivity)this.getContext();
 	    	final long debug_time = System.nanoTime();
 
-    		//addTitleToPopup(title);
 			final Button button = new Button(this.getContext());
 			button.setBackgroundColor(Color.TRANSPARENT); // workaround for Android 6 crash!
 			button.setText(title + "...");
+			button.setAllCaps(false);
+			button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, title_text_size_dip);
 			this.addView(button);
 			if( MyDebug.LOG )
 				Log.d(TAG, "addRadioOptionsToPopup time 1: " + (System.nanoTime() - debug_time));
@@ -1451,6 +1522,7 @@ public class PopupView extends LinearLayout {
 			button.setId(count);
 
 			button.setText(supported_option_entry);
+			button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, standard_text_size_dip);
 			button.setTextColor(Color.WHITE);
 			if( MyDebug.LOG )
 				Log.d(TAG, "addRadioOptionsToGroup time 3: " + (System.nanoTime() - debug_time));
@@ -1542,52 +1614,61 @@ public class PopupView extends LinearLayout {
 			LinearLayout ll2 = new LinearLayout(this.getContext());
             ll2.setOrientation(LinearLayout.HORIZONTAL);
             
-			final TextView resolution_text_view = new TextView(this.getContext());
-			setArrayOptionsText(supported_options, title, resolution_text_view, title_in_options, title_in_options_first_only, current_index);
-			resolution_text_view.setTextColor(Color.WHITE);
-			resolution_text_view.setGravity(Gravity.CENTER);
+			final TextView text_view = new TextView(this.getContext());
+			setArrayOptionsText(supported_options, title, text_view, title_in_options, title_in_options_first_only, current_index);
+			text_view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, standard_text_size_dip);
+			text_view.setTextColor(Color.WHITE);
+			text_view.setGravity(Gravity.CENTER);
 			LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-			resolution_text_view.setLayoutParams(params);
+			text_view.setLayoutParams(params);
 
 			final float scale = getResources().getDisplayMetrics().density;
 			final int padding = (int) (0 * scale + 0.5f); // convert dps to pixels
-			final int button_w = (int) (60 * scale + 0.5f); // convert dps to pixels
-			final int button_h = (int) (30 * scale + 0.5f); // convert dps to pixels
 			final Button prev_button = new Button(this.getContext());
 			prev_button.setBackgroundColor(Color.TRANSPARENT); // workaround for Android 6 crash!
 			ll2.addView(prev_button);
 			prev_button.setText("<");
-			prev_button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12.0f);
+			prev_button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, arrow_text_size_dip);
+			prev_button.setTypeface(null, Typeface.BOLD);
 			prev_button.setPadding(padding, padding, padding, padding);
 			ViewGroup.LayoutParams vg_params = prev_button.getLayoutParams();
-			vg_params.width = button_w;
-			vg_params.height = button_h;
+			vg_params.width = arrow_button_w;
+			vg_params.height = arrow_button_h;
 			prev_button.setLayoutParams(vg_params);
 			prev_button.setVisibility( (cyclic || current_index > 0) ? View.VISIBLE : View.INVISIBLE);
+			prev_button.setContentDescription( getResources().getString(R.string.previous) + " " + title);
 			main_activity.getMainUI().getTestUIButtonsMap().put(test_key + "_PREV", prev_button);
 
-        	ll2.addView(resolution_text_view);
-			main_activity.getMainUI().getTestUIButtonsMap().put(test_key, resolution_text_view);
+        	ll2.addView(text_view);
+			main_activity.getMainUI().getTestUIButtonsMap().put(test_key, text_view);
 
 			final Button next_button = new Button(this.getContext());
 			next_button.setBackgroundColor(Color.TRANSPARENT); // workaround for Android 6 crash!
 			ll2.addView(next_button);
 			next_button.setText(">");
-			next_button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12.0f);
+			next_button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, arrow_text_size_dip);
+			next_button.setTypeface(null, Typeface.BOLD);
 			next_button.setPadding(padding, padding, padding, padding);
 			vg_params = next_button.getLayoutParams();
-			vg_params.width = button_w;
-			vg_params.height = button_h;
+			vg_params.width = arrow_button_w;
+			vg_params.height = arrow_button_h;
 			next_button.setLayoutParams(vg_params);
 			next_button.setVisibility( (cyclic || current_index < supported_options.size()-1) ? View.VISIBLE : View.INVISIBLE);
+			next_button.setContentDescription( getResources().getString(R.string.next) + " " + title);
 			main_activity.getMainUI().getTestUIButtonsMap().put(test_key + "_NEXT", next_button);
+
+			// test:
+			/*prev_button.setText(prev_button.getContentDescription());
+			prev_button.setAllCaps(false);
+			next_button.setText(next_button.getContentDescription());
+			next_button.setAllCaps(false);*/
 
 			prev_button.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
         			int new_index = listener.onClickPrev();
         			if( new_index != -1 ) {
-						setArrayOptionsText(supported_options, title, resolution_text_view, title_in_options, title_in_options_first_only, new_index);
+						setArrayOptionsText(supported_options, title, text_view, title_in_options, title_in_options_first_only, new_index);
 	        			prev_button.setVisibility( (cyclic || new_index > 0) ? View.VISIBLE : View.INVISIBLE);
 	        			next_button.setVisibility( (cyclic || new_index < supported_options.size()-1) ? View.VISIBLE : View.INVISIBLE);
         			}
@@ -1598,7 +1679,7 @@ public class PopupView extends LinearLayout {
 				public void onClick(View v) {
         			int new_index = listener.onClickNext();
         			if( new_index != -1 ) {
-						setArrayOptionsText(supported_options, title, resolution_text_view, title_in_options, title_in_options_first_only, new_index);
+						setArrayOptionsText(supported_options, title, text_view, title_in_options, title_in_options_first_only, new_index);
 	        			prev_button.setVisibility( (cyclic || new_index > 0) ? View.VISIBLE : View.INVISIBLE);
 	        			next_button.setVisibility( (cyclic || new_index < supported_options.size()-1) ? View.VISIBLE : View.INVISIBLE);
         			}

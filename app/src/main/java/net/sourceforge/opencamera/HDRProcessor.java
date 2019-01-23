@@ -325,11 +325,15 @@ public class HDRProcessor {
 	 * @param hdr_alpha     A value from 0.0f to 1.0f indicating the "strength" of the HDR effect. Specifically,
 	 *                      this controls the level of the local contrast enhancement done in adjustHistogram().
 	 * @param n_tiles       A value of 1 or greater indicating how local the contrast enhancement algorithm should be.
+	 * @param ce_preserve_blacks
+	 * 						If true (recommended), then we apply a modification to the contrast enhancement algorithm to avoid
+	 *                      making darker pixels too dark. A value of false gives more contrast on the darker regions of the
+	 *                      resultant image.
 	 * @param tonemapping_algorithm
 	 *                      Algorithm to use for tonemapping (if multiple images are received).
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	public void processHDR(List<Bitmap> bitmaps, boolean release_bitmaps, Bitmap output_bitmap, boolean assume_sorted, SortCallback sort_cb, float hdr_alpha, int n_tiles, TonemappingAlgorithm tonemapping_algorithm) throws HDRProcessorException {
+	public void processHDR(List<Bitmap> bitmaps, boolean release_bitmaps, Bitmap output_bitmap, boolean assume_sorted, SortCallback sort_cb, float hdr_alpha, int n_tiles, boolean ce_preserve_blacks, TonemappingAlgorithm tonemapping_algorithm) throws HDRProcessorException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "processHDR");
 		if( !assume_sorted && !release_bitmaps ) {
@@ -368,10 +372,10 @@ public class HDRProcessor {
 				sort_order.add(0);
 				sort_cb.sortOrder(sort_order);
 			}
-			processSingleImage(bitmaps, release_bitmaps, output_bitmap, hdr_alpha, n_tiles);
+			processSingleImage(bitmaps, release_bitmaps, output_bitmap, hdr_alpha, n_tiles, ce_preserve_blacks);
 			break;
 		case HDRALGORITHM_STANDARD:
-			processHDRCore(bitmaps, release_bitmaps, output_bitmap, assume_sorted, sort_cb, hdr_alpha, n_tiles, tonemapping_algorithm);
+			processHDRCore(bitmaps, release_bitmaps, output_bitmap, assume_sorted, sort_cb, hdr_alpha, n_tiles, ce_preserve_blacks, tonemapping_algorithm);
 			break;
 		default:
 			if( MyDebug.LOG )
@@ -510,7 +514,7 @@ public class HDRProcessor {
 	 *  Android 5.0).
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	private void processHDRCore(List<Bitmap> bitmaps, boolean release_bitmaps, Bitmap output_bitmap, boolean assume_sorted, SortCallback sort_cb, float hdr_alpha, int n_tiles, TonemappingAlgorithm tonemapping_algorithm) {
+	private void processHDRCore(List<Bitmap> bitmaps, boolean release_bitmaps, Bitmap output_bitmap, boolean assume_sorted, SortCallback sort_cb, float hdr_alpha, int n_tiles, boolean ce_preserve_blacks, TonemappingAlgorithm tonemapping_algorithm) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "processHDRCore");
 
@@ -545,7 +549,7 @@ public class HDRProcessor {
 
 		// perform auto-alignment
 		// if assume_sorted if false, this function will also sort the allocations and bitmaps from darkest to brightest.
-		BrightnessDetails brightnessDetails = autoAlignment(offsets_x, offsets_y, allocations, width, height, bitmaps, base_bitmap, assume_sorted, sort_cb, true, false, 1, true, true, width, height, time_s);
+		BrightnessDetails brightnessDetails = autoAlignment(offsets_x, offsets_y, allocations, width, height, bitmaps, base_bitmap, assume_sorted, sort_cb, true, false, 1, true, false, width, height, time_s);
 		int median_brightness = brightnessDetails.median_brightness;
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "### time after autoAlignment: " + (System.currentTimeMillis() - time_s));
@@ -891,7 +895,7 @@ public class HDRProcessor {
 		}
 
 		if( hdr_alpha != 0.0f ) {
-			adjustHistogram(output_allocation, output_allocation, width, height, hdr_alpha, n_tiles, time_s);
+			adjustHistogram(output_allocation, output_allocation, width, height, hdr_alpha, n_tiles, ce_preserve_blacks, time_s);
 			if( MyDebug.LOG )
 				Log.d(TAG, "### time after adjustHistogram: " + (System.currentTimeMillis() - time_s));
 		}
@@ -926,7 +930,7 @@ public class HDRProcessor {
 	}
 
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	private void processSingleImage(List<Bitmap> bitmaps, boolean release_bitmaps, Bitmap output_bitmap, float hdr_alpha, int n_tiles) {
+	private void processSingleImage(List<Bitmap> bitmaps, boolean release_bitmaps, Bitmap output_bitmap, float hdr_alpha, int n_tiles, boolean ce_preserve_blacks) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "processSingleImage");
 
@@ -988,7 +992,7 @@ public class HDRProcessor {
 			}
 		}*/
 
-		adjustHistogram(allocation, output_allocation, width, height, hdr_alpha, n_tiles, time_s);
+		adjustHistogram(allocation, output_allocation, width, height, hdr_alpha, n_tiles, ce_preserve_blacks, time_s);
 
 		if( release_bitmaps ) {
 			allocation.copyTo(bitmaps.get(0));
@@ -1041,7 +1045,7 @@ public class HDRProcessor {
 		return cached_avg_sample_size;
 	}
 
-	public class AvgData {
+	public static class AvgData {
 		public Allocation allocation_out;
 		Bitmap bitmap_avg_align;
 		Allocation allocation_avg_align;
@@ -1082,9 +1086,10 @@ public class HDRProcessor {
 	 * @param bitmap_new     The other input image. The bitmap is recycled.
 	 * @param avg_factor     The weighting factor for bitmap_avg.
 	 * @param iso            The ISO used to take the photos.
+	 * @param zoom_factor    The digital zoom factor used to take the photos.
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	public AvgData processAvg(Bitmap bitmap_avg, Bitmap bitmap_new, float avg_factor, int iso) throws HDRProcessorException {
+	public AvgData processAvg(Bitmap bitmap_avg, Bitmap bitmap_new, float avg_factor, int iso, float zoom_factor) throws HDRProcessorException {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "processAvg");
 			Log.d(TAG, "avg_factor: " + avg_factor);
@@ -1139,7 +1144,7 @@ public class HDRProcessor {
 		if( MyDebug.LOG )
 			Log.d(TAG, "median: " + luminanceInfo.median_value);*/
 
-		AvgData avg_data = processAvgCore(null, null, bitmap_avg, bitmap_new, width, height, avg_factor, iso, null, null, time_s);
+		AvgData avg_data = processAvgCore(null, null, bitmap_avg, bitmap_new, width, height, avg_factor, iso, zoom_factor, null, null, time_s);
 
 		//allocation_avg.copyTo(bitmap_avg);
 
@@ -1156,11 +1161,12 @@ public class HDRProcessor {
 	 * @param bitmap_new     The new input image. The bitmap is recycled.
 	 * @param avg_factor     The weighting factor for bitmap_avg.
 	 * @param iso            The ISO used to take the photos.
+	 * @param zoom_factor    The digital zoom factor used to take the photos.
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	public void updateAvg(AvgData avg_data, int width, int height, Bitmap bitmap_new, float avg_factor, int iso) throws HDRProcessorException {
+	public void updateAvg(AvgData avg_data, int width, int height, Bitmap bitmap_new, float avg_factor, int iso, float zoom_factor) throws HDRProcessorException {
 		if( MyDebug.LOG ) {
-			Log.d(TAG, "processAvg");
+			Log.d(TAG, "updateAvg");
 			Log.d(TAG, "avg_factor: " + avg_factor);
 		}
 		if( width != bitmap_new.getWidth() ||
@@ -1178,7 +1184,7 @@ public class HDRProcessor {
 		if( MyDebug.LOG )
 			Log.d(TAG, "### time after creating allocations from bitmaps: " + (System.currentTimeMillis() - time_s));*/
 
-		processAvgCore(avg_data.allocation_out, avg_data.allocation_out, null, bitmap_new, width, height, avg_factor, iso, avg_data.allocation_avg_align, avg_data.bitmap_avg_align, time_s);
+		processAvgCore(avg_data.allocation_out, avg_data.allocation_out, null, bitmap_new, width, height, avg_factor, iso, zoom_factor, avg_data.allocation_avg_align, avg_data.bitmap_avg_align, time_s);
 
 		if( MyDebug.LOG )
 			Log.d(TAG, "### time for updateAvg: " + (System.currentTimeMillis() - time_s));
@@ -1196,6 +1202,7 @@ public class HDRProcessor {
 	 * @param height         The height of the bitmaps.
 	 * @param avg_factor     The averaging factor.
 	 * @param iso            The ISO used for the photos.
+	 * @param zoom_factor    The digital zoom factor used to take the photos.
 	 * @param allocation_avg_align If non-null, use this allocation for alignment for averaged image.
 	 * @param bitmap_avg_align Should be supplied if allocation_avg_align is non-null, and stores
 	 *                         the bitmap corresponding to the allocation_avg_align.
@@ -1203,10 +1210,11 @@ public class HDRProcessor {
 	 * @throws HDRProcessorException
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	private AvgData processAvgCore(Allocation allocation_out, Allocation allocation_avg, Bitmap bitmap_avg, Bitmap bitmap_new, int width, int height, float avg_factor, int iso, Allocation allocation_avg_align, Bitmap bitmap_avg_align, long time_s) throws HDRProcessorException {
+	private AvgData processAvgCore(Allocation allocation_out, Allocation allocation_avg, Bitmap bitmap_avg, Bitmap bitmap_new, int width, int height, float avg_factor, int iso, float zoom_factor, Allocation allocation_avg_align, Bitmap bitmap_avg_align, long time_s) throws HDRProcessorException {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "processAvgCore");
 			Log.d(TAG, "iso: " + iso);
+			Log.d(TAG, "zoom_factor: " + zoom_factor);
 		}
 
 		Allocation allocation_new = null;
@@ -1234,12 +1242,14 @@ public class HDRProcessor {
 			//final int scale_align_size = 2;
 			//final int scale_align_size = 4;
 			//final int scale_align_size = Math.max(4 / this.cached_avg_sample_size, 1);
-			final int scale_align_size = Math.max(4 / this.getAvgSampleSize(iso), 1);
+			final int scale_align_size = (zoom_factor > 3.9f) ?
+					1 :
+					Math.max(4 / this.getAvgSampleSize(iso), 1);
 			if( MyDebug.LOG )
 				Log.d(TAG, "scale_align_size: " + scale_align_size);
 			boolean crop_to_centre = true;
 			if( scale_align ) {
-			    // use scaled down bitmaps for alignment
+			    // use scaled down and/or cropped bitmaps for alignment
 				if( MyDebug.LOG )
 					Log.d(TAG, "### time before creating allocations for autoalignment: " + (System.currentTimeMillis() - time_s));
                 Matrix align_scale_matrix = new Matrix();
@@ -1300,10 +1310,10 @@ public class HDRProcessor {
 				allocations[1] = allocation_new;
 			}
 
-			// need to use try_harder to improve testAvg17, testAvg36
-			//autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, false, floating_point_align, 1, crop_to_centre, false, full_alignment_width, full_alignment_height, time_s);
-			autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, false, floating_point_align, 1, crop_to_centre, true, full_alignment_width, full_alignment_height, time_s);
-			//autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, true, floating_point_align, 1, crop_to_centre, false, full_alignment_width, full_alignment_height, time_s);
+			// misalignment more likely in "dark" images with more images and/or longer exposures
+			// using wider needed to prevent misalignment in testAvg51; also helps testAvg14
+			boolean wider = iso >= 1100;
+			autoAlignment(offsets_x, offsets_y, allocations, alignment_width, alignment_height, align_bitmaps, 0, true, null, false, floating_point_align, 1, crop_to_centre, wider, full_alignment_width, full_alignment_height, time_s);
 
 			/*
 			// compute allocation_diffs
@@ -1393,6 +1403,7 @@ public class HDRProcessor {
 		}
 
 		// set allocations
+		//processAvgScript.set_bitmap_avg(allocation_avg);
 		processAvgScript.set_bitmap_new(allocation_new);
 
 		// set offsets
@@ -1421,6 +1432,20 @@ public class HDRProcessor {
 		float wiener_C = 10.0f * limited_iso;
 		//float wiener_C = 1000.0f;
 		//float wiener_C = 4000.0f;
+
+		// Tapering the wiener scale means that we do more averaging for earlier images in the stack, the
+		// logic being we'll have more chance of ghosting or misalignment with later images.
+		// This helps: testAvg31, testAvg33.
+		// Also slightly helps testAvg17, testAvg23 (slightly less white speckle on tv), testAvg28
+		// (one less white speckle on face).
+		// Note that too much tapering risks increasing ghosting in testAvg26, testAvg39.
+		float tapered_wiener_scale = 1.0f - (float)Math.pow(0.5, avg_factor);
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "avg_factor: " + avg_factor);
+			Log.d(TAG, "tapered_wiener_scale: " + tapered_wiener_scale);
+		}
+		wiener_C /= tapered_wiener_scale;
+
 		float wiener_C_cutoff = wiener_cutoff_factor * wiener_C;
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "wiener_C: " + wiener_C);
@@ -1428,6 +1453,12 @@ public class HDRProcessor {
 		}
 		processAvgScript.set_wiener_C(wiener_C);
 		processAvgScript.set_wiener_C_cutoff(wiener_C_cutoff);
+
+		/*final float max_weight = 0.9375f;
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "max_weight: " + max_weight);
+		}
+		processAvgScript.set_max_weight(max_weight);*/
 
 		if( MyDebug.LOG )
 			Log.d(TAG, "call processAvgScript");
@@ -1471,7 +1502,7 @@ public class HDRProcessor {
 	 *                the other input bitmaps will be recycled.
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	public void processAvgMulti(List<Bitmap> bitmaps, float hdr_alpha, int n_tiles) throws HDRProcessorException {
+	public void processAvgMulti(List<Bitmap> bitmaps, float hdr_alpha, int n_tiles, boolean ce_preserve_blacks) throws HDRProcessorException {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "processAvgMulti");
 			Log.d(TAG, "hdr_alpha: " + hdr_alpha);
@@ -1574,7 +1605,7 @@ public class HDRProcessor {
 		}
 
 		if( hdr_alpha != 0.0f ) {
-			adjustHistogram(allocation0, allocation0, width, height, hdr_alpha, n_tiles, time_s);
+			adjustHistogram(allocation0, allocation0, width, height, hdr_alpha, n_tiles, ce_preserve_blacks, time_s);
 			if( MyDebug.LOG )
 				Log.d(TAG, "### time after adjustHistogram: " + (System.currentTimeMillis() - time_s));
 		}
@@ -1602,14 +1633,16 @@ public class HDRProcessor {
 	 *                      sort the allocations and bitmaps from darkest to brightest.
 	 * @param use_mtb       Whether to align based on the median threshold bitmaps or not.
 	 * @param floating_point If true, the first allocation is in floating point (F32_3) format.
+	 * @param wider         If true, start from a larger start area.
      */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	private BrightnessDetails autoAlignment(int [] offsets_x, int [] offsets_y, Allocation [] allocations, int width, int height, List<Bitmap> bitmaps, int base_bitmap, boolean assume_sorted, SortCallback sort_cb, boolean use_mtb, boolean floating_point, int min_step_size, boolean crop_to_centre, boolean try_harder, int full_width, int full_height, long time_s) {
+	private BrightnessDetails autoAlignment(int [] offsets_x, int [] offsets_y, Allocation [] allocations, int width, int height, List<Bitmap> bitmaps, int base_bitmap, boolean assume_sorted, SortCallback sort_cb, boolean use_mtb, boolean floating_point, int min_step_size, boolean crop_to_centre, boolean wider, int full_width, int full_height, long time_s) {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "autoAlignment");
 			Log.d(TAG, "width: " + width);
 			Log.d(TAG, "height: " + height);
 			Log.d(TAG, "use_mtb: " + use_mtb);
+			Log.d(TAG, "wider: " + wider);
 			Log.d(TAG, "allocations: " + allocations.length);
 			for(Allocation allocation : allocations) {
 				Log.d(TAG, "    allocation:");
@@ -1637,18 +1670,10 @@ public class HDRProcessor {
 		int mtb_x = 0;
 		int mtb_y = 0;
 		if( crop_to_centre ) {
-			if( try_harder ) {
-				mtb_width = width/2;
-				mtb_height = height/2;
-				mtb_x = mtb_width/2;
-				mtb_y = mtb_height/2;
-			}
-			else {
-				mtb_width = width/4;
-				mtb_height = height/4;
-				mtb_x = (width - mtb_width)/2;
-				mtb_y = (height - mtb_height)/2;
-			}
+			mtb_width = width/2;
+			mtb_height = height/2;
+			mtb_x = mtb_width/2;
+			mtb_y = mtb_height/2;
 		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "mtb_x: " + mtb_x);
@@ -1824,7 +1849,7 @@ public class HDRProcessor {
 		// to renderscript that we do). But high step sizes have a risk of producing really bad results if we were
 		// to misidentify cases as needing a large offset.
 		int max_dim = Math.max(full_width, full_height); // n.b., use the full width and height here, not the mtb_width, height
-		int max_ideal_size = max_dim / (try_harder ? 150 : 300);
+        int max_ideal_size = max_dim / (wider ? 75 : 150);
 		int initial_step_size = 1;
 		while( initial_step_size < max_ideal_size ) {
 			initial_step_size *= 2;
@@ -1944,6 +1969,9 @@ public class HDRProcessor {
 						Log.d(TAG, "offsets_x is now: " + offsets_x[i]);
 						Log.d(TAG, "offsets_y is now: " + offsets_y[i]);
 					}
+					/*if( wider && step_size == initial_step_size/2 && (this_off_x != 0 || this_off_y != 0 ) ) {
+						throw new RuntimeException(); // test
+					}*/
 				}
 			}
 			if( MyDebug.LOG ) {
@@ -2052,7 +2080,7 @@ public class HDRProcessor {
 	}
 
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	private void adjustHistogram(Allocation allocation_in, Allocation allocation_out, int width, int height, float hdr_alpha, int n_tiles, long time_s) {
+	private void adjustHistogram(Allocation allocation_in, Allocation allocation_out, int width, int height, float hdr_alpha, int n_tiles, boolean ce_preserve_blacks, long time_s) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "adjustHistogram");
 		final boolean adjust_histogram = false;
@@ -2128,11 +2156,12 @@ public class HDRProcessor {
 		final boolean adjust_histogram_local = true;
 
 		if( adjust_histogram_local ) {
-			// Contrast Limited Adaptive Histogram Equalisation
+			// Contrast Limited Adaptive Histogram Equalisation (CLAHE)
 			// Note we don't fully equalise the histogram, rather the resultant image is the mid-point of the non-equalised and fully-equalised images
 			// See https://en.wikipedia.org/wiki/Adaptive_histogram_equalization#Contrast_Limited_AHE
 			// Also see "Adaptive Histogram Equalization and its Variations" ( http://www.cs.unc.edu/Research/MIDAG/pubs/papers/Adaptive%20Histogram%20Equalization%20and%20Its%20Variations.pdf ),
 			// Pizer, Amburn, Austin, Cromartie, Geselowitz, Greer, ter Haar Romeny, Zimmerman, Zuiderveld (1987).
+			// Also note that if ce_preserve_blacks is true, we apply a modification to this algorithm, see below.
 
 			// create histograms
 			Allocation histogramAllocation = Allocation.createSized(rs, Element.I32(rs), 256);
@@ -2152,6 +2181,7 @@ public class HDRProcessor {
 			//final int n_tiles_c = 4;
 			//final int n_tiles_c = 1;
 			int [] c_histogram = new int[n_tiles*n_tiles*256];
+			int [] temp_c_histogram = new int[256];
 			for(int i=0;i<n_tiles;i++) {
 				double a0 = ((double)i)/(double)n_tiles;
 				double a1 = ((double)i+1.0)/(double)n_tiles;
@@ -2212,8 +2242,10 @@ public class HDRProcessor {
 					// clip histogram, for Contrast Limited AHE algorithm
 					int n_pixels = (stop_x - start_x) * (stop_y - start_y);
 					int clip_limit = (5 * n_pixels) / 256;
-						/*if( MyDebug.LOG )
-							Log.d(TAG, "clip_limit: " + clip_limit);*/
+					/*if( MyDebug.LOG ) {
+                        Log.d(TAG, "clip_limit: " + clip_limit);
+                        Log.d(TAG, "    relative clip limit: " + clip_limit*256.0f/n_pixels);
+                    }*/
 					{
 						// find real clip limit
 						int bottom = 0, top = clip_limit;
@@ -2231,12 +2263,17 @@ public class HDRProcessor {
 								bottom = middle;
 						}
 						clip_limit = (top + bottom)/2;
-							/*if( MyDebug.LOG )
-								Log.d(TAG, "updated clip_limit: " + clip_limit);*/
+                        /*if( MyDebug.LOG ) {
+                            Log.d(TAG, "updated clip_limit: " + clip_limit);
+                            Log.d(TAG, "    relative updated clip limit: " + clip_limit*256.0f/n_pixels);
+                        }*/
 					}
 					int n_clipped = 0;
 					for(int x=0;x<256;x++) {
 						if( histogram[x] > clip_limit ) {
+                            /*if( MyDebug.LOG ) {
+                                Log.d(TAG, "    " + x + " : " + histogram[x] + " : " + (histogram[x]*256.0f/n_pixels));
+                            }*/
 							n_clipped += (histogram[x] - clip_limit);
 							histogram[x] = clip_limit;
 						}
@@ -2250,16 +2287,82 @@ public class HDRProcessor {
 						histogram[x] += n_clipped_per_bucket;
 					}
 
+                    if( ce_preserve_blacks ) {
+						// This helps tests such as testHDR52, testHDR57, testAvg26, testAvg30
+						// The basic idea is that we want to avoid making darker pixels darker (by too
+						// much). We do this by adjusting the histogram:
+						// * We can set a minimum value of each histogram value. E.g., if we set all
+						//   pixels up to a certain brightness to a value equal to n_pixels/256, then
+						//   we prevent those pixels from being made darker. In practice, we choose
+						//   a tapered minimum, starting at (n_pixels/256) for black pixels, linearly
+						//   interpolating to no minimum at brightness 128 (dark_threshold_c).
+						// * For any adjusted value of the histogram, we redistribute, by reducing
+						//   the histogram values of brighter pixels with values larger than (n_pixels/256),
+						//   reducing them to a minimum of (n_pixels/256).
+						// * Lastly, we only modify a given histogram value if pixels of that brightness
+						//   would be made darker by the CLAHE algorithm. We can do this by looking at
+						//   the cumulative histogram (as computed before modifying any values).
+						if( MyDebug.LOG ) {
+							for(int x=0;x<256;x++) {
+								Log.d(TAG, "pre-brighten histogram[" + x + "] = " + histogram[x]);
+							}
+						}
+
+						temp_c_histogram[0] = histogram[0];
+						for(int x=1;x<256;x++) {
+							temp_c_histogram[x] = temp_c_histogram[x-1] + histogram[x];
+						}
+
+    					// avoid making pixels too dark
+						int equal_limit = n_pixels / 256;
+						if( MyDebug.LOG )
+							Log.d(TAG, "equal_limit: " + equal_limit);
+						//final int dark_threshold_c = 64;
+						final int dark_threshold_c = 128;
+						//final int dark_threshold_c = 256;
+                        for(int x=0;x<dark_threshold_c;x++) {
+                        	int c_equal_limit = equal_limit * (x+1);
+                        	if( temp_c_histogram[x] >= c_equal_limit ) {
+								continue;
+							}
+                        	float alpha = 1.0f - ((float)x)/((float)dark_threshold_c);
+                        	//float alpha = 1.0f - ((float)x)/256.0f;
+                        	int limit = (int)(alpha * equal_limit);
+							//int limit = equal_limit;
+							if( MyDebug.LOG )
+								Log.d(TAG, "x: " + x + " ; limit: " + limit);
+                            /*histogram[x] = Math.max(histogram[x], limit);
+							if( MyDebug.LOG )
+								Log.d(TAG, "    histogram pulled up to: "  + histogram[x]);*/
+                        	if( histogram[x] < limit ) {
+                        	    // top up by redistributing later values
+                                for(int y=x+1;y<256 && histogram[x] < limit;y++) {
+                                    if( histogram[y] > equal_limit ) {
+                                        int move = histogram[y] - equal_limit;
+                                        move = Math.min(move, limit - histogram[x]);
+                                        histogram[x] += move;
+                                        histogram[y] -= move;
+                                    }
+                                }
+								if( MyDebug.LOG )
+									Log.d(TAG, "    histogram pulled up to: "  + histogram[x]);
+	                        	/*if( temp_c_histogram[x] >= c_equal_limit )
+                        			throw new RuntimeException(); // test*/
+                            }
+                        }
+                    }
+
+					// compute cumulative histogram
 					int histogram_offset = 256*(i*n_tiles+j);
 					c_histogram[histogram_offset] = histogram[0];
 					for(int x=1;x<256;x++) {
 						c_histogram[histogram_offset+x] = c_histogram[histogram_offset+x-1] + histogram[x];
 					}
-						/*if( MyDebug.LOG ) {
-							for(int x=0;x<256;x++) {
-								Log.d(TAG, "histogram[" + x + "] = " + histogram[x] + " cumulative: " + c_histogram[histogram_offset+x]);
-							}
-						}*/
+					if( MyDebug.LOG ) {
+						for(int x=0;x<256;x++) {
+							Log.d(TAG, "histogram[" + x + "] = " + histogram[x] + " cumulative: " + c_histogram[histogram_offset+x]);
+						}
+					}
 				}
 			}
 
@@ -2279,7 +2382,7 @@ public class HDRProcessor {
 			histogramAdjustScript.set_height(height);
 
 			if( MyDebug.LOG )
-				Log.d(TAG, "call histogramAdjustScript");
+				Log.d(TAG, "time before histogramAdjustScript: " + (System.currentTimeMillis() - time_s));
 			histogramAdjustScript.forEach_histogram_adjust(allocation_in, allocation_out);
 			if( MyDebug.LOG )
 				Log.d(TAG, "time after histogramAdjustScript: " + (System.currentTimeMillis() - time_s));
@@ -2419,8 +2522,9 @@ public class HDRProcessor {
 		if( brightness <= 0 )
 			brightness = 1;
 		if( MyDebug.LOG ) {
-			Log.d(TAG, "max_gain_factor: " + max_gain_factor);
 			Log.d(TAG, "brightness: " + brightness);
+			Log.d(TAG, "max_gain_factor: " + max_gain_factor);
+			Log.d(TAG, "ideal_brightness: " + ideal_brightness);
 		}
 		int median_target = Math.min(ideal_brightness, (int)(max_gain_factor*brightness));
 		return Math.max(brightness, median_target); // don't make darker
@@ -2442,23 +2546,19 @@ public class HDRProcessor {
 
 	/** Computes various factors used in the avg_brighten.rs script.
 	 */
-	public static BrightenFactors computeBrightenFactors(int iso, int brightness, int max_brightness) {
-		// for iso <= 150, don't want max_gain_factor 4, otherwise we lose variation in grass colour in testAvg42
+	public static BrightenFactors computeBrightenFactors(int iso, long exposure_time, int brightness, int max_brightness) {
+		// for outdoor/bright images, don't want max_gain_factor 4, otherwise we lose variation in grass colour in testAvg42
 		// and having max_gain_factor at 1.5 prevents testAvg43, testAvg44 being too bright and oversaturated
-		// for iso > 150, we also don't want max_gain_factor 4, as makes cases too bright and overblown if it would
+		// for other images, we also don't want max_gain_factor 4, as makes cases too bright and overblown if it would
 		// take the max_possible_value over 255. Especially testAvg46, but also testAvg25, testAvg31, testAvg38,
 		// testAvg39
-		//float max_gain_factor = 4;
 		float max_gain_factor = 1.5f;
 		int ideal_brightness = 119;
-		//if( iso <= 120 ) {
-		if( iso <= 150 ) {
+		//if( iso <= 150 ) {
+		if( iso < 1100 && exposure_time < 1000000000L/59 ) {
 			// this helps: testAvg12, testAvg21, testAvg35
-			// but note we use 119 for iso > 150, otherwise testAvg17, testAvg23, testAvg36 are too bright
+			// but note we don't want to treat the following as "bright": testAvg17, testAvg23, testAvg36, testAvg37, testAvg50
 			ideal_brightness = 199;
-			//max_gain_factor = 3;
-			//max_gain_factor = 2;
-			//max_gain_factor = 1.5f;
 		}
 		int brightness_target = getBrightnessTarget(brightness, max_gain_factor, ideal_brightness);
 		//int max_target = Math.min(255, (int)((max_brightness*brightness_target)/(float)brightness + 0.5f) );
@@ -2519,8 +2619,9 @@ public class HDRProcessor {
 			if( MyDebug.LOG )
 				Log.d(TAG, "use piecewise gain/gamma");
 			// use piecewise function with gain and gamma
-			// changed from 0.5 to 0.6 to help grass colour variation in testAvg42; also helps testAvg6; using 0.8 helps testAvg46 further
-			float mid_y = iso <= 150 ? 0.6f*255.0f : 0.8f*255.0f;
+			// changed from 0.5 to 0.6 to help grass colour variation in testAvg42; also helps testAvg6; using 0.8 helps testAvg46 and testAvg50 further
+			//float mid_y = iso <= 150 ? 0.6f*255.0f : 0.8f*255.0f;
+			float mid_y = ( iso < 1100 && exposure_time < 1000000000L/59 ) ? 0.6f*255.0f : 0.8f*255.0f;
 			mid_x = mid_y / gain;
 			gamma = (float)(Math.log(mid_y/255.0f) / Math.log(mid_x/max_brightness));
 		}
@@ -2563,13 +2664,15 @@ public class HDRProcessor {
 	 * @param width         Width of the input.
 	 * @param height        Height of the input.
 	 * @param iso           ISO used for the original images.
+	 * @param exposure_time Exposure time used for the original images.
 	 * @return              Resultant bitmap.
 	 */
 	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	public Bitmap avgBrighten(Allocation input, int width, int height, int iso) {
+	public Bitmap avgBrighten(Allocation input, int width, int height, int iso, long exposure_time) {
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "avgBrighten");
 			Log.d(TAG, "iso: " + iso);
+			Log.d(TAG, "exposure_time: " + exposure_time);
 		}
         initRenderscript();
 
@@ -2588,7 +2691,7 @@ public class HDRProcessor {
 			Log.d(TAG, "max brightness: " + max_brightness);
 		}
 
-		BrightenFactors brighten_factors = computeBrightenFactors(iso, brightness, max_brightness);
+		BrightenFactors brighten_factors = computeBrightenFactors(iso, exposure_time, brightness, max_brightness);
 		float gain = brighten_factors.gain;
 		float low_x = brighten_factors.low_x;
 		float mid_x = brighten_factors.mid_x;
@@ -2732,13 +2835,15 @@ public class HDRProcessor {
 		if( MyDebug.LOG )
 			Log.d(TAG, "### time after avg_brighten: " + (System.currentTimeMillis() - time_s));
 
-		if( iso <= 150 ) {
-			// for bright scenes, local contrast enhancement helps improve the quality of images (especially where we may have both
+		//if( iso <= 150 ) {
+		if( iso < 1100 && exposure_time < 1000000000L/59 ) {
+			// for bright scenes, contrast enhancement helps improve the quality of images (especially where we may have both
 			// dark and bright regions, e.g., testAvg12); but for dark scenes, it just blows up the noise too much
 			// keep n_tiles==1 - get too much contrast enhancement with n_tiles==4 e.g. for testAvg34
 			// tests that are better at 25% (median brightness in brackets): testAvg16 (90), testAvg26 (117), testAvg30 (79),
 			//     testAvg43 (55), testAvg44 (82)
 			// tests that are better at 50%: testAvg12 (8), testAvg13 (38), testAvg15 (10), testAvg18 (39), testAvg19 (37)
+			// other tests improved by doing contrast enhancement: testAvg32, testAvg40
 			//adjustHistogram(allocation_out, allocation_out, width, height, 0.5f, 4, time_s);
 			//adjustHistogram(allocation_out, allocation_out, width, height, 0.25f, 4, time_s);
 			//adjustHistogram(allocation_out, allocation_out, width, height, 0.25f, 1, time_s);
@@ -2752,7 +2857,7 @@ public class HDRProcessor {
 				Log.d(TAG, "dro alpha: " + alpha);
 				Log.d(TAG, "dro amount: " + amount);
 			}
-			adjustHistogram(allocation_out, allocation_out, width, height, amount, 1, time_s);
+			adjustHistogram(allocation_out, allocation_out, width, height, amount, 1, true, time_s);
 			if( MyDebug.LOG )
 				Log.d(TAG, "### time after adjustHistogram: " + (System.currentTimeMillis() - time_s));
 		}

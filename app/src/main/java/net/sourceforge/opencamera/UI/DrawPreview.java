@@ -87,7 +87,7 @@ public class DrawPreview {
 	// avoid doing things that allocate memory every frame!
 	private final Paint p = new Paint();
 	private final RectF draw_rect = new RectF();
-	//private final int [] gui_location = new int[2];
+	private final int [] gui_location = new int[2];
 	private final static DecimalFormat decimalFormat = new DecimalFormat("#0.0");
 	private final float scale;
 	private final float stroke_width; // stroke_width used for various UI elements
@@ -123,7 +123,6 @@ public class DrawPreview {
 	private boolean has_video_max_amp;
 	private int video_max_amp;
 	private long last_video_max_amp_time;
-	private int video_max_amp_prev1;
 	private int video_max_amp_prev2;
 	private int video_max_amp_peak;
 
@@ -800,6 +799,9 @@ public class DrawPreview {
 					case "crop_guide_1.85":
 						crop_ratio = 1.85;
 						break;
+					case "crop_guide_2":
+						crop_ratio = 2.0;
+						break;
 					case "crop_guide_2.33":
 						crop_ratio = 2.33333333;
 						break;
@@ -837,7 +839,7 @@ public class DrawPreview {
 		}
 	}
 
-	private void onDrawInfoLines(Canvas canvas, final int top_y, long time_ms) {
+	private void onDrawInfoLines(Canvas canvas, final int top_x, final int top_y, long time_ms) {
 		Preview preview = main_activity.getPreview();
 		CameraController camera_controller = preview.getCameraController();
 		int ui_rotation = preview.getUIRotation();
@@ -845,7 +847,7 @@ public class DrawPreview {
 		// set up text etc for the multiple lines of "info" (time, free mem, etc)
 		p.setTextSize(16 * scale + 0.5f); // convert dps to pixels
 		p.setTextAlign(Paint.Align.LEFT);
-		int location_x = (int) ((show_battery_pref ? 15 : 5) * scale + 0.5f); // convert dps to pixels
+		int location_x = top_x;
 		int location_y = top_y;
 		final int gap_y = (int) (0 * scale + 0.5f); // convert dps to pixels
 		if( ui_rotation == 90 || ui_rotation == 270 ) {
@@ -1037,11 +1039,8 @@ public class DrawPreview {
 			// RAW not enabled in NR mode (see note in CameraController.takePictureBurst())
 			if(
 					is_raw_pref &&
-					preview.supportsRaw() && // RAW can be enabled, even if it isn't available for this camera (e.g., user enables RAW for back camera, but then switches to front camera which doesn't support it)
-					photoMode != MyApplicationInterface.PhotoMode.HDR &&
-					photoMode != MyApplicationInterface.PhotoMode.ExpoBracketing &&
-					photoMode != MyApplicationInterface.PhotoMode.FocusBracketing &&
-					photoMode != MyApplicationInterface.PhotoMode.NoiseReduction ) {
+					preview.supportsRaw() // RAW can be enabled, even if it isn't available for this camera (e.g., user enables RAW for back camera, but then switches to front camera which doesn't support it)
+					) {
 				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
 				p.setStyle(Paint.Style.FILL);
 				p.setColor(Color.BLACK);
@@ -1250,7 +1249,7 @@ public class DrawPreview {
 		Preview preview = main_activity.getPreview();
 		CameraController camera_controller = preview.getCameraController();
 		int ui_rotation = preview.getUIRotation();
-		boolean ui_placement_right = main_activity.getMainUI().getUIPlacementRight();
+		MainUI.UIPlacement ui_placement = main_activity.getMainUI().getUIPlacement();
 		boolean has_level_angle = preview.hasLevelAngle();
 		double level_angle = preview.getLevelAngle();
 		boolean has_geo_direction = preview.hasGeoDirection();
@@ -1265,10 +1264,13 @@ public class DrawPreview {
 			int text_y = (int) (20 * scale + 0.5f); // convert dps to pixels
 			// fine tuning to adjust placement of text with respect to the GUI, depending on orientation
 			int text_base_y = 0;
-			if( ui_rotation == ( ui_placement_right ? 0 : 180 ) ) {
+			if( ui_placement == MainUI.UIPlacement.UIPLACEMENT_TOP && ( ui_rotation == 0 || ui_rotation == 180 ) ) {
+				text_base_y = canvas.getHeight() - (int)(0.5*text_y);
+            }
+			else if( ui_rotation == ( ui_placement == MainUI.UIPlacement.UIPLACEMENT_RIGHT ? 0 : 180 ) ) {
 				text_base_y = canvas.getHeight() - (int)(0.5*text_y);
 			}
-			else if( ui_rotation == ( ui_placement_right ? 180 : 0 ) ) {
+			else if( ui_rotation == ( ui_placement == MainUI.UIPlacement.UIPLACEMENT_RIGHT ? 180 : 0 ) ) {
 				text_base_y = canvas.getHeight() - (int)(2.5*text_y); // leave room for GUI icons
 			}
 			else if( ui_rotation == 90 || ui_rotation == 270 ) {
@@ -1421,7 +1423,7 @@ public class DrawPreview {
             		// audio amplitude
 					if( !this.has_video_max_amp || time_ms > this.last_video_max_amp_time + 50 ) {
 						has_video_max_amp = true;
-						video_max_amp_prev1 = video_max_amp_prev2;
+						int video_max_amp_prev1 = video_max_amp_prev2;
 						video_max_amp_prev2 = video_max_amp;
 						video_max_amp = preview.getMaxAmplitude();
 						last_video_max_amp_time = time_ms;
@@ -1473,7 +1475,19 @@ public class DrawPreview {
 				}
 			}
 			else if( taking_picture && capture_started ) {
-				if( camera_controller.isManualISO() ) {
+				if( camera_controller.isCapturingBurst() ) {
+					int n_burst_taken = camera_controller.getNBurstTaken() + 1;
+					int n_burst_total = camera_controller.getBurstTotal();
+					p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
+					p.setTextAlign(Paint.Align.CENTER);
+					int pixels_offset_y = 3*text_y; // avoid overwriting the zoom, and also allow a bit extra space
+					String text = getContext().getResources().getString(R.string.capturing) + " " + n_burst_taken;
+					if( n_burst_total > 0 ) {
+						text += " / " + n_burst_total;
+					}
+					applicationInterface.drawTextWithBackground(canvas, p, text, Color.WHITE, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
+				}
+				else if( camera_controller.isManualISO() ) {
 					// only show "capturing" text with time for manual exposure time >= 0.5s
 					long exposure_time = camera_controller.getExposureTime();
 					if( exposure_time >= 500000000L ) {
@@ -1532,9 +1546,25 @@ public class DrawPreview {
 			//canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p);
 		}
 
-		final int top_y = (int) (5 * scale + 0.5f); // convert dps to pixels
+		int top_x = (int) (5 * scale + 0.5f); // convert dps to pixels
+		int top_y = (int) (5 * scale + 0.5f); // convert dps to pixels
+		int top_margin = main_activity.getMainUI().getTopMargin();
+		if( top_margin > 0 ) {
+			int preview_left = gui_location[0];
+			/*if( MyDebug.LOG )
+				Log.d(TAG, "preview_left: " + preview_left);*/
+			int shift = top_margin - preview_left;
+			if( shift > 0 ) {
+				if( ui_rotation == 90 || ui_rotation == 270 ) {
+					top_y += shift;
+				}
+				else {
+					top_x += shift;
+				}
+			}
+		}
 
-		int battery_x = (int) (5 * scale + 0.5f); // convert dps to pixels
+		int battery_x = top_x;
 		int battery_y = top_y + (int) (5 * scale + 0.5f);
 		int battery_width = (int) (5 * scale + 0.5f); // convert dps to pixels
 		int battery_height = 4*battery_width;
@@ -1579,9 +1609,10 @@ public class DrawPreview {
 					p.setAlpha(255);
 				}
 			}
+			top_x += (int) (10 * scale + 0.5f); // convert dps to pixels
 		}
 
-		onDrawInfoLines(canvas, top_y, time_ms);
+		onDrawInfoLines(canvas, top_x, top_y, time_ms);
 
 		canvas.restore();
 	}
@@ -1961,7 +1992,7 @@ public class DrawPreview {
 			p.setColor(Color.WHITE);
 			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p);
 		}
-		else if( preview != null && "flash_frontscreen_torch".equals(preview.getCurrentFlashValue()) ) { // getCurrentFlashValue() may return null
+		else if( "flash_frontscreen_torch".equals(preview.getCurrentFlashValue()) ) { // getCurrentFlashValue() may return null
 			p.setColor(Color.WHITE);
 			p.setAlpha(200); // set alpha so user can still see some of the preview
 			canvas.drawRect(0.0f, 0.0f, canvas.getWidth(), canvas.getHeight(), p);
@@ -1976,6 +2007,12 @@ public class DrawPreview {
 				return;
 			}
 		}
+
+		preview.getView().getLocationOnScreen(gui_location);
+		/*if( MyDebug.LOG ) {
+			Log.d(TAG, "gui_location[0]: " + gui_location[0]);
+			Log.d(TAG, "gui_location[1]: " + gui_location[1]);
+		}*/
 
 		if( camera_controller != null && taking_picture && !front_screen_flash && take_photo_border_pref ) {
 			p.setColor(Color.WHITE);
@@ -2091,7 +2128,7 @@ public class DrawPreview {
 		if( flip_front ) {
 			boolean is_front_facing = camera_controller != null && camera_controller.isFrontFacing();
 			if( is_front_facing && !sharedPreferences.getString(PreferenceKeys.FrontCameraMirrorKey, "preference_front_camera_mirror_no").equals("preference_front_camera_mirror_photo") ) {
-				last_image_matrix.preScale(-1.0f, 1.0f, bitmap.getWidth()/2, 0.0f);
+				last_image_matrix.preScale(-1.0f, 1.0f, bitmap.getWidth()/2.0f, 0.0f);
 			}
 		}
 	}

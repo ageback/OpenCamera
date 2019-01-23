@@ -301,7 +301,69 @@
                 android:defaultValue="immersive_mode_low_profile"
                 />
     
+	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+            <ListPreference
+                android:key="preference_focus_assist"
+                android:title="@string/preference_focus_assist"
+                android:summary="@string/preference_focus_assist_summary"
+                android:entries="@array/preference_focus_assist_entries"
+                android:entryValues="@array/preference_focus_assist_values"
+                android:defaultValue="0"
+                />
+
+	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
             <CheckBoxPreference
+                android:key="preference_show_face_detection"
+                android:title="@string/preference_show_face_detection"
+                android:summary="@string/preference_show_face_detection_summary"
+				android:icon="@drawable/ic_face_white_48dp"
+                android:defaultValue="false"
+                />
+
+	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+            <CheckBoxPreference
+                android:key="preference_show_auto_level"
+                android:title="@string/preference_show_auto_level"
+                android:summary="@string/preference_show_auto_level_summary"
+				android:icon="@drawable/auto_stabilise_icon"
+                android:defaultValue="false"
+                />
+
+			<CheckBoxPreference
+				android:key="preference_show_stamp"
+				android:title="@string/preference_show_stamp"
+				android:summary="@string/preference_show_stamp_summary"
+				android:icon="@drawable/ic_text_format_white_48dp"
+				android:defaultValue="false"
+				/>
+
+			<CheckBoxPreference
+				android:key="preference_show_textstamp"
+				android:title="@string/preference_show_textstamp"
+				android:summary="@string/preference_show_textstamp_summary"
+				android:icon="@drawable/baseline_text_fields_white_48"
+				android:defaultValue="false"
+				/>
+
+	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+			<CheckBoxPreference
+				android:key="preference_show_white_balance_lock"
+				android:title="@string/preference_show_white_balance_lock"
+				android:summary="@string/preference_show_white_balance_lock_summary"
+				android:icon="@drawable/white_balance_unlocked"
+				android:defaultValue="false"
+				/>
+
+	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+			<CheckBoxPreference
+				android:key="preference_show_exposure_lock"
+				android:title="@string/preference_show_exposure_lock"
+				android:summary="@string/preference_show_exposure_lock_summary"
+				android:icon="@drawable/exposure_unlocked"
+				android:defaultValue="true"
+				/>
+
+			<CheckBoxPreference
                 android:key="preference_show_zoom"
                 android:title="@string/preference_show_zoom"
                 android:summary="@string/preference_show_zoom_summary"
@@ -506,6 +568,15 @@
 		        android:defaultValue="90"
 		        />
 
+	        <ListPreference
+	            android:key="preference_image_format"
+	            android:title="@string/preference_image_format"
+	            android:summary="%s"
+	            android:entries="@array/preference_image_format_entries"
+	            android:entryValues="@array/preference_image_format_values"
+	            android:defaultValue="preference_image_format_jpeg"
+	            />
+
             <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
 	        <ListPreference 
 	            android:key="preference_raw"
@@ -533,6 +604,17 @@
 	            android:summary="@string/preference_hdr_save_expo_summary"
 	            android:defaultValue="false"
 	            />
+
+            <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
+	        <ListPreference
+	            android:key="preference_hdr_contrast_enhancement"
+	            android:title="@string/preference_hdr_contrast_enhancement"
+	            android:summary="@string/preference_hdr_contrast_enhancement_summary"
+	            android:entries="@array/preference_hdr_contrast_enhancement_entries"
+	            android:entryValues="@array/preference_hdr_contrast_enhancement_values"
+	            android:defaultValue="preference_hdr_contrast_enhancement_smart"
+	            />
+
 
 	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
 	        <ListPreference
@@ -731,9 +813,9 @@
 	        android:persistent="false">
 
 	        <!--  if we move this to another PreferenceGroup, we should update code to remove this Preference -->
-	        <ListPreference 
+			<!-- title set programmatically -->
+	        <ListPreference
 	            android:key="preference_video_quality"
-	            android:title="@string/video_quality"
 	            android:summary="%s"
 	            />
 
@@ -745,7 +827,16 @@
                 android:defaultValue="false"
                 />
 
-	        <ListPreference 
+	        <ListPreference
+                android:key="preference_video_output_format"
+                android:title="@string/preference_video_output_format"
+                android:summary="@string/preference_video_output_format_summary"
+                android:entries="@array/preference_video_output_format_entries"
+                android:entryValues="@array/preference_video_output_format_values"
+                android:defaultValue="preference_video_output_format_default"
+                />
+
+	        <ListPreference
                 android:key="preference_video_bitrate"
                 android:title="@string/preference_video_bitrate"
                 android:summary="@string/preference_video_bitrate_summary"
@@ -974,13 +1065,35 @@
             android:icon="@drawable/ic_info_outline_white_48dp"
             />  
         
-        <Preference
-            android:key="preference_reset"  
-            android:title="@string/preference_reset"
-            android:summary="@string/preference_reset_summary"  
-            android:icon="@drawable/ic_power_settings_new_white_48dp"
-            />
-        
+	    <PreferenceScreen
+	        android:key="preference_screen_settings_manager"
+	        android:title="@string/preference_screen_settings_manager"
+	        android:icon="@drawable/settings"
+	        android:persistent="false">
+
+			<Preference
+				android:key="preference_save_settings"
+				android:title="@string/preference_save_settings"
+				android:summary="@string/preference_save_settings_summary"
+	            android:icon="@drawable/ic_save_white_48dp"
+				/>
+
+			<Preference
+				android:key="preference_restore_settings"
+				android:title="@string/preference_restore_settings"
+				android:summary="@string/preference_restore_settings_summary"
+		        android:icon="@drawable/baseline_folder_open_white_48"
+				/>
+
+			<Preference
+				android:key="preference_reset"
+				android:title="@string/preference_reset"
+				android:summary="@string/preference_reset_summary"
+				android:icon="@drawable/ic_power_settings_new_white_48dp"
+				/>
+
+		</PreferenceScreen>
+
         </PreferenceCategory>
         
 </PreferenceScreen>
