@@ -47,7 +47,6 @@ import android.widget.Toast;
 
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 
 /** Fragment to handle the Settings UI. Note that originally this was a
@@ -116,15 +115,49 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 		if( antibanding_values != null && antibanding_values.length > 0 ) {
 			String [] antibanding_entries = bundle.getStringArray("antibanding_entries");
 			if( antibanding_entries != null && antibanding_entries.length == antibanding_values.length ) { // should always be true here, but just in case
-				readFromBundle(antibanding_values, antibanding_entries, PreferenceKeys.AntiBandingPreferenceKey, CameraController.ANTIBANDING_DEFAULT, "preference_category_camera_quality");
+				readFromBundle(antibanding_values, antibanding_entries, PreferenceKeys.AntiBandingPreferenceKey, CameraController.ANTIBANDING_DEFAULT, "preference_screen_processing_settings");
 				has_antibanding = true;
 			}
 		}
 		if( MyDebug.LOG )
 			Log.d(TAG, "has_antibanding?: " + has_antibanding);
 		if( !has_antibanding ) {
-			Preference pref = findPreference("preference_antibanding");
-			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_camera_quality");
+			Preference pref = findPreference(PreferenceKeys.AntiBandingPreferenceKey);
+			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_processing_settings");
+        	pg.removePreference(pref);
+		}
+
+		boolean has_edge_mode = false;
+		String [] edge_mode_values = bundle.getStringArray("edge_modes");
+		if( edge_mode_values != null && edge_mode_values.length > 0 ) {
+			String [] edge_mode_entries = bundle.getStringArray("edge_modes_entries");
+			if( edge_mode_entries != null && edge_mode_entries.length == edge_mode_values.length ) { // should always be true here, but just in case
+				readFromBundle(edge_mode_values, edge_mode_entries, PreferenceKeys.EdgeModePreferenceKey, CameraController.EDGE_MODE_DEFAULT, "preference_screen_processing_settings");
+				has_edge_mode = true;
+			}
+		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "has_edge_mode?: " + has_edge_mode);
+		if( !has_edge_mode ) {
+			Preference pref = findPreference(PreferenceKeys.EdgeModePreferenceKey);
+			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_processing_settings");
+        	pg.removePreference(pref);
+		}
+
+		boolean has_noise_reduction_mode = false;
+		String [] noise_reduction_mode_values = bundle.getStringArray("noise_reduction_modes");
+		if( noise_reduction_mode_values != null && noise_reduction_mode_values.length > 0 ) {
+			String [] noise_reduction_mode_entries = bundle.getStringArray("noise_reduction_modes_entries");
+			if( noise_reduction_mode_entries != null && noise_reduction_mode_entries.length == noise_reduction_mode_values.length ) { // should always be true here, but just in case
+				readFromBundle(noise_reduction_mode_values, noise_reduction_mode_entries, PreferenceKeys.NoiseReductionModePreferenceKey, CameraController.NOISE_REDUCTION_MODE_DEFAULT, "preference_screen_processing_settings");
+				has_noise_reduction_mode = true;
+			}
+		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "has_noise_reduction_mode?: " + has_noise_reduction_mode);
+		if( !has_noise_reduction_mode ) {
+			Preference pref = findPreference(PreferenceKeys.NoiseReductionModePreferenceKey);
+			PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_processing_settings");
         	pg.removePreference(pref);
 		}
 
@@ -673,7 +706,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 								if( MyDebug.LOG )
 									Log.d(TAG, "user clicked calibrate level");
 								MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
-								if( main_activity.getPreview().hasLevelAngle() ) {
+								if( main_activity.getPreview().hasLevelAngleStable() ) {
 									double current_level_angle = main_activity.getPreview().getLevelAngleUncalibrated();
 									SharedPreferences.Editor editor = sharedPreferences.edit();
 									editor.putFloat(PreferenceKeys.CalibratedLevelAnglePreferenceKey, (float)current_level_angle);
@@ -939,7 +972,8 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 						}
                         about_string.append("\nVideo stabilization?: ");
                         about_string.append(getString(supports_video_stabilization ? R.string.about_available : R.string.about_not_available));
-						about_string.append("\nTonemap max curve points: " + tonemap_max_curve_points);
+						about_string.append("\nTonemap max curve points: ");
+						about_string.append(tonemap_max_curve_points);
 						about_string.append("\nCan disable shutter sound?: ");
 						about_string.append(getString(can_disable_shutter_sound ? R.string.about_available : R.string.about_not_available));
                         about_string.append("\nFlash modes: ");
@@ -1027,6 +1061,10 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 							}
 						}
 
+						int magnetic_accuracy = bundle.getInt("magnetic_accuracy");
+						about_string.append("\nMagnetic accuracy?: ");
+						about_string.append(magnetic_accuracy);
+
 						about_string.append("\nUsing SAF?: ");
 						about_string.append(sharedPreferences.getBoolean(PreferenceKeys.getUsingSAFPreferenceKey(), false));
                 		String save_location = sharedPreferences.getString(PreferenceKeys.getSaveLocationPreferenceKey(), "OpenCamera");
@@ -1059,9 +1097,9 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
 					        @Override
         					public void onClick(View v) {
                         		if( MyDebug.LOG )
-	            					Log.d(TAG, "online help link clicked");
+	            					Log.d(TAG, "online help link clicked for licence");
 								MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
-								main_activity.launchOnlineHelp();
+								main_activity.launchOnlineHelp("#licence");
 					        }
 						}, about_string.indexOf(online_help_link), about_string.indexOf(online_help_link) + online_help_link.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
 

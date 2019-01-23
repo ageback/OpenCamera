@@ -29,6 +29,7 @@ public class MainTests {
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testAutoFocus"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testAutoFocusCorners"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPopup"));
+		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPopupLayout"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testSwitchResolution"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testFaceDetection"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testFocusFlashAvailability"));
@@ -52,6 +53,7 @@ public class MainTests {
 			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testSwitchCameraIdle"));
 		}
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testSwitchCameraRepeat"));
+		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testSwitchCameraRepeat2"));
 		suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTouchFocusQuick"));
 		if( !MainActivityTest.test_camera2 ) {
 			suite.addTest(TestSuite.createTest(MainActivityTest.class, "testGallery"));

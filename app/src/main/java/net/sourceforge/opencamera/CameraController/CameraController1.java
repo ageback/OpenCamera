@@ -421,7 +421,15 @@ public class CameraController1 extends CameraController {
 	 */
 	@Override
 	public SupportedValues setSceneMode(String value) {
-		Camera.Parameters parameters = this.getParameters();
+		Camera.Parameters parameters;
+		try {
+			parameters = this.getParameters();
+		}
+		catch(RuntimeException e) {
+			Log.e(TAG, "exception from getParameters");
+			e.printStackTrace();
+			return null;
+		}
 		List<String> values = parameters.getSupportedSceneModes();
 		/*{
 			// test
@@ -542,6 +550,26 @@ public class CameraController1 extends CameraController {
 	public String getAntiBanding() {
     	Camera.Parameters parameters = this.getParameters();
     	return parameters.getAntibanding();
+	}
+
+	@Override
+	public SupportedValues setEdgeMode(String value) {
+		return null;
+	}
+
+	@Override
+	public String getEdgeMode() {
+		return null;
+	}
+
+	@Override
+	public SupportedValues setNoiseReductionMode(String value) {
+		return null;
+	}
+
+	@Override
+	public String getNoiseReductionMode() {
+		return null;
 	}
 
 	@Override
@@ -843,12 +871,18 @@ public class CameraController1 extends CameraController {
 	}
 	
 	public void setZoom(int value) {
-		Camera.Parameters parameters = this.getParameters();
-		if( MyDebug.LOG )
-			Log.d(TAG, "zoom was: " + parameters.getZoom());
-		this.current_zoom_value = value;
-		parameters.setZoom(value);
-    	setCameraParameters(parameters);
+    	try {
+			Camera.Parameters parameters = this.getParameters();
+			if( MyDebug.LOG )
+				Log.d(TAG, "zoom was: " + parameters.getZoom());
+			this.current_zoom_value = value;
+			parameters.setZoom(value);
+			setCameraParameters(parameters);
+		}
+		catch(RuntimeException e) {
+    		Log.e(TAG, "failed to set parameters for zoom");
+    		e.printStackTrace();
+		}
 	}
 
 	public int getExposureCompensation() {
@@ -1017,6 +1051,38 @@ public class CameraController1 extends CameraController {
 	public boolean setFocusDistance(float focus_distance) {
 		// not supported for CameraController1!
 		return false;
+	}
+
+	@Override
+	public void setFocusBracketingNImages(int n_images) {
+		// not supported for CameraController1
+	}
+
+	@Override
+	public void setFocusBracketingAddInfinity(boolean focus_bracketing_add_infinity) {
+		// not supported for CameraController1
+	}
+
+	@Override
+	public void setFocusBracketingSourceDistance(float focus_bracketing_source_distance) {
+		// not supported for CameraController1!
+	}
+
+	@Override
+	public float getFocusBracketingSourceDistance() {
+		// not supported for CameraController1!
+		return 0.0f;
+	}
+
+	@Override
+	public void setFocusBracketingTargetDistance(float focus_bracketing_target_distance) {
+		// not supported for CameraController1!
+	}
+
+	@Override
+	public float getFocusBracketingTargetDistance() {
+		// not supported for CameraController1!
+		return 0.0f;
 	}
 
 	private String convertFlashValueToMode(String flash_value) {
@@ -1317,8 +1383,7 @@ public class CameraController1 extends CameraController {
 	}
 	
 	@Override
-	public 
-	void reconnect() throws CameraControllerException {
+	public void reconnect() throws CameraControllerException {
 		if( MyDebug.LOG )
 			Log.d(TAG, "reconnect");
 		try {

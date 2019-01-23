@@ -4,9 +4,9 @@ import android.media.CamcorderProfile;
 
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.CameraController.CameraController2;
+import net.sourceforge.opencamera.HDRProcessor;
 import net.sourceforge.opencamera.ImageSaver;
 import net.sourceforge.opencamera.LocationSupplier;
-import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.Preview.Preview;
 import net.sourceforge.opencamera.Preview.VideoQualityHandler;
 import net.sourceforge.opencamera.TextFormatter;
@@ -450,12 +450,12 @@ public class UnitTest {
 		assertEquals( 0.5, CameraController2.getScaleForExposureTime(1000000000L/240, fixed_exposure_time, scaled_exposure_time, full_exposure_time_scale), delta );
 	}
 
-	@Test
+	/*@Test
 	public void testExponentialScaling() {
 		Log.d(TAG, "testExponentialScaling");
 		assertEquals(100, (int)MainActivity.exponentialScaling(0.0f, 100, 1600));
 		assertEquals(1600, (int)MainActivity.exponentialScaling(1.0f, 100, 1600));
-	}
+	}*/
 
 	@Test
 	public void testFormatLevelAngle() {
@@ -499,7 +499,7 @@ public class UnitTest {
 	}
 
 	private class float4 {
-		float r, g, b, a;
+		final float r, g, b, a;
 
 		float4(float r, float g, float b, float a) {
 			this.r = r;
@@ -608,5 +608,106 @@ public class UnitTest {
 				new float4(0, 51, 53, 53)
 		);
 		assertEquals(m2, new float4(49, 49, 71, 71));
+	}
+
+	@Test
+	public void testBrightenFactors() {
+		Log.d(TAG, "testBrightenFactors");
+
+		// If any of these tests fail due to changes to HDRProcessor, consider that we might want to update the values tested in
+		// computeBrightenFactors(), rather than simply updating the expected results, to preserve what the test is meant to test.
+
+		HDRProcessor.BrightenFactors brighten_factors = HDRProcessor.computeBrightenFactors(1600, 20, 170);
+		assertEquals(1.5f, brighten_factors.gain, 1.0e-5f);
+		assertEquals(8.0f, brighten_factors.low_x, 0.1f);
+		assertEquals(255.5f, brighten_factors.mid_x, 1.0e-5f);
+		assertEquals(1.0f, brighten_factors.gamma, 1.0e-5f);
+
+		// this checks for stability - we change the inputs so we enter "use piecewise function with gain and gamma", but
+		// we should not significantly change the values of gain or low_x, and gamma should be close to 1
+		brighten_factors = HDRProcessor.computeBrightenFactors(1600, 20, 171);
+		assertEquals(1.5f, brighten_factors.gain, 1.0e-5f);
+		assertEquals(8.0f, brighten_factors.low_x, 0.1f);
+		assertEquals(136.0f, brighten_factors.mid_x, 0.5f);
+		assertEquals(1.0f, brighten_factors.gamma, 0.5f);
+
+	}
+
+	@Test
+	public void testFocusBracketingDistances() {
+		Log.d(TAG, "testFocusBracketingDistances");
+
+		List<Float> focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/0.1f, 1.0f/10.0f, 5);
+		for(int i=0;i<focus_distances.size();i++)
+			Log.d(TAG, i + ": " + focus_distances.get(i));
+		assertEquals(5, focus_distances.size());
+		assertEquals(1.0f/0.1f, focus_distances.get(0), 1.0e-5);
+		// linear interpolation in distance:
+		/*assertEquals(1.0f/2.575f, focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/5.05f, focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/7.525f, focus_distances.get(3), 1.0e-5);*/
+		// log interpolation:
+		assertEquals(1.0f/(0.138647f*(10.0f-0.1f) + 0.1f), focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/(0.317394f*(10.0f-0.1f) + 0.1f), focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/(0.569323f*(10.0f-0.1f) + 0.1f), focus_distances.get(3), 1.0e-5);
+		assertEquals(1.0f/10.0f, focus_distances.get(4), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/10.0f, 1.0f/0.1f, 5);
+		for(int i=0;i<focus_distances.size();i++)
+			Log.d(TAG, i + ": " + focus_distances.get(i));
+		assertEquals(5, focus_distances.size());
+		// should be reverse of above
+		assertEquals(1.0f/0.1f, focus_distances.get(4), 1.0e-5);
+		// linear interpolation in distance:
+		/*assertEquals(1.0f/2.575f, focus_distances.get(3), 1.0e-5);
+		assertEquals(1.0f/5.05f, focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/7.525f, focus_distances.get(1), 1.0e-5);*/
+		// log interpolation:
+		assertEquals(1.0f/(0.138647f*(10.0f-0.1f) + 0.1f), focus_distances.get(3), 1.0e-5);
+		assertEquals(1.0f/(0.317394f*(10.0f-0.1f) + 0.1f), focus_distances.get(2), 1.0e-5);
+		assertEquals(1.0f/(0.569323f*(10.0f-0.1f) + 0.1f), focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/10.0f, focus_distances.get(0), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/0.1f, 1.0f/15.0f, 3);
+		for(int i=0;i<focus_distances.size();i++)
+			Log.d(TAG, i + ": " + focus_distances.get(i));
+		assertEquals(3, focus_distances.size());
+		assertEquals(1.0f/0.1f, focus_distances.get(0), 1.0e-5);
+		// linear interpolation in distance:
+		//assertEquals(1.0f/5.05f, focus_distances.get(1), 1.0e-5); // not 7.55, as we clamp distances to a max of 10m when averaging
+		// log interpolation:
+		assertEquals(1.0f/(0.369070f*(10.0f-0.1f) + 0.1f), focus_distances.get(1), 1.0e-5); // we clamp distances to a max of 10m when averaging
+		assertEquals(1.0f/15.0f, focus_distances.get(2), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/15.0f, 1.0f/0.1f, 3);
+		for(int i=0;i<focus_distances.size();i++)
+			Log.d(TAG, i + ": " + focus_distances.get(i));
+		assertEquals(3, focus_distances.size());
+		// should be reverse of above
+		assertEquals(1.0f/0.1f, focus_distances.get(2), 1.0e-5);
+		// linear interpolation in distance:
+		//assertEquals(1.0f/5.05f, focus_distances.get(1), 1.0e-5); // not 7.55, as we clamp distances to a max of 10m when averaging
+		// log interpolation:
+		assertEquals(1.0f/(0.369070f*(10.0f-0.1f) + 0.1f), focus_distances.get(1), 1.0e-5); // we clamp distances to a max of 10m when averaging
+		assertEquals(1.0f/15.0f, focus_distances.get(0), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/0.1f, 1.0f/0.2f, 3);
+		for(int i=0;i<focus_distances.size();i++)
+			Log.d(TAG, i + ": " + focus_distances.get(i));
+		assertEquals(3, focus_distances.size());
+		assertEquals(1.0f/0.1f, focus_distances.get(0), 1.0e-5);
+		// log interpolation:
+		assertEquals(1.0f/(0.369070f*(0.2f-0.1f) + 0.1f), focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/0.2f, focus_distances.get(2), 1.0e-5);
+
+		focus_distances = CameraController2.setupFocusBracketingDistances(1.0f/0.2f, 1.0f/0.1f, 3);
+		for(int i=0;i<focus_distances.size();i++)
+			Log.d(TAG, i + ": " + focus_distances.get(i));
+		assertEquals(3, focus_distances.size());
+		// should be reverse of above
+		assertEquals(1.0f/0.1f, focus_distances.get(2), 1.0e-5);
+		// log interpolation:
+		assertEquals(1.0f/(0.369070f*(0.2f-0.1f) + 0.1f), focus_distances.get(1), 1.0e-5);
+		assertEquals(1.0f/0.2f, focus_distances.get(0), 1.0e-5);
 	}
 }

@@ -15,6 +15,10 @@ public class PreferenceKeys {
 	 */
 	public static final String LatestVersionPreferenceKey = "latest_version";
 
+	/** This preference stores whether to allow showing the "What's New" dialog.
+	 */
+	public static final String ShowWhatsNewPreferenceKey = "preference_show_whats_new";
+
 	/** If this preference is set, no longer show the auto-stabilise info dialog.
 	 */
 	public static final String AutoStabiliseInfoPreferenceKey = "done_auto_stabilise_info";
@@ -26,6 +30,10 @@ public class PreferenceKeys {
     /** If this preference is set, no longer show the raw info dialog.
 	 */
 	public static final String RawInfoPreferenceKey = "done_raw_info";
+
+    /** If this preference is set, no longer show the dialog for poor magnetic accuracy
+	 */
+	public static final String MagneticAccuracyPreferenceKey = "done_magnetic_accuracy";
 
 	public static final String UseCamera2PreferenceKey = "preference_use_camera2";
 
@@ -59,6 +67,10 @@ public class PreferenceKeys {
 
 	public static final String AntiBandingPreferenceKey = "preference_antibanding";
 
+	public static final String EdgeModePreferenceKey = "preference_edge_mode";
+
+	public static final String NoiseReductionModePreferenceKey = "preference_noise_reduction_mode";
+
 	public static final String ISOPreferenceKey = "preference_iso";
 
 	public static final String ExposureTimePreferenceKey = "preference_exposure_time";
@@ -68,6 +80,14 @@ public class PreferenceKeys {
 	public static final String ExpoBracketingNImagesPreferenceKey = "preference_expo_bracketing_n_images";
 
 	public static final String ExpoBracketingStopsPreferenceKey = "preference_expo_bracketing_stops";
+
+	public static final String FocusDistancePreferenceKey = "preference_focus_distance";
+
+	public static final String FocusBracketingTargetDistancePreferenceKey = "preference_focus_bracketing_target_distance";
+
+	public static final String FocusBracketingNImagesPreferenceKey = "preference_focus_bracketing_n_images";
+
+	public static final String FocusBracketingAddInfinityPreferenceKey = "preference_focus_bracketing_add_infinity";
 
 	public static final String VolumeKeysPreferenceKey = "preference_volume_keys";
 
@@ -104,6 +124,8 @@ public class PreferenceKeys {
 	public static final String StampTimeFormatPreferenceKey = "preference_stamp_timeformat";
 
 	public static final String StampGPSFormatPreferenceKey = "preference_stamp_gpsformat";
+
+	public static final String UnitsDistancePreferenceKey = "preference_units_distance";
 
 	public static final String TextStampPreferenceKey = "preference_textstamp";
 

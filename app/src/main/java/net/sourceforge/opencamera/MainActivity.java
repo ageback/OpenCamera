@@ -6,6 +6,7 @@ import net.sourceforge.opencamera.Preview.Preview;
 import net.sourceforge.opencamera.Preview.VideoProfile;
 import net.sourceforge.opencamera.UI.FolderChooserDialog;
 import net.sourceforge.opencamera.UI.MainUI;
+import net.sourceforge.opencamera.UI.ManualSeekbars;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,7 +18,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
@@ -31,9 +31,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.media.AudioAttributes;
-import android.media.AudioManager;
-import android.media.SoundPool;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -55,7 +52,6 @@ import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnDismissListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -67,9 +63,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
 import android.util.Log;
-import android.util.SparseIntArray;
 import android.view.Display;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
@@ -88,12 +82,15 @@ import android.widget.ZoomControls;
 
 /** The main Activity for Open Camera.
  */
-public class MainActivity extends Activity implements AudioListener.AudioListenerCallback {
+public class MainActivity extends Activity {
 	private static final String TAG = "MainActivity";
 	private SensorManager mSensorManager;
 	private Sensor mSensorAccelerometer;
 	private Sensor mSensorMagnetic;
 	private MainUI mainUI;
+	private PermissionHandler permissionHandler;
+	private SoundPoolManager soundPoolManager;
+	private ManualSeekbars manualSeekbars;
 	private TextFormatter textFormatter;
 	private MyApplicationInterface applicationInterface;
 	private Preview preview;
@@ -111,14 +108,10 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     private final Map<Integer, Bitmap> preloaded_bitmap_resources = new Hashtable<>();
 	private ValueAnimator gallery_save_anim;
 
-    private SoundPool sound_pool;
-	private SparseIntArray sound_ids;
-	
 	private TextToSpeech textToSpeech;
 	private boolean textToSpeechSuccess;
-	
+
 	private AudioListener audio_listener;
-	private int audio_noise_sensitivity = -1;
 	private SpeechRecognizer speechRecognizer;
 	private boolean speechRecognizerIsStarted;
 	
@@ -130,8 +123,6 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	private final ToastBoxer exposure_lock_toast = new ToastBoxer();
 	private final ToastBoxer audio_control_toast = new ToastBoxer();
 	private boolean block_startup_toast = false; // used when returning from Settings/Popup - if we're displaying a toast anyway, don't want to display the info toast too
-
-	private final int manual_n = 1000; // the number of values on the seekbar used for manual focus distance, ISO or exposure speed
 
 	// application shortcuts:
 	static private final String ACTION_SHORTCUT_CAMERA = "net.sourceforge.opencamera.SHORTCUT_CAMERA";
@@ -214,11 +205,14 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			Log.d(TAG, "supports_force_video_4k? " + supports_force_video_4k);
 
 		// set up components
+		permissionHandler = new PermissionHandler(this);
 		mainUI = new MainUI(this);
+		manualSeekbars = new ManualSeekbars();
 		applicationInterface = new MyApplicationInterface(this, savedInstanceState);
 		if( MyDebug.LOG )
 			Log.d(TAG, "onCreate: time after creating application interface: " + (System.currentTimeMillis() - debug_time));
 		textFormatter = new TextFormatter(this);
+		soundPoolManager = new SoundPoolManager(this);
 
 		// determine whether we support Camera2 API
 		initCamera2Support();
@@ -406,12 +400,26 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					Log.d(TAG, "version_code: " + version_code);
 					Log.d(TAG, "latest_version: " + latest_version);
 				}
-				final boolean whats_new_enabled = false;
+				//final boolean whats_new_enabled = false;
+				final boolean whats_new_enabled = true;
 				if( whats_new_enabled ) {
+					// whats_new_version is the version code that the What's New text is written for. Normally it will equal the
+					// current release (version_code), but it some cases we may want to leave it unchanged.
+					// E.g., we have a "What's New" for 1.44 (64), but then push out a quick fix for 1.44.1 (65). We don't want to
+					// show the dialog again to people who alreaddy received 1.44 (64), but we still want to show the dialog to people
+					// upgrading from earlier versions.
+					int whats_new_version = 64; // 1.44
+					whats_new_version = Math.min(whats_new_version, version_code); // whats_new_version should always be <= version_code, but just in case!
+					if( MyDebug.LOG ) {
+						Log.d(TAG, "whats_new_version: " + whats_new_version);
+					}
 					final boolean force_whats_new = false;
 					//final boolean force_whats_new = true; // for testing
+					boolean allow_show_whats_new = sharedPreferences.getBoolean(PreferenceKeys.ShowWhatsNewPreferenceKey, true);
+					if( MyDebug.LOG )
+						Log.d(TAG, "allow_show_whats_new: " + allow_show_whats_new);
 					// don't show What's New if this is the first time the user has run
-					if( has_done_first_time && ( force_whats_new || version_code > latest_version ) ) {
+					if( has_done_first_time && allow_show_whats_new && ( force_whats_new || whats_new_version > latest_version ) ) {
 						AlertDialog.Builder alertDialog = new AlertDialog.Builder(this);
 						alertDialog.setTitle(R.string.whats_new);
 						alertDialog.setMessage(R.string.whats_new_text);
@@ -428,8 +436,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 						alertDialog.show();
 					}
 				}
-				// we set the latest_version whether or not the dialog is shown - if we showed the irst time dialog, we don't
-				// want to then show the What's New dialog next time we run!
+				// We set the latest_version whether or not the dialog is shown - if we showed the first time dialog, we don't
+				// want to then show the What's New dialog next time we run! Similarly if the user had disabled showing the dialog,
+				// but then enables it, we still shouldn't show the dialog until the new time Open Camera upgrades.
 				SharedPreferences.Editor editor = sharedPreferences.edit();
 				editor.putInt(PreferenceKeys.LatestVersionPreferenceKey, version_code);
 				editor.apply();
@@ -732,99 +741,21 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		editor.apply();
 	}
 
-	void launchOnlineHelp() {
+	void launchOnlineHelp(String append) {
 		if( MyDebug.LOG )
-			Log.d(TAG, "launchOnlineHelp");
-		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/"));
+			Log.d(TAG, "launchOnlineHelp: " + append);
+		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/"+ append));
 		startActivity(browserIntent);
 	}
 
-	// for audio "noise" trigger option
-	private int last_level = -1;
-	private long time_quiet_loud = -1;
-	private long time_last_audio_trigger_photo = -1;
-
-	/** Listens to audio noise and decides when there's been a "loud" noise to trigger taking a photo.
-	 */
-	public void onAudio(int level) {
-		boolean audio_trigger = false;
-		/*if( level > 150 ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "loud noise!: " + level);
-			audio_trigger = true;
-		}*/
-
-		if( last_level == -1 ) {
-			last_level = level;
-			return;
-		}
-		int diff = level - last_level;
-		
-		if( MyDebug.LOG )
-			Log.d(TAG, "noise_sensitivity: " + audio_noise_sensitivity);
-
-		if( diff > audio_noise_sensitivity ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "got louder!: " + last_level + " to " + level + " , diff: " + diff);
-			time_quiet_loud = System.currentTimeMillis();
-			if( MyDebug.LOG )
-				Log.d(TAG, "    time: " + time_quiet_loud);
-		}
-		else if( diff < -audio_noise_sensitivity && time_quiet_loud != -1 ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "got quieter!: " + last_level + " to " + level + " , diff: " + diff);
-			long time_now = System.currentTimeMillis();
-			long duration = time_now - time_quiet_loud;
-			if( MyDebug.LOG ) {
-				Log.d(TAG, "stopped being loud - was loud since :" + time_quiet_loud);
-				Log.d(TAG, "    time_now: " + time_now);
-				Log.d(TAG, "    duration: " + duration);
-			}
-			if( duration < 1500 ) {
-				if( MyDebug.LOG )
-					Log.d(TAG, "audio_trigger set");
-				audio_trigger = true;
-			}
-			time_quiet_loud = -1;
-		}
-		else {
-			if( MyDebug.LOG )
-				Log.d(TAG, "audio level: " + last_level + " to " + level + " , diff: " + diff);
-		}
-
-		last_level = level;
-
-		if( audio_trigger ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "audio trigger");
-			// need to run on UI thread so that this function returns quickly (otherwise we'll have lag in processing the audio)
-			// but also need to check we're not currently taking a photo or on timer, so we don't repeatedly queue up takePicture() calls, or cancel a timer
-			long time_now = System.currentTimeMillis();
-			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-			boolean want_audio_listener = sharedPreferences.getString(PreferenceKeys.AudioControlPreferenceKey, "none").equals("noise");
-			if( time_last_audio_trigger_photo != -1 && time_now - time_last_audio_trigger_photo < 5000 ) {
-				// avoid risk of repeatedly being triggered - as well as problem of being triggered again by the camera's own "beep"!
-				if( MyDebug.LOG )
-					Log.d(TAG, "ignore loud noise due to too soon since last audio triggerred photo:" + (time_now - time_last_audio_trigger_photo));
-			}
-			else if( !want_audio_listener ) {
-				// just in case this is a callback from an AudioListener before it's been freed (e.g., if there's a loud noise when exiting settings after turning the option off
-				if( MyDebug.LOG )
-					Log.d(TAG, "ignore loud noise due to audio listener option turned off");
-			}
-			else {
-				if( MyDebug.LOG )
-					Log.d(TAG, "audio trigger from loud noise");
-				time_last_audio_trigger_photo = time_now;
-				audioTrigger();
-			}
-		}
+	void launchOnlineHelp() {
+		launchOnlineHelp("");
 	}
-	
+
 	/* Audio trigger - either loud sound, or speech recognition.
 	 * This performs some additional checks before taking a photo.
 	 */
-	private void audioTrigger() {
+	void audioTrigger() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "ignore audio trigger due to popup open");
 		if( popupIsOpen() ) {
@@ -889,8 +820,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		mainUI.changeSeekbar(R.id.iso_seekbar, change);
 	}
 
-	public void changeFocusDistance(int change) {
-		mainUI.changeSeekbar(R.id.focus_seekbar, change);
+	public void changeFocusDistance(int change, boolean is_target_distance) {
+		mainUI.changeSeekbar(is_target_distance ? R.id.focus_bracketing_target_seekbar : R.id.focus_seekbar, change);
 	}
 	
 	private final SensorEventListener accelerometerListener = new SensorEventListener() {
@@ -904,9 +835,79 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		}
 	};
 	
+	private int magnetic_accuracy = -1;
+	private AlertDialog magnetic_accuracy_dialog;
+
+	private boolean magneticListenerIsRegistered;
+
+	/** Registers the magnetic sensor, only if it's required (by user preferences), and hasn't already
+	 *  been registered.
+	 *  If the magnetic sensor was previously registered, but is no longer required by user preferences,
+	 *  then it is unregistered.
+	 */
+	private void registerMagneticListener() {
+		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		if( !magneticListenerIsRegistered ) {
+			if( needsMagneticSensor(sharedPreferences) ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "register magneticListener");
+				mSensorManager.registerListener(magneticListener, mSensorMagnetic, SensorManager.SENSOR_DELAY_NORMAL);
+				magneticListenerIsRegistered = true;
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.d(TAG, "don't register magneticListener as not needed");
+			}
+		}
+		else {
+			if( needsMagneticSensor(sharedPreferences) ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "magneticListener already registered");
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.d(TAG, "magneticListener already registered but no longer needed");
+				mSensorManager.unregisterListener(magneticListener);
+				magneticListenerIsRegistered = false;
+			}
+		}
+	}
+
+	/** Unregisters the magnetic sensor, if it was registered.
+	 */
+	private void unregisterMagneticListener() {
+		if( magneticListenerIsRegistered ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "unregister magneticListener");
+			mSensorManager.unregisterListener(magneticListener);
+			magneticListenerIsRegistered = false;
+		}
+		else {
+			if( MyDebug.LOG )
+				Log.d(TAG, "magneticListener wasn't registered");
+		}
+	}
+
 	private final SensorEventListener magneticListener = new SensorEventListener() {
+
 		@Override
 		public void onAccuracyChanged(Sensor sensor, int accuracy) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "magneticListener.onAccuracyChanged: " + accuracy);
+			//accuracy = SensorManager.SENSOR_STATUS_ACCURACY_LOW; // test
+			MainActivity.this.magnetic_accuracy = accuracy;
+			setMagneticAccuracyDialogText(); // update if a dialog is already open for this
+			checkMagneticAccuracy();
+
+			// test accuracy changing after dialog opened:
+			/*Handler handler = new Handler();
+			handler.postDelayed(new Runnable() {
+				public void run() {
+					MainActivity.this.magnetic_accuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH;
+					setMagneticAccuracyDialogText();
+					checkMagneticAccuracy();
+				}
+			}, 5000);*/
 		}
 
 		@Override
@@ -914,6 +915,96 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			preview.onMagneticSensorChanged(event);
 		}
 	};
+
+	private void setMagneticAccuracyDialogText() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setMagneticAccuracyDialogText()");
+		if( magnetic_accuracy_dialog != null ) {
+			String message = getResources().getString(R.string.magnetic_accuracy_info) + " ";
+			switch( magnetic_accuracy ) {
+				case SensorManager.SENSOR_STATUS_UNRELIABLE:
+					message += getResources().getString(R.string.accuracy_unreliable);
+					break;
+				case SensorManager.SENSOR_STATUS_ACCURACY_LOW:
+					message += getResources().getString(R.string.accuracy_low);
+					break;
+				case SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM:
+					message += getResources().getString(R.string.accuracy_medium);
+					break;
+				case SensorManager.SENSOR_STATUS_ACCURACY_HIGH:
+					message += getResources().getString(R.string.accuracy_high);
+					break;
+				default:
+					message += getResources().getString(R.string.accuracy_unknown);
+					break;
+			}
+			if( MyDebug.LOG )
+				Log.d(TAG, "message: " + message);
+			magnetic_accuracy_dialog.setMessage(message);
+		}
+		else {
+			magnetic_accuracy_dialog = null;
+		}
+	}
+
+	private boolean shown_magnetic_accuracy_dialog = false; // whether the dialog for poor magnetic accuracy has been shown since application start
+
+	/** Checks whether the user should be informed about poor magnetic sensor accuracy, and shows
+	 *  the dialog if so.
+	 */
+	private void checkMagneticAccuracy() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "checkMagneticAccuracy(): " + magnetic_accuracy);
+		if( magnetic_accuracy != SensorManager.SENSOR_STATUS_UNRELIABLE && magnetic_accuracy != SensorManager.SENSOR_STATUS_ACCURACY_LOW ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "accuracy is good enough (or accuracy not yet known)");
+		}
+		else if( shown_magnetic_accuracy_dialog ) {
+			// if we've shown the dialog since application start, then don't show again even if the user didn't click to not show again
+			if( MyDebug.LOG )
+				Log.d(TAG, "already shown_magnetic_accuracy_dialog");
+		}
+		else if( preview.isTakingPhotoOrOnTimer() || preview.isVideoRecording() ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "don't disturb whilst taking photo, on timer, or recording video");
+		}
+		else if( camera_in_background ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "don't show magnetic accuracy dialog due to camera in background");
+			// don't want to show dialog if another is open, or in settings, etc
+		}
+		else {
+			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+			if( !needsMagneticSensor(sharedPreferences) ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "don't need magnetic sensor");
+				// note, we shouldn't set shown_magnetic_accuracy_dialog to true here, otherwise we won't pick up if the user enables one of these options
+			}
+			else if( sharedPreferences.contains(PreferenceKeys.MagneticAccuracyPreferenceKey) ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "user selected to no longer show the dialog");
+				shown_magnetic_accuracy_dialog = true; // also set this flag, so future calls to checkMagneticAccuracy() will exit without needing to get/read the SharedPreferences
+			}
+			else {
+				if( MyDebug.LOG )
+					Log.d(TAG, "show dialog for magnetic accuracy");
+				shown_magnetic_accuracy_dialog = true;
+				magnetic_accuracy_dialog = mainUI.showInfoDialog(R.string.magnetic_accuracy_title, 0, PreferenceKeys.MagneticAccuracyPreferenceKey);
+				setMagneticAccuracyDialogText();
+			}
+		}
+	}
+
+	/* Whether the user preferences indicate that we need the magnetic sensor to be enabled.
+	 */
+	private boolean needsMagneticSensor(SharedPreferences sharedPreferences) {
+		if( applicationInterface.getGeodirectionPref() ||
+				sharedPreferences.getBoolean(PreferenceKeys.ShowGeoDirectionLinesPreferenceKey, false) ||
+				sharedPreferences.getBoolean(PreferenceKeys.ShowGeoDirectionPreferenceKey, false) ) {
+			return true;
+		}
+		return false;
+	}
 
 	/* To support https://play.google.com/store/apps/details?id=com.miband2.mibandselfie .
 	 * Allows using the Mi Band 2 as a Bluetooth remote for Open Camera to take photos or start/stop
@@ -942,16 +1033,16 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		getWindow().getDecorView().getRootView().setBackgroundColor(Color.BLACK);
 
         mSensorManager.registerListener(accelerometerListener, mSensorAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(magneticListener, mSensorMagnetic, SensorManager.SENSOR_DELAY_NORMAL);
+        registerMagneticListener();
         orientationEventListener.enable();
 
         registerReceiver(cameraReceiver, new IntentFilter("com.miband2.action.CAMERA"));
 
         initSpeechRecognizer();
         initLocation();
-        initSound();
-    	loadSound(R.raw.beep);
-    	loadSound(R.raw.beep_hi);
+        soundPoolManager.initSound();
+    	soundPoolManager.loadSound(R.raw.beep);
+    	soundPoolManager.loadSound(R.raw.beep_hi);
 
 		mainUI.layoutUI();
 
@@ -989,7 +1080,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         super.onPause(); // docs say to call this before freeing other things
         mainUI.destroyPopup(); // important as user could change/reset settings from Android settings when pausing
         mSensorManager.unregisterListener(accelerometerListener);
-        mSensorManager.unregisterListener(magneticListener);
+        unregisterMagneticListener();
         orientationEventListener.disable();
         try {
 			unregisterReceiver(cameraReceiver);
@@ -1002,7 +1093,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         freeSpeechRecognizer();
         applicationInterface.getLocationSupplier().freeLocationListeners();
 		applicationInterface.getGyroSensor().stopRecording();
-		releaseSound();
+		soundPoolManager.releaseSound();
 		applicationInterface.clearLastImages(); // this should happen when pausing the preview, but call explicitly just to be safe
 		applicationInterface.getDrawPreview().clearGhostImage();
 		preview.onPause();
@@ -1162,54 +1253,6 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		mainUI.toggleExposureUI();
     }
     
-    private static double seekbarScaling(double frac) {
-    	// For various seekbars, we want to use a non-linear scaling, so user has more control over smaller values
-    	return (Math.pow(100.0, frac) - 1.0) / 99.0;
-    }
-
-    private static double seekbarScalingInverse(double scaling) {
-    	return Math.log(99.0*scaling + 1.0) / Math.log(100.0);
-    }
-
-	private void setProgressSeekbarScaled(SeekBar seekBar, double min_value, double max_value, double value) {
-		seekBar.setMax(manual_n);
-		double scaling = (value - min_value)/(max_value - min_value);
-		double frac = MainActivity.seekbarScalingInverse(scaling);
-		int new_value = (int)(frac*manual_n + 0.5); // add 0.5 for rounding
-		if( new_value < 0 )
-			new_value = 0;
-		else if( new_value > manual_n )
-			new_value = manual_n;
-		seekBar.setProgress(new_value);
-	}
-    
-    public static long exponentialScaling(double frac, double min, double max) {
-		/* We use S(frac) = A * e^(s * frac)
-		 * We want S(0) = min, S(1) = max
-		 * So A = min
-		 * and Ae^s = max
-		 * => s = ln(max/min)
-		 */
-		double s = Math.log(max / min);
-		return (long)(min * Math.exp(s * frac) + 0.5f); // add 0.5f so we round to nearest
-	}
-
-    private static double exponentialScalingInverse(double value, double min, double max) {
-		double s = Math.log(max / min);
-		return Math.log(value / min) / s;
-	}
-
-	public void setProgressSeekbarExponential(SeekBar seekBar, double min_value, double max_value, double value) {
-		seekBar.setMax(manual_n);
-		double frac = exponentialScalingInverse(value, min_value, max_value);
-		int new_value = (int)(frac*manual_n + 0.5); // add 0.5 for rounding
-		if( new_value < 0 )
-			new_value = 0;
-		else if( new_value > manual_n )
-			new_value = manual_n;
-		seekBar.setProgress(new_value);
-	}
-
     public void clickedExposureLock(View view) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clickedExposureLock");
@@ -1303,8 +1346,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				case "preference_show_angle_line":
 				case "preference_show_pitch_lines":
 				case "preference_angle_highlight_color":
-				case "preference_show_geo_direction":
-				case "preference_show_geo_direction_lines":
+				//case "preference_show_geo_direction": // don't whitelist these, as if enabled we need to call checkMagneticAccuracy()
+				//case "preference_show_geo_direction_lines": // as above
 				case "preference_show_battery":
 				case "preference_show_time":
 				case "preference_free_memory":
@@ -1394,6 +1437,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		putBundleExtra(bundle, "scene_modes", this.preview.getSupportedSceneModes());
 		putBundleExtra(bundle, "white_balances", this.preview.getSupportedWhiteBalances());
 		putBundleExtra(bundle, "isos", this.preview.getSupportedISOs());
+		bundle.putInt("magnetic_accuracy", magnetic_accuracy);
 		bundle.putString("iso_key", this.preview.getISOKey());
 		if( this.preview.getCameraController() != null ) {
 			bundle.putString("parameters_string", preview.getCameraController().getParametersString());
@@ -1408,6 +1452,28 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				i++;
 			}
 			bundle.putStringArray("antibanding_entries", entries_arr);
+		}
+		List<String> edge_modes = this.preview.getSupportedEdgeModes();
+		putBundleExtra(bundle, "edge_modes", edge_modes);
+		if( edge_modes != null ) {
+			String [] entries_arr = new String[edge_modes.size()];
+			int i=0;
+			for(String value: edge_modes) {
+				entries_arr[i] = getMainUI().getEntryForNoiseReductionMode(value);
+				i++;
+			}
+			bundle.putStringArray("edge_modes_entries", entries_arr);
+		}
+		List<String> noise_reduction_modes = this.preview.getSupportedNoiseReductionModes();
+		putBundleExtra(bundle, "noise_reduction_modes", noise_reduction_modes);
+		if( noise_reduction_modes != null ) {
+			String [] entries_arr = new String[noise_reduction_modes.size()];
+			int i=0;
+			for(String value: noise_reduction_modes) {
+				entries_arr[i] = getMainUI().getEntryForNoiseReductionMode(value);
+				i++;
+			}
+			bundle.putStringArray("noise_reduction_modes_entries", entries_arr);
 		}
 
 		List<CameraController.Size> preview_sizes = this.preview.getSupportedPreviewSizes();
@@ -1622,16 +1688,6 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					}
 				}
 			}
-
-			if( !need_reopen ) {
-				if( preview.getCameraController().isLogProfile() && !applicationInterface.useVideoLogProfile() ) {
-					// needed for Nexus 6, but not OnePlus 3T, Nokia 8, so this may be a device specific bug: problem that
-					// turning off log profile in settings doesn't take effect until the camera is reopened
-					if( MyDebug.LOG )
-						Log.d(TAG, "turning off log profile");
-					need_reopen = true;
-				}
-			}
 		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "updateForSettings: time after check need_reopen: " + (System.currentTimeMillis() - debug_time));
@@ -1685,6 +1741,9 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				Log.d(TAG, "switch focus back to: " + saved_focus_value);
     		preview.updateFocus(saved_focus_value, true, false);
     	}*/
+
+        registerMagneticListener(); // check whether we need to register or unregister the magnetic listener
+    	checkMagneticAccuracy();
 
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "updateForSettings: done: " + (System.currentTimeMillis() - debug_time));
@@ -1898,6 +1957,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		
 		initImmersiveMode();
 		camera_in_background = false;
+
+		magnetic_accuracy_dialog = null; // if the magnetic accuracy was opened, it must have been closed now
     }
     
     /** Sets the window flags for when the settings window is open.
@@ -1983,7 +2044,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	    /*if( MyDebug.LOG )
 			Log.d(TAG, "padding: " + bottom);*/
 	    galleryButton.setImageBitmap(null);
-		galleryButton.setImageResource(R.drawable.gallery);
+		galleryButton.setImageResource(R.drawable.baseline_photo_library_white_48);
 		// workaround for setImageResource also resetting padding, Android bug
 		galleryButton.setPadding(left, top, right, bottom);
 		gallery_bitmap = null;
@@ -2967,28 +3028,8 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 		{
 			if( MyDebug.LOG )
 				Log.d(TAG, "set up manual focus");
-		    SeekBar focusSeekBar = findViewById(R.id.focus_seekbar);
-		    focusSeekBar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
-			setProgressSeekbarScaled(focusSeekBar, 0.0, preview.getMinimumFocusDistance(), preview.getCameraController().getFocusDistance());
-		    focusSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
-				@Override
-				public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-					double frac = progress/(double)manual_n;
-					double scaling = MainActivity.seekbarScaling(frac);
-					float focus_distance = (float)(scaling * preview.getMinimumFocusDistance());
-					preview.setFocusDistance(focus_distance);
-				}
-
-				@Override
-				public void onStartTrackingTouch(SeekBar seekBar) {
-				}
-
-				@Override
-				public void onStopTrackingTouch(SeekBar seekBar) {
-				}
-			});
-	    	final int visibility = preview.getCurrentFocusValue() != null && this.getPreview().getCurrentFocusValue().equals("focus_mode_manual2") ? View.VISIBLE : View.GONE;
-		    focusSeekBar.setVisibility(visibility);
+			setManualFocusSeekbar(false);
+			setManualFocusSeekbar(true);
 		}
 		if( MyDebug.LOG )
 			Log.d(TAG, "cameraSetup: time after setting up manual focus: " + (System.currentTimeMillis() - debug_time));
@@ -2996,27 +3037,28 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			if( preview.supportsISORange()) {
 				if( MyDebug.LOG )
 					Log.d(TAG, "set up iso");
-				SeekBar iso_seek_bar = findViewById(R.id.iso_seekbar);
+				final SeekBar iso_seek_bar = findViewById(R.id.iso_seekbar);
 			    iso_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
-				setProgressSeekbarExponential(iso_seek_bar, preview.getMinimumISO(), preview.getMaximumISO(), preview.getCameraController().getISO());
+				//setProgressSeekbarExponential(iso_seek_bar, preview.getMinimumISO(), preview.getMaximumISO(), preview.getCameraController().getISO());
+				manualSeekbars.setProgressSeekbarISO(iso_seek_bar, preview.getMinimumISO(), preview.getMaximumISO(), preview.getCameraController().getISO());
 				iso_seek_bar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
 					@Override
 					public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "iso seekbar onProgressChanged: " + progress);
-						double frac = progress/(double)manual_n;
+						/*double frac = progress/(double)iso_seek_bar.getMax();
 						if( MyDebug.LOG )
 							Log.d(TAG, "exposure_time frac: " + frac);
-						/*double scaling = MainActivity.seekbarScaling(frac);
+						double scaling = MainActivity.seekbarScaling(frac);
 						if( MyDebug.LOG )
 							Log.d(TAG, "exposure_time scaling: " + scaling);
 						int min_iso = preview.getMinimumISO();
 						int max_iso = preview.getMaximumISO();
 						int iso = min_iso + (int)(scaling * (max_iso - min_iso));*/
-						int min_iso = preview.getMinimumISO();
+						/*int min_iso = preview.getMinimumISO();
 						int max_iso = preview.getMaximumISO();
-						int iso = (int)exponentialScaling(frac, min_iso, max_iso);
-						preview.setISO(iso);
+						int iso = (int)exponentialScaling(frac, min_iso, max_iso);*/
+						preview.setISO( manualSeekbars.getISO(progress) );
 						mainUI.updateSelectedISOButton();
 					}
 
@@ -3031,31 +3073,22 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				if( preview.supportsExposureTime() ) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "set up exposure time");
-					SeekBar exposure_time_seek_bar = findViewById(R.id.exposure_time_seekbar);
+					final SeekBar exposure_time_seek_bar = findViewById(R.id.exposure_time_seekbar);
 					exposure_time_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
-					setProgressSeekbarExponential(exposure_time_seek_bar, preview.getMinimumExposureTime(), preview.getMaximumExposureTime(), preview.getCameraController().getExposureTime());
+					//setProgressSeekbarExponential(exposure_time_seek_bar, preview.getMinimumExposureTime(), preview.getMaximumExposureTime(), preview.getCameraController().getExposureTime());
+					manualSeekbars.setProgressSeekbarShutterSpeed(exposure_time_seek_bar, preview.getMinimumExposureTime(), preview.getMaximumExposureTime(), preview.getCameraController().getExposureTime());
 					exposure_time_seek_bar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
 						@Override
 						public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
 							if( MyDebug.LOG )
 								Log.d(TAG, "exposure_time seekbar onProgressChanged: " + progress);
-							double frac = progress/(double)manual_n;
+							/*double frac = progress/(double)exposure_time_seek_bar.getMax();
 							if( MyDebug.LOG )
 								Log.d(TAG, "exposure_time frac: " + frac);
-							//long exposure_time = min_exposure_time + (long)(frac * (max_exposure_time - min_exposure_time));
-							//double exposure_time_r = min_exposure_time_r + (frac * (max_exposure_time_r - min_exposure_time_r));
-							//long exposure_time = (long)(1.0 / exposure_time_r);
-							// we use the formula: [100^(percent/100) - 1]/99.0 rather than a simple linear scaling
-							/*double scaling = MainActivity.seekbarScaling(frac);
-							if( MyDebug.LOG )
-								Log.d(TAG, "exposure_time scaling: " + scaling);
 							long min_exposure_time = preview.getMinimumExposureTime();
 							long max_exposure_time = preview.getMaximumExposureTime();
-							long exposure_time = min_exposure_time + (long)(scaling * (max_exposure_time - min_exposure_time));*/
-							long min_exposure_time = preview.getMinimumExposureTime();
-							long max_exposure_time = preview.getMaximumExposureTime();
-							long exposure_time = exponentialScaling(frac, min_exposure_time, max_exposure_time);
-							preview.setExposureTime(exposure_time);
+							long exposure_time = exponentialScaling(frac, min_exposure_time, max_exposure_time);*/
+							preview.setExposureTime( manualSeekbars.getExposureTime(progress) );
 						}
 
 						@Override
@@ -3142,6 +3175,43 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			Log.d(TAG, "cameraSetup: total time for cameraSetup: " + (System.currentTimeMillis() - debug_time));
     }
 
+    private void setManualFocusSeekbar(final boolean is_target_distance) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setManualFocusSeekbar");
+		final SeekBar focusSeekBar = findViewById(is_target_distance ? R.id.focus_bracketing_target_seekbar : R.id.focus_seekbar);
+		focusSeekBar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
+		ManualSeekbars.setProgressSeekbarScaled(focusSeekBar, 0.0, preview.getMinimumFocusDistance(), is_target_distance ? preview.getCameraController().getFocusBracketingTargetDistance() : preview.getCameraController().getFocusDistance());
+		focusSeekBar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+			@Override
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				double frac = progress/(double)focusSeekBar.getMax();
+				double scaling = ManualSeekbars.seekbarScaling(frac);
+				float focus_distance = (float)(scaling * preview.getMinimumFocusDistance());
+				preview.setFocusDistance(focus_distance, is_target_distance);
+			}
+
+			@Override
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			@Override
+			public void onStopTrackingTouch(SeekBar seekBar) {
+				preview.stoppedSettingFocusDistance(is_target_distance);
+			}
+		});
+		setManualFocusSeekBarVisibility(is_target_distance);
+	}
+
+    void setManualFocusSeekBarVisibility(final boolean is_target_distance) {
+		SeekBar focusSeekBar = findViewById(is_target_distance ? R.id.focus_bracketing_target_seekbar : R.id.focus_seekbar);
+		boolean is_visible = preview.getCurrentFocusValue() != null && this.getPreview().getCurrentFocusValue().equals("focus_mode_manual2");
+		if( is_target_distance ) {
+			is_visible = is_visible && (applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.FocusBracketing) && !preview.isVideo();
+		}
+		final int visibility = is_visible ? View.VISIBLE : View.GONE;
+		focusSeekBar.setVisibility(visibility);
+	}
+
     public void setManualWBSeekbar() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setManualWBSeekbar");
@@ -3152,16 +3222,20 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			white_balance_seek_bar.setOnSeekBarChangeListener(null); // clear an existing listener - don't want to call the listener when setting up the progress bar to match the existing state
 			final int minimum_temperature = preview.getMinimumWhiteBalanceTemperature();
 			final int maximum_temperature = preview.getMaximumWhiteBalanceTemperature();
+			/*
 			// white balance should use linear scaling
 			white_balance_seek_bar.setMax(maximum_temperature - minimum_temperature);
 			white_balance_seek_bar.setProgress(preview.getCameraController().getWhiteBalanceTemperature() - minimum_temperature);
+			*/
+			manualSeekbars.setProgressSeekbarWhiteBalance(white_balance_seek_bar, minimum_temperature, maximum_temperature, preview.getCameraController().getWhiteBalanceTemperature());
 			white_balance_seek_bar.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
 				@Override
 				public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "white balance seekbar onProgressChanged: " + progress);
-					int temperature = minimum_temperature + progress;
-					preview.setWhiteBalanceTemperature(temperature);
+					//int temperature = minimum_temperature + progress;
+					//preview.setWhiteBalanceTemperature(temperature);
+					preview.setWhiteBalanceTemperature( manualSeekbars.getWhiteBalanceTemperature(progress) );
 				}
 
 				@Override
@@ -3196,6 +3270,10 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     
     public boolean supportsExpoBracketing() {
 		return preview.supportsExpoBracketing();
+    }
+
+    public boolean supportsFocusBracketing() {
+		return preview.supportsFocusBracketing();
     }
 
     public boolean supportsFastBurst() {
@@ -3279,8 +3357,12 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
     public Preview getPreview() {
     	return this.preview;
     }
-    
-    public MainUI getMainUI() {
+
+	public PermissionHandler getPermissionHandler() {
+		return permissionHandler;
+	}
+
+	public MainUI getMainUI() {
     	return this.mainUI;
     }
     
@@ -3291,7 +3373,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	public TextFormatter getTextFormatter() {
 		return this.textFormatter;
 	}
-    
+
+	SoundPoolManager getSoundPoolManager() {
+    	return this.soundPoolManager;
+	}
+
     public LocationSupplier getLocationSupplier() {
     	return this.applicationInterface.getLocationSupplier();
     }
@@ -3390,10 +3476,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 			}
 		}
 		else {
+			MyApplicationInterface.PhotoMode photo_mode = applicationInterface.getPhotoMode();
 			toast_string = getResources().getString(R.string.photo);
 			CameraController.Size current_size = preview.getCurrentPictureSize();
 			toast_string += " " + current_size.width + "x" + current_size.height;
-			if( preview.supportsFocus() && preview.getSupportedFocusValues().size() > 1 ) {
+			if( preview.supportsFocus() && preview.getSupportedFocusValues().size() > 1 && photo_mode != MyApplicationInterface.PhotoMode.FocusBracketing ) {
 				String focus_value = preview.getCurrentFocusValue();
 				if( focus_value != null && !focus_value.equals("focus_mode_auto") && !focus_value.equals("focus_mode_continuous_picture") ) {
 					String focus_entry = preview.findFocusEntryForValue(focus_value);
@@ -3408,23 +3495,31 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 				simple = false;
 			}
 			String photo_mode_string = null;
-			MyApplicationInterface.PhotoMode photo_mode = applicationInterface.getPhotoMode();
-			if( photo_mode == MyApplicationInterface.PhotoMode.DRO ) {
-				photo_mode_string = getResources().getString(R.string.photo_mode_dro);
-			}
-			else if( photo_mode == MyApplicationInterface.PhotoMode.HDR ) {
-				photo_mode_string = getResources().getString(R.string.photo_mode_hdr);
-			}
-			else if( photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing ) {
-				photo_mode_string = getResources().getString(R.string.photo_mode_expo_bracketing_full);
-			}
-			else if( photo_mode == MyApplicationInterface.PhotoMode.FastBurst ) {
-				photo_mode_string = getResources().getString(R.string.photo_mode_fast_burst_full);
-				int n_images = applicationInterface.getBurstNImages();
-				photo_mode_string += " (" + n_images + ")";
-			}
-			else if( photo_mode == MyApplicationInterface.PhotoMode.NoiseReduction ) {
-				photo_mode_string = getResources().getString(R.string.photo_mode_noise_reduction_full);
+			switch (photo_mode) {
+				case DRO:
+					photo_mode_string = getResources().getString(R.string.photo_mode_dro);
+					break;
+				case HDR:
+					photo_mode_string = getResources().getString(R.string.photo_mode_hdr);
+					break;
+				case ExpoBracketing:
+					photo_mode_string = getResources().getString(R.string.photo_mode_expo_bracketing_full);
+					break;
+				case FocusBracketing: {
+					photo_mode_string = getResources().getString(R.string.photo_mode_focus_bracketing_full);
+					int n_images = applicationInterface.getFocusBracketingNImagesPref();
+					photo_mode_string += " (" + n_images + ")";
+					break;
+				}
+				case FastBurst: {
+					photo_mode_string = getResources().getString(R.string.photo_mode_fast_burst_full);
+					int n_images = applicationInterface.getBurstNImages();
+					photo_mode_string += " (" + n_images + ")";
+					break;
+				}
+				case NoiseReduction:
+					photo_mode_string = getResources().getString(R.string.photo_mode_noise_reduction_full);
+					break;
 			}
 			if( photo_mode_string != null ) {
 				toast_string += "\n" + getResources().getString(R.string.photo_mode) + ": " + photo_mode_string;
@@ -3529,11 +3624,13 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 	private void startAudioListener() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "startAudioListener");
-		audio_listener = new AudioListener(this);
+		MyAudioTriggerListenerCallback callback = new MyAudioTriggerListenerCallback(this);
+		audio_listener = new AudioListener(callback);
 		if( audio_listener.status() ) {
 			audio_listener.start();
 			SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 			String sensitivity_pref = sharedPreferences.getString(PreferenceKeys.AudioNoiseControlSensitivityPreferenceKey, "0");
+			int audio_noise_sensitivity;
 			switch(sensitivity_pref) {
 				case "3":
 					audio_noise_sensitivity = 50;
@@ -3555,6 +3652,7 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
 					audio_noise_sensitivity = 100;
 					break;
 			}
+			callback.setAudioNoiseSensitivity(audio_noise_sensitivity);
 			mainUI.audioControlStarted();
 		}
 		else {
@@ -3724,74 +3822,14 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         }
 	}
 	
-	private void initLocation() {
+	void initLocation() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "initLocation");
         if( !applicationInterface.getLocationSupplier().setupLocationListener() ) {
     		if( MyDebug.LOG )
     			Log.d(TAG, "location permission not available, so request permission");
-    		requestLocationPermission();
+    		permissionHandler.requestLocationPermission();
         }
-	}
-	
-	@SuppressWarnings("deprecation")
-	private void initSound() {
-		if( sound_pool == null ) {
-    		if( MyDebug.LOG )
-    			Log.d(TAG, "create new sound_pool");
-	        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
-	        	AudioAttributes audio_attributes = new AudioAttributes.Builder()
-	        		.setLegacyStreamType(AudioManager.STREAM_SYSTEM)
-	        		.setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-	        		.build();
-	        	sound_pool = new SoundPool.Builder()
-	        		.setMaxStreams(1)
-	        		.setAudioAttributes(audio_attributes)
-        			.build();
-	        }
-	        else {
-				sound_pool = new SoundPool(1, AudioManager.STREAM_SYSTEM, 0);
-	        }
-			sound_ids = new SparseIntArray();
-		}
-	}
-	
-	private void releaseSound() {
-        if( sound_pool != null ) {
-    		if( MyDebug.LOG )
-    			Log.d(TAG, "release sound_pool");
-            sound_pool.release();
-        	sound_pool = null;
-    		sound_ids = null;
-        }
-	}
-	
-	// must be called before playSound (allowing enough time to load the sound)
-	private void loadSound(int resource_id) {
-		if( sound_pool != null ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "loading sound resource: " + resource_id);
-			int sound_id = sound_pool.load(this, resource_id, 1);
-			if( MyDebug.LOG )
-				Log.d(TAG, "    loaded sound: " + sound_id);
-			sound_ids.put(resource_id, sound_id);
-		}
-	}
-	
-	// must call loadSound first (allowing enough time to load the sound)
-	void playSound(int resource_id) {
-		if( sound_pool != null ) {
-			if( sound_ids.indexOfKey(resource_id) < 0 ) {
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "resource not loaded: " + resource_id);
-			}
-			else {
-				int sound_id = sound_ids.get(resource_id);
-	    		if( MyDebug.LOG )
-	    			Log.d(TAG, "play sound: " + sound_id);
-				sound_pool.play(sound_id, 1.0f, 1.0f, 0, 0, 1);
-			}
-		}
 	}
 	
 	@SuppressWarnings("deprecation")
@@ -3801,274 +3839,11 @@ public class MainActivity extends Activity implements AudioListener.AudioListene
         }
 	}
 
-	// Android 6+ permission handling:
-	
-	final private int MY_PERMISSIONS_REQUEST_CAMERA = 0;
-	final private int MY_PERMISSIONS_REQUEST_STORAGE = 1;
-	final private int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 2;
-	final private int MY_PERMISSIONS_REQUEST_LOCATION = 3;
-
-	/** Show a "rationale" to the user for needing a particular permission, then request that permission again
-	 *  once they close the dialog.
-	 */
-	@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
-	private void showRequestPermissionRationale(final int permission_code) {
-		if( MyDebug.LOG )
-			Log.d(TAG, "showRequestPermissionRational: " + permission_code);
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		boolean ok = true;
-		String [] permissions = null;
-		int message_id = 0;
-		if( permission_code == MY_PERMISSIONS_REQUEST_CAMERA ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for camera permission");
-			permissions = new String[]{Manifest.permission.CAMERA};
-			message_id = R.string.permission_rationale_camera;
-		}
-		else if( permission_code == MY_PERMISSIONS_REQUEST_STORAGE ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for storage permission");
-			permissions = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE};
-			message_id = R.string.permission_rationale_storage;
-		}
-		else if( permission_code == MY_PERMISSIONS_REQUEST_RECORD_AUDIO ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for record audio permission");
-			permissions = new String[]{Manifest.permission.RECORD_AUDIO};
-			message_id = R.string.permission_rationale_record_audio;
-		}
-		else if( permission_code == MY_PERMISSIONS_REQUEST_LOCATION ) {
-			if( MyDebug.LOG )
-				Log.d(TAG, "display rationale for location permission");
-			permissions = new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION};
-			message_id = R.string.permission_rationale_location;
-		}
-		else {
-			if( MyDebug.LOG )
-				Log.e(TAG, "showRequestPermissionRational unknown permission_code: " + permission_code);
-			ok = false;
-		}
-
-		if( ok ) {
-			final String [] permissions_f = permissions;
-			new AlertDialog.Builder(this)
-			.setTitle(R.string.permission_rationale_title)
-			.setMessage(message_id)
-			.setIcon(android.R.drawable.ic_dialog_alert)
-        	.setPositiveButton(android.R.string.ok, null)
-			.setOnDismissListener(new OnDismissListener() {
-				public void onDismiss(DialogInterface dialog) {
-					if( MyDebug.LOG )
-						Log.d(TAG, "requesting permission...");
-					ActivityCompat.requestPermissions(MainActivity.this, permissions_f, permission_code); 
-				}
-			}).show();
-		}
-	}
-
-	void requestCameraPermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestCameraPermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_CAMERA);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting camera permission...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, MY_PERMISSIONS_REQUEST_CAMERA);
-        }
-    }
-
-	void requestStoragePermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestStoragePermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_STORAGE);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting storage permission...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, MY_PERMISSIONS_REQUEST_STORAGE);
-        }
-    }
-
-	void requestRecordAudioPermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestRecordAudioPermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting record audio permission...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
-        }
-    }
-
-	private void requestLocationPermission() {
-		if( MyDebug.LOG )
-			Log.d(TAG, "requestLocationPermission");
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		if( ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION) ||
-				ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION) ) {
-	        // Show an explanation to the user *asynchronously* -- don't block
-	        // this thread waiting for the user's response! After the user
-	        // sees the explanation, try again to request the permission.
-	    	showRequestPermissionRationale(MY_PERMISSIONS_REQUEST_LOCATION);
-	    }
-	    else {
-	    	// Can go ahead and request the permission
-			if( MyDebug.LOG )
-				Log.d(TAG, "requesting loacation permissions...");
-	        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, MY_PERMISSIONS_REQUEST_LOCATION);
-        }
-    }
-
 	@Override
 	public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "onRequestPermissionsResult: requestCode " + requestCode);
-		if( Build.VERSION.SDK_INT < Build.VERSION_CODES.M ) {
-			if( MyDebug.LOG )
-				Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!");
-			return;
-		}
-
-		switch( requestCode ) {
-	        case MY_PERMISSIONS_REQUEST_CAMERA:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "camera permission granted");
-	            	preview.retryOpenCamera();
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "camera permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	            	// Open Camera doesn't need to do anything: the camera will remain closed
-	            }
-	            return;
-	        }
-	        case MY_PERMISSIONS_REQUEST_STORAGE:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "storage permission granted");
-	            	preview.retryOpenCamera();
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "storage permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	            	// Open Camera doesn't need to do anything: the camera will remain closed
-	            }
-	            return;
-	        }
-	        case MY_PERMISSIONS_REQUEST_RECORD_AUDIO:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "record audio permission granted");
-	        		// no need to do anything
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "record audio permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	        		// no need to do anything
-	        		// note that we don't turn off record audio option, as user may then record video not realising audio won't be recorded - best to be explicit each time
-	            }
-	            return;
-	        }
-	        case MY_PERMISSIONS_REQUEST_LOCATION:
-	        {
-	            // If request is cancelled, the result arrays are empty.
-	            if( grantResults.length > 0
-	                && grantResults[0] == PackageManager.PERMISSION_GRANTED ) {
-	                // permission was granted, yay! Do the
-	                // contacts-related task you need to do.
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "location permission granted");
-	                initLocation();
-	            }
-	            else {
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "location permission denied");
-	                // permission denied, boo! Disable the
-	                // functionality that depends on this permission.
-	        		// for location, seems best to turn the option back off
-	        		if( MyDebug.LOG )
-	        			Log.d(TAG, "location permission not available, so switch location off");
-		    		preview.showToast(null, R.string.permission_location_not_available);
-					SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(this);
-					SharedPreferences.Editor editor = settings.edit();
-					editor.putBoolean(PreferenceKeys.LocationPreferenceKey, false);
-					editor.apply();
-	            }
-	            return;
-	        }
-	        default:
-	        {
-	    		if( MyDebug.LOG )
-	    			Log.e(TAG, "unknown requestCode " + requestCode);
-	        }
-	    }
+		permissionHandler.onRequestPermissionsResult(requestCode, grantResults);
 	}
 
 	// for testing:

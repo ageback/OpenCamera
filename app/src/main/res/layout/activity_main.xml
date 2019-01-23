@@ -92,10 +92,11 @@
         android:contentDescription="@string/zoom"
         android:layout_width="150dp"
         android:layout_height="50dp"
-        android:layout_marginLeft="10dp"
+        android:layout_marginLeft="0dp"
         android:layout_marginRight="20dp"
         android:layout_marginTop="0dp"
         android:layout_marginBottom="0dp"
+        android:background="@color/seekbar_background"
         />
 
     <SeekBar
@@ -103,14 +104,27 @@
         android:contentDescription="@string/focus_distance"
         android:layout_width="150dp"
         android:layout_height="50dp"
-        android:layout_marginLeft="50dp"
-        android:layout_marginRight="10dp"
+        android:layout_marginLeft="75dp"
+        android:layout_marginRight="0dp"
         android:layout_marginTop="0dp"
         android:layout_marginBottom="0dp"
         android:visibility="gone"
         android:background="@color/seekbar_background"
         />
-    
+
+    <SeekBar
+        android:id="@+id/focus_bracketing_target_seekbar"
+        android:contentDescription="@string/focus_bracketing_target_distance"
+        android:layout_width="150dp"
+        android:layout_height="50dp"
+        android:layout_marginLeft="75dp"
+        android:layout_marginRight="0dp"
+        android:layout_marginTop="0dp"
+        android:layout_marginBottom="0dp"
+        android:visibility="gone"
+        android:background="@color/seekbar_background"
+        />
+
     <Button
         android:id="@+id/gui_anchor"
         android:layout_width="0dp"
@@ -127,7 +141,7 @@
         android:padding="8dp"
         android:scaleType="fitCenter"
         android:contentDescription="@string/gallery"
-        android:src="@drawable/gallery"
+        android:src="@drawable/baseline_photo_library_white_48"
         android:onClick="clickedGallery"
         />
 
@@ -412,8 +426,9 @@
         android:id="@+id/popup_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_toLeftOf="@+id/settings"
-        android:layout_below="@+id/settings"
+        android:layout_alignRight="@+id/popup"
+        android:layout_below="@+id/popup"
+        android:fadeScrollbars="false"
         />
     
     <ScrollView

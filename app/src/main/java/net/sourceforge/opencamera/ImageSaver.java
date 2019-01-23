@@ -118,6 +118,7 @@ public class ImageSaver extends Thread {
 		final String preference_stamp_dateformat;
 		final String preference_stamp_timeformat;
 		final String preference_stamp_gpsformat;
+		final String preference_units_distance;
 		final boolean store_location;
 		final Location location;
 		final boolean store_geo_direction;
@@ -140,7 +141,7 @@ public class ImageSaver extends Thread {
 			boolean mirror,
 			Date current_date,
 			int iso,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -170,6 +171,7 @@ public class ImageSaver extends Thread {
 			this.preference_stamp_dateformat = preference_stamp_dateformat;
 			this.preference_stamp_timeformat = preference_stamp_timeformat;
 			this.preference_stamp_gpsformat = preference_stamp_gpsformat;
+			this.preference_units_distance = preference_units_distance;
 			this.store_location = store_location;
 			this.location = location;
 			this.store_geo_direction = store_geo_direction;
@@ -345,25 +347,27 @@ public class ImageSaver extends Thread {
 				if( MyDebug.LOG )
 					Log.d(TAG, "ImageSaver thread found new request from queue, size is now: " + queue.size());
 				boolean success;
-				if( request.type == Request.Type.RAW ) {
-					if( MyDebug.LOG )
-						Log.d(TAG, "request is raw");
-					success = saveImageNowRaw(request);
-				}
-				else if( request.type == Request.Type.JPEG ) {
-					if( MyDebug.LOG )
-						Log.d(TAG, "request is jpeg");
-					success = saveImageNow(request);
-				}
-				else if( request.type == Request.Type.DUMMY ) {
-					if( MyDebug.LOG )
-						Log.d(TAG, "request is dummy");
-					success = true;
-				}
-				else {
-					if( MyDebug.LOG )
-						Log.e(TAG, "request is unknown type!");
-					success = false;
+				switch (request.type) {
+					case RAW:
+						if (MyDebug.LOG)
+							Log.d(TAG, "request is raw");
+						success = saveImageNowRaw(request);
+						break;
+					case JPEG:
+						if (MyDebug.LOG)
+							Log.d(TAG, "request is jpeg");
+						success = saveImageNow(request);
+						break;
+					case DUMMY:
+						if (MyDebug.LOG)
+							Log.d(TAG, "request is dummy");
+						success = true;
+						break;
+					default:
+						if (MyDebug.LOG)
+							Log.e(TAG, "request is unknown type!");
+						success = false;
+						break;
 				}
 				if( MyDebug.LOG ) {
 					if( success )
@@ -415,7 +419,7 @@ public class ImageSaver extends Thread {
 			boolean mirror,
 			Date current_date,
 			int iso,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -440,7 +444,7 @@ public class ImageSaver extends Thread {
 				mirror,
 				current_date,
 				iso,
-				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 				store_location, location, store_geo_direction, geo_direction,
 				custom_tag_artist,
 				custom_tag_copyright,
@@ -475,7 +479,7 @@ public class ImageSaver extends Thread {
 				false,
 				current_date,
 				0,
-				null, null, 0, 0, null, null, null, null,
+				null, null, 0, 0, null, null, null, null, null,
 				false, null, false, 0.0,
 				null, null,
 				1);
@@ -492,7 +496,7 @@ public class ImageSaver extends Thread {
 			boolean mirror,
 			Date current_date,
 			int iso,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -515,7 +519,7 @@ public class ImageSaver extends Thread {
 				mirror,
 				current_date,
 				iso,
-				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 				store_location, location, store_geo_direction, geo_direction,
 				custom_tag_artist,
 				custom_tag_copyright,
@@ -573,7 +577,7 @@ public class ImageSaver extends Thread {
 			boolean mirror,
 			Date current_date,
 			int iso,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -600,7 +604,7 @@ public class ImageSaver extends Thread {
 				mirror,
 				current_date,
 				iso,
-				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 				store_location, location, store_geo_direction, geo_direction,
 				custom_tag_artist,
 				custom_tag_copyright,
@@ -702,7 +706,7 @@ public class ImageSaver extends Thread {
 			false,
 			null,
 			0,
-			null, null, 0, 0, null, null, null, null,
+			null, null, 0, 0, null, null, null, null, null,
 			false, null, false, 0.0,
 			null, null,
 			1);
@@ -936,7 +940,8 @@ public class ImageSaver extends Thread {
 				try {
 					long time_s = System.currentTimeMillis();
 					// initialise allocation from first two bitmaps
-					int inSampleSize = hdrProcessor.getAvgSampleSize();
+					//int inSampleSize = hdrProcessor.getAvgSampleSize(request.jpeg_images.size());
+					int inSampleSize = hdrProcessor.getAvgSampleSize(request.iso);
 					//final boolean use_smp = false;
 					final boolean use_smp = true;
 					// n_smp_images is how many bitmaps to decompress at once if use_smp==true. Beware of setting too high -
@@ -1532,7 +1537,7 @@ public class ImageSaver extends Thread {
 						applicationInterface.drawTextWithBackground(canvas, p, datetime_stamp, color, Color.BLACK, width - offset_x, ypos, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, draw_shadowed);
 					}
 					ypos -= diff_y;
-					String gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, request.store_location, request.location, request.store_geo_direction, request.geo_direction);
+					String gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, request.preference_units_distance, request.store_location, request.location, request.store_geo_direction, request.geo_direction);
 					if( gps_stamp.length() > 0 ) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "stamp with location_string: " + gps_stamp);
@@ -1937,7 +1942,7 @@ public class ImageSaver extends Thread {
     		    matrix.postScale(scale, scale);
 	    		if( MyDebug.LOG )
 	    			Log.d(TAG, "    scale: " + scale);
-				if( width > 0 && height > 0 ) {
+				try {
 					thumbnail = Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true);
 					if( MyDebug.LOG ) {
 						Log.d(TAG, "thumbnail width: " + thumbnail.getWidth());
@@ -1945,11 +1950,15 @@ public class ImageSaver extends Thread {
 					}
 					// don't need to rotate for exif, as we already did that when creating the bitmap
 				}
-				else {
+				catch(IllegalArgumentException e) {
 					// received IllegalArgumentException on Google Play from Bitmap.createBitmap; documentation suggests this
-					// means width or height are 0
-					if( MyDebug.LOG )
-						Log.e(TAG, "bitmap has zero width or height?!");
+					// means width or height are 0 - but trapping that didn't fix the problem
+					// or "the x, y, width, height values are outside of the dimensions of the source bitmap", but that can't be
+					// true here
+					// crashes seem to all be Android 7.1 or earlier, so maybe this is a bug that's been fixed - but catch it anyway
+					// as it's grown popular
+					Log.e(TAG, "can't create thumbnail bitmap due to IllegalArgumentException?!");
+					e.printStackTrace();
 					thumbnail = null;
 				}
 			}
@@ -2503,25 +2512,28 @@ public class ImageSaver extends Thread {
 			int exif_orientation = 0;
 			// from http://jpegclub.org/exif_orientation.html
 			// and http://stackoverflow.com/questions/20478765/how-to-get-the-correct-orientation-of-the-image-selected-from-the-default-image
-			if( exif_orientation_s == ExifInterface.ORIENTATION_UNDEFINED || exif_orientation_s == ExifInterface.ORIENTATION_NORMAL ) {
-				// leave unchanged
-			}
-			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_180 ) {
-				needs_tf = true;
-				exif_orientation = 180;
-			}
-			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_90 ) {
-				needs_tf = true;
-				exif_orientation = 90;
-			}
-			else if( exif_orientation_s == ExifInterface.ORIENTATION_ROTATE_270 ) {
-				needs_tf = true;
-				exif_orientation = 270;
-			}
-			else {
-				// just leave unchanged for now
-	    		if( MyDebug.LOG )
-	    			Log.e(TAG, "    unsupported exif orientation: " + exif_orientation_s);
+			switch (exif_orientation_s) {
+				case ExifInterface.ORIENTATION_UNDEFINED:
+				case ExifInterface.ORIENTATION_NORMAL:
+					// leave unchanged
+					break;
+				case ExifInterface.ORIENTATION_ROTATE_180:
+					needs_tf = true;
+					exif_orientation = 180;
+					break;
+				case ExifInterface.ORIENTATION_ROTATE_90:
+					needs_tf = true;
+					exif_orientation = 90;
+					break;
+				case ExifInterface.ORIENTATION_ROTATE_270:
+					needs_tf = true;
+					exif_orientation = 270;
+					break;
+				default:
+					// just leave unchanged for now
+					if (MyDebug.LOG)
+						Log.e(TAG, "    unsupported exif orientation: " + exif_orientation_s);
+					break;
 			}
     		if( MyDebug.LOG )
     			Log.d(TAG, "    exif orientation: " + exif_orientation);

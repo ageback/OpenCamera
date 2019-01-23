@@ -173,6 +173,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 
 	private boolean is_preview_started;
 
+	private OrientationEventListener orientationEventListener;
 	private int current_orientation; // orientation received by onOrientationChanged
 	private int current_rotation; // orientation relative to camera's orientation (used for parameters.setRotation())
 	private boolean has_level_angle;
@@ -207,6 +208,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	private List<String> scene_modes;
 	private List<String> white_balances;
 	private List<String> antibanding;
+	private List<String> edge_modes;
+	private List<String> noise_reduction_modes; // n.b., this is for the Camera2 API setting, not for Open Camera's Noise Reduction photo mode
 	private List<String> isos;
 	private boolean supports_white_balance_temperature;
 	private int min_temperature;
@@ -223,8 +226,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	private float exposure_step;
 	private boolean supports_expo_bracketing;
 	private int max_expo_bracketing_n_images;
-	private boolean supports_raw;
+	private boolean supports_focus_bracketing;
 	private boolean supports_burst;
+	private boolean supports_raw;
 	private float view_angle_x;
 	private float view_angle_y;
 
@@ -241,6 +245,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	private final VideoQualityHandler video_quality_handler = new VideoQualityHandler();
 
 	private Toast last_toast;
+	private long last_toast_time_ms;
 	private final ToastBoxer flash_toast = new ToastBoxer();
 	private final ToastBoxer focus_toast = new ToastBoxer();
 	private final ToastBoxer take_photo_toast = new ToastBoxer();
@@ -1152,6 +1157,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				closeCameraCallback.onClosed();
 			}
 		}
+
+		if( orientationEventListener != null ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "free orientationEventListener");
+			orientationEventListener.disable();
+			orientationEventListener = null;
+		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "closeCamera: total time: " + (System.currentTimeMillis() - debug_time));
 		}
@@ -1278,6 +1290,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		color_effects = null;
 		white_balances = null;
 		antibanding = null;
+		edge_modes = null;
+		noise_reduction_modes = null;
 		isos = null;
 		supports_white_balance_temperature = false;
 		min_temperature = 0;
@@ -1294,8 +1308,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		exposure_step = 0.0f;
 		supports_expo_bracketing = false;
 		max_expo_bracketing_n_images = 0;
-		supports_raw = false;
+		supports_focus_bracketing = false;
 		supports_burst = false;
+		supports_raw = false;
 		view_angle_x = 55.0f; // set a sensible default
 		view_angle_y = 43.0f; // set a sensible default
 		sizes = null;
@@ -1534,12 +1549,17 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				Log.d(TAG, "take_photo?: " + take_photo);
 
 			setCameraDisplayOrientation();
-			new OrientationEventListener(activity) {
-				@Override
-				public void onOrientationChanged(int orientation) {
-					Preview.this.onOrientationChanged(orientation);
-				}
-			}.enable();
+			if( orientationEventListener == null ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "create orientationEventListener");
+				orientationEventListener = new OrientationEventListener(activity) {
+					@Override
+					public void onOrientationChanged(int orientation) {
+						Preview.this.onOrientationChanged(orientation);
+					}
+				};
+				orientationEventListener.enable();
+			}
 			if( MyDebug.LOG ) {
 				Log.d(TAG, "openCamera: time after setting orientation: " + (System.currentTimeMillis() - debug_time));
 			}
@@ -1737,6 +1757,11 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			camera_controller.setExpoBracketingNImages( applicationInterface.getExpoBracketingNImagesPref() );
 			camera_controller.setExpoBracketingStops( applicationInterface.getExpoBracketingStopsPref() );
 			// setUseExpoFastBurst called when taking a photo
+		}
+		else if( this.supports_focus_bracketing && applicationInterface.isFocusBracketingPref() ) {
+			camera_controller.setBurstType(CameraController.BurstType.BURSTTYPE_FOCUS);
+			camera_controller.setFocusBracketingNImages( applicationInterface.getFocusBracketingNImagesPref() );
+			camera_controller.setFocusBracketingAddInfinity( applicationInterface.getFocusBracketingAddInfinityPref() );
 		}
 		else if( this.supports_burst && applicationInterface.isCameraBurstPref() ) {
 			if( applicationInterface.getBurstForNoiseReduction() ) {
@@ -1939,8 +1964,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			this.exposure_step = camera_features.exposure_step;
 			this.supports_expo_bracketing = camera_features.supports_expo_bracketing;
 			this.max_expo_bracketing_n_images = camera_features.max_expo_bracketing_n_images;
-			this.supports_raw = camera_features.supports_raw;
+			this.supports_focus_bracketing = camera_features.supports_focus_bracketing;
 			this.supports_burst = camera_features.supports_burst;
+			this.supports_raw = camera_features.supports_raw;
 			this.view_angle_x = camera_features.view_angle_x;
 			this.view_angle_y = camera_features.view_angle_y;
 			this.supports_video_high_speed = camera_features.video_sizes_high_speed != null && camera_features.video_sizes_high_speed.size() > 0;
@@ -2225,6 +2251,36 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             // write it back to the user preference
 			if( supported_values != null ) {
                 antibanding = supported_values.values;
+            }
+		}
+
+		{
+			if( MyDebug.LOG )
+				Log.d(TAG, "set up edge_mode");
+			String value = applicationInterface.getEdgeModePref();
+			if( MyDebug.LOG )
+				Log.d(TAG, "saved edge_mode: " + value);
+
+			CameraController.SupportedValues supported_values = camera_controller.setEdgeMode(value);
+            // for edge mode, if the stored preference wasn't supported, we stick with the device default - but don't
+            // write it back to the user preference
+			if( supported_values != null ) {
+                edge_modes = supported_values.values;
+            }
+		}
+
+		{
+			if( MyDebug.LOG )
+				Log.d(TAG, "set up noise_reduction_mode");
+			String value = applicationInterface.getNoiseReductionModePref();
+			if( MyDebug.LOG )
+				Log.d(TAG, "saved noise_reduction_mode: " + value);
+
+			CameraController.SupportedValues supported_values = camera_controller.setNoiseReductionMode(value);
+            // for noise reduction mode, if the stored preference wasn't supported, we stick with the device default - but don't
+            // write it back to the user preference
+			if( supported_values != null ) {
+                noise_reduction_modes = supported_values.values;
             }
 		}
 
@@ -2620,7 +2676,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 
 		{
-			float focus_distance_value = applicationInterface.getFocusDistancePref();
+			float focus_distance_value = applicationInterface.getFocusDistancePref(false);
 			if( MyDebug.LOG )
 				Log.d(TAG, "saved focus_distance: " + focus_distance_value);
 			if( focus_distance_value < 0.0f )
@@ -2628,8 +2684,21 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			else if( focus_distance_value > minimum_focus_distance )
 				focus_distance_value = minimum_focus_distance;
 			camera_controller.setFocusDistance(focus_distance_value);
+			camera_controller.setFocusBracketingSourceDistance(focus_distance_value);
 			// now save
-			applicationInterface.setFocusDistancePref(focus_distance_value);
+			applicationInterface.setFocusDistancePref(focus_distance_value, false);
+		}
+		{
+			float focus_distance_value = applicationInterface.getFocusDistancePref(true);
+			if( MyDebug.LOG )
+				Log.d(TAG, "saved focus_bracketing_target_distance: " + focus_distance_value);
+			if( focus_distance_value < 0.0f )
+				focus_distance_value = 0.0f;
+			else if( focus_distance_value > minimum_focus_distance )
+				focus_distance_value = minimum_focus_distance;
+			camera_controller.setFocusBracketingTargetDistance(focus_distance_value);
+			// now save
+			applicationInterface.setFocusDistancePref(focus_distance_value, true);
 		}
 		if( MyDebug.LOG ) {
 			Log.d(TAG, "setupCameraParameters: time after setting up focus: " + (System.currentTimeMillis() - debug_time));
@@ -2957,7 +3026,14 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			record_audio = false;
 		}
 
-		video_profile.videoSource = using_android_l ? MediaRecorder.VideoSource.SURFACE : MediaRecorder.VideoSource.CAMERA;
+		// we repeat the Build.VERSION check to avoid Android Lint warning; also needs to be an "if" statement rather than using the
+		// "?" operator, otherwise we still get the Android Lint warning
+		if( using_android_l && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ) {
+			video_profile.videoSource = MediaRecorder.VideoSource.SURFACE;
+		}
+		else {
+			video_profile.videoSource = MediaRecorder.VideoSource.CAMERA;
+		}
 
 		// Done with video
 
@@ -3437,11 +3513,11 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	    	new_rotation = (camera_orientation + orientation) % 360;
 	    }
 	    if( new_rotation != current_rotation ) {
-			/*if( MyDebug.LOG ) {
+			if( MyDebug.LOG ) {
 				Log.d(TAG, "    current_orientation is " + current_orientation);
 				Log.d(TAG, "    info orientation is " + camera_orientation);
 				Log.d(TAG, "    set Camera rotation from " + current_rotation + " to " + new_rotation);
-			}*/
+			}
 	    	this.current_rotation = new_rotation;
 	    }
 	}
@@ -3607,17 +3683,31 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         }
 	}
 	
-	public void setFocusDistance(float new_focus_distance) {
-		if( MyDebug.LOG )
+	public void setFocusDistance(float new_focus_distance, boolean is_target_distance) {
+		if( MyDebug.LOG ) {
 			Log.d(TAG, "setFocusDistance: " + new_focus_distance);
+			Log.d(TAG, "is_target_distance: " + is_target_distance);
+		}
 		if( camera_controller != null ) {
 			if( new_focus_distance < 0.0f )
 				new_focus_distance = 0.0f;
 			else if( new_focus_distance > minimum_focus_distance )
 				new_focus_distance = minimum_focus_distance;
-			if( camera_controller.setFocusDistance(new_focus_distance) ) {
+			boolean focus_changed = false;
+			if( is_target_distance ) {
+				focus_changed = true;
+				camera_controller.setFocusBracketingTargetDistance(new_focus_distance);
+				// also set the focus distance, so the user can see what the target distance looks like
+				camera_controller.setFocusDistance(new_focus_distance);
+			}
+			else if( camera_controller.setFocusDistance(new_focus_distance) ) {
+				focus_changed = true;
+				camera_controller.setFocusBracketingSourceDistance(new_focus_distance);
+			}
+
+			if( focus_changed ) {
 				// now save
-				applicationInterface.setFocusDistancePref(new_focus_distance);
+				applicationInterface.setFocusDistancePref(new_focus_distance, is_target_distance);
 				{
 					String focus_distance_s;
 					if( new_focus_distance > 0.0f ) {
@@ -3627,9 +3717,24 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					else {
 						focus_distance_s = getResources().getString(R.string.infinite);
 					}
-		    		showToast(seekbar_toast, getResources().getString(R.string.focus_distance) + " " + focus_distance_s);
+					int id = R.string.focus_distance;
+					if( this.supports_focus_bracketing && applicationInterface.isFocusBracketingPref() )
+						id = is_target_distance ? R.string.focus_bracketing_target_distance : R.string.focus_bracketing_source_distance;
+		    		showToast(seekbar_toast, getResources().getString(id) + " " + focus_distance_s);
 				}
 			}
+		}
+	}
+
+	public void stoppedSettingFocusDistance(boolean is_target_distance) {
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "stoppedSettingFocusDistance");
+			Log.d(TAG, "is_target_distance: " + is_target_distance);
+		}
+		if( is_target_distance && camera_controller != null ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "set manual focus distance back to start");
+			camera_controller.setFocusDistance( camera_controller.getFocusBracketingSourceDistance() );
 		}
 	}
 	
@@ -3729,13 +3834,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	public String getExposureTimeString(long exposure_time) {
 		double exposure_time_s = exposure_time/1000000000.0;
 		String string;
-		if( exposure_time >= 500000000 ) {
-			// show exposure times of more than 0.5s directly
+		if( exposure_time > 100000000 ) {
+			// show exposure times of more than 0.1s directly
 			string = decimal_format_1dp.format(exposure_time_s) + getResources().getString(R.string.seconds_abbreviation);
 		}
 		else {
 			double exposure_time_r = 1.0/exposure_time_s;
-			string = " 1/" + decimal_format_1dp.format(exposure_time_r) + getResources().getString(R.string.seconds_abbreviation);
+			string = " 1/" + (int)(exposure_time_r + 0.5) + getResources().getString(R.string.seconds_abbreviation);
 		}
 		return string;
 	}
@@ -3979,7 +4084,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 		if( selected_fps != null ) {
 			if( MyDebug.LOG )
-				Log.d(TAG, "set preview fps range: " + selected_fps);
+				Log.d(TAG, "set preview fps range: " + Arrays.toString(selected_fps));
             camera_controller.setPreviewFpsRange(selected_fps[0], selected_fps[1]);
         }
         else if( using_android_l ) {
@@ -5459,6 +5564,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     	        		if( MyDebug.LOG )
     	        			Log.d(TAG, "repeat mode photos remaining: onPictureTaken started preview: " + remaining_repeat_photos);
     	        	}
+					applicationInterface.cameraInOperation(false, false);
     	        }
     	        else {
     		        phase = PHASE_NORMAL;
@@ -5924,20 +6030,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			/*if( MyDebug.LOG )
 				Log.d(TAG, "pitch: " + pitch_angle);*/
 
-			if( !is_test && Math.abs(pitch_angle) > 70.0 ) {
-				// level angle becomes unstable when device is near vertical
-				// note that if is_test, we always set the level angle - since the device typically lies face down when running tests...
-				this.has_level_angle = false;
+			this.has_level_angle = true;
+			this.natural_level_angle = Math.atan2(-x, y) * 180.0 / Math.PI;
+			if( this.natural_level_angle < -0.0 ) {
+				this.natural_level_angle += 360.0;
 			}
-			else {
-				this.has_level_angle = true;
-				this.natural_level_angle = Math.atan2(-x, y) * 180.0 / Math.PI;
-				if( this.natural_level_angle < -0.0 ) {
-					this.natural_level_angle += 360.0;
-				}
 
-				updateLevelAngles();
-			}
+			updateLevelAngles();
 		}
 		else {
 			Log.e(TAG, "accel sensor has zero mag: " + mag);
@@ -5968,6 +6067,17 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	}
     
     public boolean hasLevelAngle() {
+    	return this.has_level_angle;
+    }
+
+    /* Returns true if we have the level angle ("roll"), but the pitch is not near vertically up or down (70 degrees to level).
+	 * This is useful as the level angle becomes unstable when device is near vertical
+     */
+    public boolean hasLevelAngleStable() {
+		if( !is_test && has_pitch_angle && Math.abs(pitch_angle) > 70.0 ) {
+			// note that if is_test, we always set the level angle - since the device typically lies face down when running tests...
+			return false;
+		}
     	return this.has_level_angle;
     }
 
@@ -6118,6 +6228,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			Log.d(TAG, "getTonemapMaxCurvePoints");
     	return tonemap_max_curve_points;
     }
+
     public boolean supportsTonemapCurve() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "supportsTonemapCurve");
@@ -6148,6 +6259,18 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		return this.antibanding;
     }
     
+    public List<String> getSupportedEdgeModes() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getSupportedEdgeModes");
+		return this.edge_modes;
+    }
+
+    public List<String> getSupportedNoiseReductionModes() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getSupportedNoiseReductionModes");
+		return this.noise_reduction_modes;
+    }
+
     public String getISOKey() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "getISOKey");
@@ -6229,18 +6352,20 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     
     public long getMinimumExposureTime() {
 		if( MyDebug.LOG )
-			Log.d(TAG, "getMinimumExposureTime");
+			Log.d(TAG, "getMinimumExposureTime: " + min_exposure_time);
     	return this.min_exposure_time;
     }
     
     public long getMaximumExposureTime() {
 		if( MyDebug.LOG )
-			Log.d(TAG, "getMaximumExposureTime");
+			Log.d(TAG, "getMaximumExposureTime: " + max_exposure_time);
 		long max = max_exposure_time;
-		if( applicationInterface.isExpoBracketingPref() || applicationInterface.isCameraBurstPref() ) {
+		if( applicationInterface.isExpoBracketingPref() || applicationInterface.isFocusBracketingPref() || applicationInterface.isCameraBurstPref() ) {
 			// doesn't make sense to allow exposure times more than 0.5s in these modes
 			max = Math.min(max_exposure_time, 1000000000L/2);
 		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "max: " + max);
     	return max;
     }
     
@@ -6291,12 +6416,16 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     	return this.max_expo_bracketing_n_images;
     }
 
-    public boolean supportsRaw() {
-    	return this.supports_raw;
+    public boolean supportsFocusBracketing() {
+    	return this.supports_focus_bracketing;
     }
 
     public boolean supportsBurst() {
     	return this.supports_burst;
+    }
+
+    public boolean supportsRaw() {
+    	return this.supports_raw;
     }
 
 	/** Returns the horizontal angle of view in degrees (when unzoomed).
@@ -6658,10 +6787,20 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 				Toast toast = new Toast(activity);
 				if( clear_toast != null )
 					clear_toast.toast = toast;*/
+				if( MyDebug.LOG ) {
+					Log.d(TAG, "clear_toast: " + clear_toast);
+					if( clear_toast != null )
+						Log.d(TAG, "clear_toast.toast: " + clear_toast.toast);
+					Log.d(TAG, "last_toast: " + last_toast);
+					Log.d(TAG, "last_toast_time_ms: " + last_toast_time_ms);
+				}
 				// This method is better, as otherwise a previous toast (with different or no clear_toast) never seems to clear if we repeatedly issue new toasts - this doesn't happen if we reuse existing toasts if possible
 				// However should only do this if the previous toast was the most recent toast (to avoid messing up ordering)
 				Toast toast;
-				if( clear_toast != null && clear_toast.toast != null && clear_toast.toast == last_toast ) {
+				long time_now = System.currentTimeMillis();
+				// We recreate a toast every 2s, to workaround Android toast bug that calling show() no longer seems to extend the toast duration!
+				// (E.g., see bug where toasts for sliders disappear after a while if continually moving the slider.)
+				if( clear_toast != null && clear_toast.toast != null && clear_toast.toast == last_toast && time_now < last_toast_time_ms+2000) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "reuse last toast: " + last_toast);
 					toast = clear_toast.toast;
@@ -6684,6 +6823,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 						clear_toast.toast = toast;
 					View text = new RotatedTextView(message, activity);
 					toast.setView(text);
+					last_toast_time_ms = time_now;
 				}
 				toast.setDuration(Toast.LENGTH_SHORT);
 				if( !((Activity)getContext()).isFinishing() ) {

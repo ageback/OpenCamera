@@ -7,7 +7,9 @@ import net.sourceforge.opencamera.PreferenceKeys;
 import net.sourceforge.opencamera.Preview.Preview;
 import net.sourceforge.opencamera.R;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -45,6 +47,7 @@ public class MainUI {
 	private volatile boolean popup_view_is_open; // must be volatile for test project reading the state
     private PopupView popup_view;
 	private final static boolean cache_popup = true; // if false, we recreate the popup each time
+	private boolean force_destroy_popup = false; // if true, then the popup isn't cached for only the next time the popup is closed
 
     private int current_orientation;
 	private boolean ui_placement_right = true;
@@ -98,6 +101,10 @@ public class MainUI {
 			seekBar.setThumbTintList(thumb_color);
 
 			seekBar = main_activity.findViewById(R.id.focus_seekbar);
+			seekBar.setProgressTintList(progress_color);
+			seekBar.setThumbTintList(thumb_color);
+
+			seekBar = main_activity.findViewById(R.id.focus_bracketing_target_seekbar);
 			seekBar.setProgressTintList(progress_color);
 			seekBar.setThumbTintList(thumb_color);
 
@@ -386,6 +393,16 @@ public class MainUI {
 			layoutParams.addRule(align_parent_top, 0);
 			layoutParams.addRule(align_parent_bottom, RelativeLayout.TRUE);
 			view.setLayoutParams(layoutParams);
+
+			view = main_activity.findViewById(R.id.focus_bracketing_target_seekbar);
+			layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
+			layoutParams.addRule(align_left, R.id.preview);
+			layoutParams.addRule(align_right, 0);
+			layoutParams.addRule(left_of, R.id.zoom_seekbar);
+			layoutParams.addRule(right_of, 0);
+			layoutParams.addRule(above, R.id.focus_seekbar);
+			layoutParams.addRule(below, 0);
+			view.setLayoutParams(layoutParams);
 		}
 
 		if( !popup_container_only )
@@ -396,7 +413,7 @@ public class MainUI {
 				width_dp = 350;
 			}
 			else {
-				width_dp = 200;
+				width_dp = 250;
 			}
 			int height_dp = 50;
 			final float scale = main_activity.getResources().getDisplayMetrics().density;
@@ -439,6 +456,7 @@ public class MainUI {
 			view.setLayoutParams(lp);
 		}
 
+		if( popupIsOpen() )
 		{
 			View view = main_activity.findViewById(R.id.popup_container);
 			RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
@@ -454,28 +472,53 @@ public class MainUI {
 			// reset:
 			view.setTranslationX(0.0f);
 			view.setTranslationY(0.0f);
+
+			int popup_width = view.getWidth();
+			int popup_height = view.getHeight();
 			if( MyDebug.LOG ) {
-				Log.d(TAG, "popup view width: " + view.getWidth());
-				Log.d(TAG, "popup view height: " + view.getHeight());
+				Log.d(TAG, "popup_width: " + popup_width);
+				Log.d(TAG, "popup_height: " + popup_height);
+				if( popup_view != null )
+					Log.d(TAG, "popup total width: " + popup_view.getTotalWidth());
 			}
-			if( ui_rotation == 0 || ui_rotation == 180 ) {
-				view.setPivotX(view.getWidth()/2.0f);
-				view.setPivotY(view.getHeight()/2.0f);
+			if( popup_view != null && popup_width > popup_view.getTotalWidth()*1.2  ) {
+				// This is a workaround for the rare but annoying bug where the popup window is too large
+				// (and appears partially off-screen). Unfortunately have been unable to fix - and trying
+				// to force the popup container to have a particular width just means some of the contents
+				// (e.g., Timer) are missing. But at least stop caching it, so that reopening the popup
+				// should fix it, rather than having to restart or pause/resume Open Camera.
+				// Also note, normally we should expect popup_width == popup_view.getTotalWidth(), but
+				// have put a fudge factor of 1.2 just in case it's normally slightly larger on some
+				// devices.
+				Log.e(TAG, "### popup view is too big?!");
+				force_destroy_popup = true;
+				/*popup_width = popup_view.getTotalWidth();
+				ViewGroup.LayoutParams params = new RelativeLayout.LayoutParams(
+						popup_width,
+						RelativeLayout.LayoutParams.WRAP_CONTENT);
+				view.setLayoutParams(params);*/
 			}
 			else {
-				view.setPivotX(view.getWidth());
-				view.setPivotY(ui_placement_right ? 0.0f : view.getHeight());
+				force_destroy_popup = false;
+			}
+			if( ui_rotation == 0 || ui_rotation == 180 ) {
+				view.setPivotX(popup_width/2.0f);
+				view.setPivotY(popup_height/2.0f);
+			}
+			else {
+				view.setPivotX(popup_width);
+				view.setPivotY(ui_placement_right ? 0.0f : popup_height);
 				if( ui_placement_right ) {
 					if( ui_rotation == 90 )
-						view.setTranslationY( view.getWidth() );
+						view.setTranslationY( popup_width );
 					else if( ui_rotation == 270 )
-						view.setTranslationX( - view.getHeight() );
+						view.setTranslationX( - popup_height );
 				}
 				else {
 					if( ui_rotation == 90 )
-						view.setTranslationX( - view.getHeight() );
+						view.setTranslationX( - popup_height );
 					else if( ui_rotation == 270 )
-						view.setTranslationY( - view.getWidth() );
+						view.setTranslationY( - popup_width );
 				}
 			}
 		}
@@ -796,7 +839,7 @@ public class MainUI {
 		if( !current_iso.equals(CameraController.ISO_DEFAULT) && supported_isos != null && supported_isos.contains(manual_iso_value) && !supported_isos.contains(current_iso) )
 			current_iso = manual_iso_value;
 		// n.b., we hardcode the string "ISO" as this isn't a user displayed string, rather it's used to filter out "ISO" included in old Camera API parameters
-		iso_buttons = PopupView.createButtonOptions(iso_buttons_container, main_activity, 280, test_ui_buttons, supported_isos, -1, -1, "ISO", false, current_iso, "TEST_ISO", new PopupView.ButtonOptionsPopupListener() {
+		iso_buttons = PopupView.createButtonOptions(iso_buttons_container, main_activity, 280, test_ui_buttons, supported_isos, -1, -1, "ISO", false, current_iso, 0, "TEST_ISO", new PopupView.ButtonOptionsPopupListener() {
 			@Override
 			public void onClick(String option) {
 				if( MyDebug.LOG )
@@ -1061,7 +1104,7 @@ public class MainUI {
 			 *     MainActivity.updateForSettings(), but doing so makes the popup close when checking photo or video resolutions!
 			 *     See test testSwitchResolution().
 			 */
-			if( cache_popup ) {
+			if( cache_popup && !force_destroy_popup ) {
 				popup_view.setVisibility(View.GONE);
 			}
 			else {
@@ -1076,6 +1119,9 @@ public class MainUI {
     }
     
     public void destroyPopup() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "destroyPopup");
+		force_destroy_popup = false;
 		if( popupIsOpen() ) {
 			closePopup();
 		}
@@ -1203,9 +1249,9 @@ public class MainUI {
 						}
 						else if (main_activity.getPreview().getCurrentFocusValue() != null && main_activity.getPreview().getCurrentFocusValue().equals("focus_mode_manual2")) {
 							if(keyCode == KeyEvent.KEYCODE_VOLUME_UP)
-								main_activity.changeFocusDistance(-1);
+								main_activity.changeFocusDistance(-1, false);
 							else
-								main_activity.changeFocusDistance(1);
+								main_activity.changeFocusDistance(1, false);
 						}
 						else {
 							// important not to repeatedly request focus, even though main_activity.getPreview().requestAutoFocus() will cancel, as causes problem if key is held down (e.g., flash gets stuck on)
@@ -1317,6 +1363,51 @@ public class MainUI {
 		else if( keyCode == KeyEvent.KEYCODE_VOLUME_DOWN )
 			keydown_volume_down = false;
 	}
+
+	/** Shows an information dialog, with a button to request not to show again.
+	 *  Note it's up to the caller to check whether the info_preference_key (to not show again) was
+	 *  already set.
+	 * @param title_id Resource id for title string.
+	 * @param info_id Resource id for dialog text string.
+	 * @param info_preference_key Preference key to set in SharedPreferences if the user selects to
+	 *                            not show the dialog again.
+	 * @return The AlertDialog that was created.
+	 */
+	public AlertDialog showInfoDialog(int title_id, int info_id, final String info_preference_key) {
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(main_activity);
+        alertDialog.setTitle(title_id);
+        if( info_id != 0 )
+        	alertDialog.setMessage(info_id);
+        alertDialog.setPositiveButton(android.R.string.ok, null);
+        alertDialog.setNegativeButton(R.string.dont_show_again, new DialogInterface.OnClickListener() {
+			@Override
+			public void onClick(DialogInterface dialog, int which) {
+        		if( MyDebug.LOG )
+        			Log.d(TAG, "user clicked dont_show_again for info dialog");
+				final SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity);
+        		SharedPreferences.Editor editor = sharedPreferences.edit();
+        		editor.putBoolean(info_preference_key, true);
+        		editor.apply();
+			}
+        });
+
+		main_activity.showPreview(false);
+		main_activity.setWindowFlagsForSettings();
+
+		AlertDialog alert = alertDialog.create();
+		// AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+		alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+			@Override
+			public void onDismiss(DialogInterface arg0) {
+        		if( MyDebug.LOG )
+        			Log.d(TAG, "info dialog dismissed");
+        		main_activity.setWindowFlagsForCamera();
+        		main_activity.showPreview(true);
+			}
+        });
+		main_activity.showAlert(alert);
+		return alert;
+    }
 
 	/** Returns a (possibly translated) user readable string for a white balance preference value.
 	 *  If the value is not recognised (this can happen for the old Camera API, some devices can
@@ -1497,6 +1588,41 @@ public class MainUI {
 				break;
 			case "off":
 				id = R.string.anti_banding_off;
+				break;
+			default:
+				break;
+		}
+		String entry;
+		if( id != -1 ) {
+			entry = main_activity.getResources().getString(id);
+		}
+		else {
+			entry = value;
+		}
+		return entry;
+	}
+
+	/** Returns a (possibly translated) user readable string for an noise reduction mode preference value.
+	 *  If the value is not recognised, then the received value is returned.
+	 *  Also used for edge mode.
+	 */
+	public String getEntryForNoiseReductionMode(String value) {
+		int id = -1;
+		switch( value ) {
+			case CameraController.NOISE_REDUCTION_MODE_DEFAULT:
+				id = R.string.noise_reduction_mode_default;
+				break;
+			case "off":
+				id = R.string.noise_reduction_mode_off;
+				break;
+			case "minimal":
+				id = R.string.noise_reduction_mode_minimal;
+				break;
+			case "fast":
+				id = R.string.noise_reduction_mode_fast;
+				break;
+			case "high_quality":
+				id = R.string.noise_reduction_mode_high_quality;
 				break;
 			default:
 				break;

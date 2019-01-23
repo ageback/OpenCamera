@@ -33,6 +33,8 @@ public abstract class CameraController {
 	public static final String COLOR_EFFECT_DEFAULT = "none"; // chosen to match Camera.Parameters.EFFECT_NONE, but we also use compatible values for Camera2 API
 	public static final String WHITE_BALANCE_DEFAULT = "auto"; // chosen to match Camera.Parameters.WHITE_BALANCE_AUTO, but we also use compatible values for Camera2 API
 	public static final String ANTIBANDING_DEFAULT = "auto"; // chosen to match Camera.Parameters.ANTIBANDING_AUTO, but we also use compatible values for Camera2 API
+	public static final String EDGE_MODE_DEFAULT = "default";
+	public static final String NOISE_REDUCTION_MODE_DEFAULT = "default";
 	public static final String ISO_DEFAULT = "auto";
 	public static final long EXPOSURE_TIME_DEFAULT = 1000000000L/30; // note, responsibility of callers to check that this is within the valid min/max range
 
@@ -78,10 +80,11 @@ public abstract class CameraController {
 		public boolean can_disable_shutter_sound;
 		public int tonemap_max_curve_points;
 		public boolean supports_tonemap_curve;
-		public boolean supports_expo_bracketing;
+		public boolean supports_expo_bracketing; // whether setBurstTye(BURSTTYPE_EXPO) can be used
 		public int max_expo_bracketing_n_images;
+		public boolean supports_focus_bracketing; // whether setBurstTye(BURSTTYPE_FOCUS) can be used
+		public boolean supports_burst; // whether setBurstTye(BURSTTYPE_NORMAL) can be used
 		public boolean supports_raw;
-		public boolean supports_burst; // whether setWantBurst() can be set to true
 		public float view_angle_x; // horizontal angle of view in degrees (when unzoomed)
 		public float view_angle_y; // vertical angle of view in degrees (when unzoomed)
 
@@ -304,6 +307,10 @@ public abstract class CameraController {
 	public abstract int getWhiteBalanceTemperature();
 	public abstract SupportedValues setAntiBanding(String value);
 	public abstract String getAntiBanding();
+	public abstract SupportedValues setEdgeMode(String value);
+	public abstract String getEdgeMode();
+	public abstract SupportedValues setNoiseReductionMode(String value);
+	public abstract String getNoiseReductionMode();
 	/** Set an ISO value. Only supported if supports_iso_range is false.
 	 */
 	public abstract SupportedValues setISO(String value);
@@ -413,6 +420,21 @@ public abstract class CameraController {
 	public abstract String getFocusValue();
 	public abstract float getFocusDistance();
 	public abstract boolean setFocusDistance(float focus_distance);
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_FOCUS. Sets the number of
+	 *  images to take in the focus burst.
+	 */
+	public abstract void setFocusBracketingNImages(int n_images);
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_FOCUS. If set to true, an
+	 *  additional image will be included at infinite distance.
+	 */
+	public abstract void setFocusBracketingAddInfinity(boolean focus_bracketing_add_infinity);
+	/** Only relevant if setBurstType() is also called with BURSTTYPE_FOCUS. Sets the target focus
+	 *  distance for focus bracketing.
+	 */
+	public abstract void setFocusBracketingSourceDistance(float focus_bracketing_source_distance);
+	public abstract float getFocusBracketingSourceDistance();
+	public abstract void setFocusBracketingTargetDistance(float focus_bracketing_target_distance);
+	public abstract float getFocusBracketingTargetDistance();
 	public abstract void setFlashValue(String flash_value);
 	public abstract String getFlashValue();
 	public abstract void setRecordingHint(boolean hint);

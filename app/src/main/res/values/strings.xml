@@ -487,6 +487,18 @@
     <string name="preference_fast_burst_n_images_entries_15">15</string>
     <string name="preference_fast_burst_n_images_entries_20">20</string>
 
+    <string name="preference_focus_bracketing_n_images">Number of photos</string>
+    <string name="preference_focus_bracketing_n_images_entries_2">2</string>
+    <string name="preference_focus_bracketing_n_images_entries_3">3</string>
+    <string name="preference_focus_bracketing_n_images_entries_4">4</string>
+    <string name="preference_focus_bracketing_n_images_entries_5">5</string>
+    <string name="preference_focus_bracketing_n_images_entries_6">6</string>
+    <string name="preference_focus_bracketing_n_images_entries_8">8</string>
+    <string name="preference_focus_bracketing_n_images_entries_10">10</string>
+    <string name="preference_focus_bracketing_n_images_entries_12">12</string>
+    <string name="preference_focus_bracketing_n_images_entries_15">15</string>
+    <string name="preference_focus_bracketing_n_images_entries_20">20</string>
+
     <string name="preference_video_capture_rate">Speed</string>
     <string name="preference_video_capture_rate_normal">Normal</string>
     <string name="slow_motion_enabled">Slow motion enabled</string>
@@ -568,15 +580,59 @@
     <string name="preference_show_video_max_amp">Show audio level meter</string>
     <string name="preference_show_video_max_amp_summary">Whether to show on-screen audio level when recording video</string>
 
+    <string name="photo_mode_focus_bracketing">Focus {}</string> <!-- keep short, as this shows in the popup menu -->
+    <string name="photo_mode_focus_bracketing_full">Focus Bracketing</string>
+
+    <string name="focus_bracketing_source_distance">Focus bracketing source distance</string>
+    <string name="focus_bracketing_target_distance">Focus bracketing target distance</string>
+
+    <string name="focus_bracketing_add_infinity">Add infinite distance</string>
+
+    <string name="magnetic_accuracy_title">Compass direction</string>
+    <string name="magnetic_accuracy_info">Your device\'s compass needs calibrating to improve its accuracy. This can be done by moving your phone in a figure of 8 motion.\n\nCurrent accuracy:</string>
+
+    <string name="accuracy_unreliable">Unreliable</string>
+    <string name="accuracy_low">Low</string>
+    <string name="accuracy_medium">Medium</string>
+    <string name="accuracy_high">High</string>
+    <string name="accuracy_unknown">Unknown</string>
+
+    <string name="preference_units_distance">Distance unit</string>
+    <string name="preference_units_distance_summary">Used for GPS altitude for photo stamp and video subtitles\n%s</string>
+    <string name="preference_units_distance_m">Metres</string>
+    <string name="preference_units_distance_ft">Feet</string>
+    <string name="feet_abbreviation">ft</string> <!-- symbol short for feet -->
+
+    <string name="preference_show_whats_new">Shows What\'s New dialog</string>
+    <string name="preference_show_whats_new_summary">Whether to display information on new features and improvements when the application has updated</string>
+
+    <string name="preference_edge_mode">Edge mode algorithm</string>
+    <string name="preference_edge_mode_summary">Algorithm that the camera driver should use for applying edge enhancement. Edge enhancement improves sharpness and details in the captured image. (This setting is ignored in NR photo mode.)\n%s</string>
+
+    <string name="preference_screen_processing_settings">Processing settings…</string>
+
+    <string name="preference_noise_reduction_mode">Noise reduction algorithm</string>
+    <string name="preference_noise_reduction_mode_summary">Algorithm that the camera driver should use for applying noise reduction. The noise reduction algorithm attempts to improve image quality by removing excessive noise added by the capture process, especially in dark conditions. (Note that this is not related to the Noise Reduction photo mode, and in fact this setting is ignored in NR photo mode.)\n%s</string>
+    <string name="noise_reduction_mode_default">Default</string>
+    <string name="noise_reduction_mode_off">Off</string>
+    <string name="noise_reduction_mode_minimal">Minimal</string>
+    <string name="noise_reduction_mode_fast">Fast</string>
+    <string name="noise_reduction_mode_high_quality">High Quality</string>
+
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
-    <string name="whats_new_text"><b>v1.41:</b>\n\n
+    <string name="whats_new_text">
+        [This dialog is shown when Open Camera is updated. You can disable it under
+        Settings/On screen GUI/Show What\'s New dialog.]
+        \n\n<b>v1.44:</b>\n\n
         <ul>
-            <li>User interface improvements: icons to switch photo/video mode, and switch camera, are
-                next to the shutter button for easier one-handed use; ISO controls are now moved
-                entirely to the exposure icon.\n</li>
-            <li>Take photos while recording video (on supported devices).\n</li>
-            <li>HDR improvements (ghost removal, and brightening of too dark images).\n</li>
-            <li>Performance improvements and bug fixes.\n</li>
+            <li>New photo modes (if Camera2 API is enabled): NR noise reduction (only supported on high end devices), and focus bracketing.\n</li>
+            <li>New "Ghost image" option, to overlap the last photo or a selected image.\n</li>
+            <li>New option to show audio level meter when recording video.\n</li>
+            <li>New option to record video with flat (log) profile. (Camera2 API only.)\n</li>
+            <li>New option to choose metres or feet for photo stamp.\n</li>
+            <li>Improved behaviour of seekbars for manual ISO, shutter speed, white balance.\n</li>
+            <li>If an option that requires compass direction is set, Open Camera will warn you if the device\'s compass is unreliable.\n</li>
+            <li>Other improvements and bug fixes.\n</li>
         </ul>
     </string>
 </resources>

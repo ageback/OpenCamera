@@ -135,6 +135,7 @@ public class DrawPreview {
 	private Bitmap dro_bitmap;
 	private Bitmap hdr_bitmap;
 	private Bitmap expo_bitmap;
+	private Bitmap focus_bracket_bitmap;
 	private Bitmap burst_bitmap;
 	private Bitmap nr_bitmap;
 	private Bitmap photostamp_bitmap;
@@ -198,6 +199,7 @@ public class DrawPreview {
 		dro_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.dro_icon);
 		hdr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_hdr_on_white_48dp);
 		expo_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.expo_icon);
+		focus_bracket_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.focus_bracket_icon);
 		burst_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_burst_mode_white_48dp);
 		nr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.nr_icon);
 		photostamp_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_text_format_white_48dp);
@@ -242,6 +244,10 @@ public class DrawPreview {
 		if( expo_bitmap != null ) {
 			expo_bitmap.recycle();
 			expo_bitmap = null;
+		}
+		if( focus_bracket_bitmap != null ) {
+			focus_bracket_bitmap.recycle();
+			focus_bracket_bitmap = null;
 		}
 		if( burst_bitmap != null ) {
 			burst_bitmap.recycle();
@@ -500,7 +506,18 @@ public class DrawPreview {
     private Bitmap loadBitmap(Uri uri, File file) throws IOException {
         if( MyDebug.LOG )
             Log.d(TAG, "loadBitmap: " + uri);
-        Bitmap bitmap = MediaStore.Images.Media.getBitmap(main_activity.getContentResolver(), uri);
+        Bitmap bitmap;
+        try {
+			bitmap = MediaStore.Images.Media.getBitmap(main_activity.getContentResolver(), uri);
+		}
+		catch(Exception e) {
+        	// Although Media.getBitmap() is documented as only throwing FileNotFoundException, IOException
+			// (with the former being a subset of IOException anyway), I've had SecurityException from
+			// Google Play - best to catch everything just in case.
+            Log.e(TAG, "MediaStore.Images.Media.getBitmap exception");
+        	e.printStackTrace();
+            throw new IOException();
+		}
         if( bitmap == null ) {
             // just in case!
             Log.e(TAG, "MediaStore.Images.Media.getBitmap returned null");
@@ -1016,13 +1033,14 @@ public class DrawPreview {
 				}
 			}
 
-			// RAW not enabled in HDR or ExpoBracketing modes (see note in CameraController.takePictureBurstExpoBracketing())
+			// RAW not enabled in HDR, ExpoBracketing or FocusBracketing modes (see note in CameraController.takePictureBurstBracketing())
 			// RAW not enabled in NR mode (see note in CameraController.takePictureBurst())
 			if(
 					is_raw_pref &&
 					preview.supportsRaw() && // RAW can be enabled, even if it isn't available for this camera (e.g., user enables RAW for back camera, but then switches to front camera which doesn't support it)
 					photoMode != MyApplicationInterface.PhotoMode.HDR &&
 					photoMode != MyApplicationInterface.PhotoMode.ExpoBracketing &&
+					photoMode != MyApplicationInterface.PhotoMode.FocusBracketing &&
 					photoMode != MyApplicationInterface.PhotoMode.NoiseReduction ) {
 				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
 				p.setStyle(Paint.Style.FILL);
@@ -1057,7 +1075,7 @@ public class DrawPreview {
 				}
 			}
 
-			if( auto_stabilise_pref ) { // auto-level is supported for photos taken in video mode
+			if( auto_stabilise_pref && preview.hasLevelAngleStable() ) { // auto-level is supported for photos taken in video mode
 				icon_dest.set(location_x2, location_y, location_x2 + icon_size, location_y + icon_size);
 				p.setStyle(Paint.Style.FILL);
 				p.setColor(Color.BLACK);
@@ -1078,6 +1096,7 @@ public class DrawPreview {
 					photoMode == MyApplicationInterface.PhotoMode.DRO ||
 					photoMode == MyApplicationInterface.PhotoMode.HDR ||
 					photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ||
+					photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ||
 					photoMode == MyApplicationInterface.PhotoMode.FastBurst ||
 					photoMode == MyApplicationInterface.PhotoMode.NoiseReduction
 					) &&
@@ -1091,6 +1110,7 @@ public class DrawPreview {
 				Bitmap bitmap = photoMode == MyApplicationInterface.PhotoMode.DRO ? dro_bitmap :
 						photoMode == MyApplicationInterface.PhotoMode.HDR ? hdr_bitmap :
 						photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ? expo_bitmap :
+						photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ? focus_bracket_bitmap :
 						photoMode == MyApplicationInterface.PhotoMode.FastBurst ? burst_bitmap :
 						photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ? nr_bitmap :
 								null;
@@ -1399,7 +1419,7 @@ public class DrawPreview {
 				}
 				if( show_video_max_amp_pref && !preview.isVideoRecordingPaused() ) {
             		// audio amplitude
-					if( !this.has_video_max_amp || time_ms > this.last_video_max_amp_time + 33 ) {
+					if( !this.has_video_max_amp || time_ms > this.last_video_max_amp_time + 50 ) {
 						has_video_max_amp = true;
 						video_max_amp_prev1 = video_max_amp_prev2;
 						video_max_amp_prev2 = video_max_amp;
@@ -1424,11 +1444,13 @@ public class DrawPreview {
 					amp_frac = Math.min(amp_frac, 1.0f);
 					//applicationInterface.drawTextWithBackground(canvas, p, "" + max_amp, color, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
 
-		            int amp_width = (int) (120 * scale + 0.5f); // convert dps to pixels
-		            int amp_height = (int) (5 * scale + 0.5f); // convert dps to pixels
+            		pixels_offset_y += text_y; // allow extra space
+		            int amp_width = (int) (160 * scale + 0.5f); // convert dps to pixels
+		            int amp_height = (int) (10 * scale + 0.5f); // convert dps to pixels
                     int amp_x = (canvas.getWidth() - amp_width)/2;
 					p.setColor(Color.WHITE);
 					p.setStyle(Paint.Style.STROKE);
+					p.setStrokeWidth(stroke_width);
     				canvas.drawRect(amp_x, text_base_y - pixels_offset_y, amp_x+amp_width, text_base_y - pixels_offset_y+amp_height, p);
 					p.setStyle(Paint.Style.FILL);
     				canvas.drawRect(amp_x, text_base_y - pixels_offset_y, amp_x+amp_frac*amp_width, text_base_y - pixels_offset_y+amp_height, p);
@@ -1444,6 +1466,7 @@ public class DrawPreview {
 						peak_frac = Math.min(peak_frac, 1.0f);
 						p.setColor(Color.YELLOW);
 						p.setStyle(Paint.Style.STROKE);
+						p.setStrokeWidth(stroke_width);
 						canvas.drawLine(amp_x+peak_frac*amp_width, text_base_y - pixels_offset_y, amp_x+peak_frac*amp_width, text_base_y - pixels_offset_y+amp_height, p);
 						p.setColor(Color.WHITE);
 					}
@@ -1598,7 +1621,7 @@ public class DrawPreview {
 			int cy = canvas.getHeight()/2;
 
 			boolean is_level = false;
-			if( Math.abs(level_angle) <= close_level_angle ) { // n.b., use level_angle, not angle or orig_level_angle
+			if( has_level_angle && Math.abs(level_angle) <= close_level_angle ) { // n.b., use level_angle, not angle or orig_level_angle
 				is_level = true;
 			}
 
@@ -1612,7 +1635,8 @@ public class DrawPreview {
 			final int line_alpha = 160;
 			float hthickness = (0.5f * scale + 0.5f); // convert dps to pixels
 			p.setStyle(Paint.Style.FILL);
-			if( show_angle_line_pref ) {
+			if( show_angle_line_pref && preview.hasLevelAngleStable() ) {
+				// only show the angle line if level angle "stable" (i.e., not pointing near vertically up or down)
 				// draw outline
 				p.setColor(Color.BLACK);
 				p.setAlpha(64);
@@ -1693,6 +1717,12 @@ public class DrawPreview {
 						p.setColor(Color.WHITE);
 						p.setTextAlign(Paint.Align.LEFT);
 						if( latitude_angle == 0 && Math.abs(pitch_angle) < 1.0 ) {
+							p.setAlpha(255);
+						}
+						else if( latitude_angle == 90 && Math.abs(pitch_angle - 90) < 3.0 ) {
+							p.setAlpha(255);
+						}
+						else if( latitude_angle == -90 && Math.abs(pitch_angle + 90) < 3.0 ) {
 							p.setAlpha(255);
 						}
 						else {

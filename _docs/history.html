@@ -48,22 +48,45 @@
 <p>&lt; <small><a href="index.html">Main Page.</a></small></p>
 
 <pre>
-Version 1.44 (Work in progress)
+Version 1.44.1 (2018/09/23)
+
+FIXED   Crash in 1.44 for ghost image option if selected image could not be loaded due to
+        SecurityException.
+FIXED   Crash with RAW (DNG) in some cases due to threading issue when "Pause after taking photo"
+        enabled.
+
+Version 1.44 (2018/09/18)
 
 FIXED   Crash if activity is destroyed as photo is taken.
+FIXED   Crash if camera reopened 128 times in a single instance of the application.
 FIXED   Fixed some crashes for old camera API.
+FIXED   Fixed crash with Camera2 API when using expo/HDR if fast burst disabled, and camera
 FIXED   In Camera2 API mode, wasn't checking to see if video stabilization option is supported.
-FIXED   Preview size/"Maximise preview size" option didn't always work correctly on some devices
-        (e.g., Nokia 8).
+FIXED   Settings/Preview size/"Maximise preview size" option didn't always work correctly on some
+        devices (e.g., Nokia 8).
 FIXED   Fixed a crash related to failing to save with storage access framework.
 FIXED   Switching from slow motion back to regular speed wouldn't reset exposure level on some
         devices.
+FIXED   Prevent manual focus slider from overlapping with on-screen icons.
+FIXED   Photos taken while recording video were being saved at 100% quality if photo mode was DRO or
+        HDR, even though the photo mode isn't relevant for photos when recording video.
+FIXED   Don't show fast burst options on popup mode when in video mode.
+FIXED   Problem of toasts for seekbars disappearing when continually moving seekbar.
+FIXED   GUI not updating properly when using auto-repeat with timed interval in Camera2 API mode.
 FIXED   Norwegian strings for video bitrate preferences were incorrect.
-ADDED   New option "Ghost image", to overlay either last photo taken, or a selected image on your
-        device.
-ADDED   New option On screen GUI/"Show audio level meter", to display on-screen audio level when
-        recording video.
-ADDED   New option to record video with a flat (log) profile. (Camera2 API only.)
+ADDED   New photo mode "NR" Noise Reduction, takes a burst of photos and aligns and merges to reduce
+        noise. (Camera2 API only, only supported on high end devices.)
+ADDED   New photo mode "Focus {}" to enable Focus Bracketing. (Camera2 API only.)
+ADDED   New option Settings/"Ghost image", to overlay either last photo taken, or a selected image
+        on your device.
+ADDED   New option Settings/On screen GUI/"Show audio level meter", to display on-screen audio level
+        when recording video.
+ADDED   New option Settings/Video settings/"Video flat (log) profile" to record video with a flat
+        profile. (Camera2 API only.)
+ADDED   New options under Settings/"Processing settings..." for setting Edge Mode and Noise
+        Reduction Mode filtering options. (Camera2 API only.)
+ADDED   New option Settings/Photo settings/"Distance unit" to allow using feet instead of metres for
+        GPS altitude on photo stamp and video subtitles.
 ADDED   On-screen flash icon (to show whether flash will fire or not) now supported for front screen
         flash.
 ADDED   New Camera2 API debug option under Settings/"Photo settings" to disable taking photos whilst
@@ -76,15 +99,34 @@ ADDED   Launching from intent now recognises request for front or back camera
         android.intent.extras.LENS_FACING_BACK, android.intent.extra.USE_FRONT_CAMERA).
 ADDED   Video bitrate options for 150Mbps and 200Mbps (may not work on all devices).
 ADDED   New video audio source options: UNPROCESSED (requires Android 7) and VOICE_RECOGNITION.
+ADDED   Partial Greek translation (thanks to Wasilis Mandratzis-Walz).
+ADDED   New option to disable ever showing the "What's New" dialog (under Settings/On screen GUI/
+        "Show What's New dialog").
 UPDATED No longer wait for image queue to be saved to go to settings, or background.
-UPDATED On Android 8 when restarting video due to hitting maximum filesize, transition to new file
+UPDATED On Android 8+ when restarting video due to hitting maximum filesize, transition to new file
         is now seamless.
+UPDATED Improved behaviour of seekbars for manual ISO, shutter speed, white balance (they now select
+        sensible "round" values).
+UPDATED Show pitch lines etc even when device is near vertically down or up; also highlight the 90
+        degree pitch line when almost vertically down or up.
+UPDATED Don't show auto-level on-screen icon when device is near vertically down or up (since auto
+        level won't occur in that situation).
+UPDATED Always show scrollbar on popup menu (so it's more obvious that it can be scrolled).
 UPDATED Show FPS on-screen when recording video (Camera2 API only).
+UPDATED Made disabled buttons on popup menu easier to see in bright light.
 UPDATED Made on-screen level lines clearer.
+UPDATED New material design gallery icon (used when no last thumbnail found, and also for shortcut
+        icons).
+UPDATED If an option that requires compass direction is set, warn user if compass is unreliable.
+UPDATED Current manual focus distance is now always saved.
 UPDATED Show video bitrate on info toast if not set to default.
 UPDATED More preferences in settings now show the currently selected value.
+UPDATED Battery optimisation: don't use magnetic compass sensor unless required for user
+        preferences.
 UPDATED Camera opening on background thread (for smoother operation) now enabled for Android 6
         devices (was already supported for Android 7+).
+UPDATED Workaround for bug where popup menu appears too large (off-screen), reopening the popup at
+        least should fix this without having to restart Open Camera.
 
 Version 1.43.3 (2018/04/20)
 

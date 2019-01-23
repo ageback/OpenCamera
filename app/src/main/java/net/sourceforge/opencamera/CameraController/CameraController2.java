@@ -95,8 +95,11 @@ public class CameraController2 extends CameraController {
 	private boolean use_expo_fast_burst = true;
 	// for BURSTTYPE_FOCUS:
 	private int focus_bracketing_n_images = 3;
+	private float focus_bracketing_source_distance = 0.0f;
+	private float focus_bracketing_target_distance = 0.0f;
+	private boolean focus_bracketing_add_infinity = false;
 	// for BURSTTYPE_NORMAL:
-	private boolean burst_for_noise_reduction; // chooses number of burst images and other settings for noise reduction mode
+	private boolean burst_for_noise_reduction; // chooses number of burst images and other settings for Open Camera's noise reduction (NR) photo mode
 	private int burst_requested_n_images; // if burst_for_noise_reduction==false, this gives the number of images for the burst
 
 	private boolean optimise_ae_for_dro = false;
@@ -195,6 +198,12 @@ public class CameraController2 extends CameraController {
 		private int white_balance = CameraMetadata.CONTROL_AWB_MODE_AUTO;
 		private boolean has_antibanding;
 		private int antibanding = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO;
+		private boolean has_edge_mode;
+		private int edge_mode = CameraMetadata.EDGE_MODE_FAST;
+		private Integer default_edge_mode;
+		private boolean has_noise_reduction_mode;
+		private int noise_reduction_mode = CameraMetadata.NOISE_REDUCTION_MODE_FAST;
+		private Integer default_noise_reduction_mode;
 		private int white_balance_temperature = 5000; // used for white_balance == CONTROL_AWB_MODE_OFF
 		private String flash_value = "flash_off";
 		private boolean has_iso;
@@ -208,7 +217,7 @@ public class CameraController2 extends CameraController {
 		private boolean has_af_mode;
 		private int af_mode = CaptureRequest.CONTROL_AF_MODE_AUTO;
 		private float focus_distance; // actual value passed to camera device (set to 0.0 if in infinity mode)
-		private float focus_distance_manual; // saved setting when in manual mode
+		private float focus_distance_manual; // saved setting when in manual mode (so if user switches to infinity mode and back, we'll still remember the manual focus distance)
 		private boolean ae_lock;
 		private MeteringRectangle [] af_regions; // no need for has_scalar_crop_region, as we can set to null instead
 		private MeteringRectangle [] ae_regions; // no need for has_scalar_crop_region, as we can set to null instead
@@ -287,16 +296,8 @@ public class CameraController2 extends CameraController {
 				builder.set(CaptureRequest.JPEG_QUALITY, jpeg_quality);
 			}
 
-			if( is_samsung_s7 ) {
-				// see https://sourceforge.net/p/opencamera/discussion/general/thread/48bd836b/ ,
-				// https://stackoverflow.com/questions/36028273/android-camera-api-glossy-effect-on-galaxy-s7
-				// need EDGE_MODE_OFF to avoid a "glow" effect
-				// need NOISE_REDUCTION_MODE_OFF to avoid excessive blurring
-				if( MyDebug.LOG )
-					Log.d(TAG, "set EDGE_MODE_OFF");
-				builder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF);
-				builder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
-			}
+			setEdgeMode(builder);
+			setNoiseReductionMode(builder);
 
 			/*builder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
 			builder.set(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_OFF);
@@ -424,6 +425,88 @@ public class CameraController2 extends CameraController {
 					if( MyDebug.LOG )
 						Log.d(TAG, "setting antibanding: " + antibanding);
 					builder.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, antibanding);
+					changed = true;
+				}
+			}
+			return changed;
+		}
+
+		private boolean setEdgeMode(CaptureRequest.Builder builder) {
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "setEdgeMode");
+				Log.d(TAG, "default_edge_mode: " + default_edge_mode);
+			}
+			boolean changed = false;
+			if( has_edge_mode ) {
+				if( default_edge_mode == null ) {
+					// save the default_edge_mode edge_mode
+					default_edge_mode = builder.get(CaptureRequest.EDGE_MODE);
+					if( MyDebug.LOG )
+						Log.d(TAG, "default_edge_mode: " + default_edge_mode);
+				}
+				if( builder.get(CaptureRequest.EDGE_MODE) == null || builder.get(CaptureRequest.EDGE_MODE) != edge_mode ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "setting edge_mode: " + edge_mode);
+					builder.set(CaptureRequest.EDGE_MODE, edge_mode);
+					changed = true;
+				}
+				else {
+					if( MyDebug.LOG )
+						Log.d(TAG, "edge_mode was already set: " + edge_mode);
+				}
+			}
+			else if( is_samsung_s7 ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "set EDGE_MODE_OFF");
+				// see https://sourceforge.net/p/opencamera/discussion/general/thread/48bd836b/ ,
+				// https://stackoverflow.com/questions/36028273/android-camera-api-glossy-effect-on-galaxy-s7
+				// need EDGE_MODE_OFF to avoid a "glow" effect
+				builder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF);
+            }
+			else if( default_edge_mode != null ) {
+				if( builder.get(CaptureRequest.EDGE_MODE) != null && builder.get(CaptureRequest.EDGE_MODE) != default_edge_mode ) {
+					builder.set(CaptureRequest.EDGE_MODE, default_edge_mode);
+					changed = true;
+				}
+			}
+			return changed;
+		}
+
+		private boolean setNoiseReductionMode(CaptureRequest.Builder builder) {
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "setNoiseReductionMode");
+				Log.d(TAG, "default_noise_reduction_mode: " + default_noise_reduction_mode);
+			}
+			boolean changed = false;
+			if( has_noise_reduction_mode ) {
+				if( default_noise_reduction_mode == null ) {
+					// save the default_noise_reduction_mode noise_reduction_mode
+					default_noise_reduction_mode = builder.get(CaptureRequest.NOISE_REDUCTION_MODE);
+					if( MyDebug.LOG )
+						Log.d(TAG, "default_noise_reduction_mode: " + default_noise_reduction_mode);
+				}
+				if( builder.get(CaptureRequest.NOISE_REDUCTION_MODE) == null || builder.get(CaptureRequest.NOISE_REDUCTION_MODE) != noise_reduction_mode ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "setting noise_reduction_mode: " + noise_reduction_mode);
+					builder.set(CaptureRequest.NOISE_REDUCTION_MODE, noise_reduction_mode);
+					changed = true;
+				}
+				else {
+					if( MyDebug.LOG )
+						Log.d(TAG, "noise_reduction_mode was already set: " + noise_reduction_mode);
+				}
+			}
+			else if( is_samsung_s7 ) {
+				if( MyDebug.LOG )
+					Log.d(TAG, "set NOISE_REDUCTION_MODE_OFF");
+				// see https://sourceforge.net/p/opencamera/discussion/general/thread/48bd836b/ ,
+				// https://stackoverflow.com/questions/36028273/android-camera-api-glossy-effect-on-galaxy-s7
+				// need NOISE_REDUCTION_MODE_OFF to avoid excessive blurring
+				builder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
+            }
+			else if( default_noise_reduction_mode != null ) {
+				if( builder.get(CaptureRequest.NOISE_REDUCTION_MODE) != null && builder.get(CaptureRequest.NOISE_REDUCTION_MODE) != default_noise_reduction_mode ) {
+					builder.set(CaptureRequest.NOISE_REDUCTION_MODE, default_noise_reduction_mode);
 					changed = true;
 				}
 			}
@@ -694,7 +777,7 @@ public class CameraController2 extends CameraController {
 				builder.set(CaptureRequest.TONEMAP_CURVE, tonemap_curve);
 				test_used_tonemap_curve = true;
 			}
-			else {
+			else if( default_tonemap_mode != null ) {
 				builder.set(CaptureRequest.TONEMAP_MODE, default_tonemap_mode);
 			}
 		}
@@ -865,6 +948,24 @@ public class CameraController2 extends CameraController {
 						cb.onBurstPictureTaken(images);
 						pending_burst_images.clear();
 						cb.onCompleted();
+
+						if( burst_type == BurstType.BURSTTYPE_FOCUS ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "focus bracketing complete, reset manual focus");
+							camera_settings.setFocusDistance(previewBuilder);
+							try {
+								setRepeatingRequest();
+							}
+							catch(CameraAccessException e) {
+								if( MyDebug.LOG ) {
+									Log.e(TAG, "failed to set focus distance");
+									Log.e(TAG, "reason: " + e.getReason());
+									Log.e(TAG, "message: " + e.getMessage());
+								}
+								e.printStackTrace();
+							}
+						}
+
 					}
 					else {
 						if( MyDebug.LOG )
@@ -874,74 +975,81 @@ public class CameraController2 extends CameraController {
 								Log.d(TAG, "need to execute the next capture");
 								Log.d(TAG, "time since start: " + (System.currentTimeMillis() - slow_burst_start_ms));
 							}
-							try {
-								captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
-							}
-							catch(CameraAccessException e) {
-								if( MyDebug.LOG ) {
-									Log.e(TAG, "failed to take next burst");
-									Log.e(TAG, "reason: " + e.getReason());
-									Log.e(TAG, "message: " + e.getMessage());
-								}
-								e.printStackTrace();
-								jpeg_cb = null;
-								if( take_picture_error_cb != null ) {
-									take_picture_error_cb.onError();
-									take_picture_error_cb = null;
-								}
-							}
-							/*
-							// code for focus bracketing
-							try {
-								float focus_distance = slow_burst_capture_requests.get(pending_burst_images.size()).get(CaptureRequest.LENS_FOCUS_DISTANCE);
-								if( MyDebug.LOG ) {
-									Log.d(TAG, "prepare preview for next focus_distance: " + focus_distance);
-								}
-								previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-								previewBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distance);
-
-								setRepeatingRequest(previewBuilder.build());
-								//captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
-							}
-							catch(CameraAccessException e) {
-								if( MyDebug.LOG ) {
-									Log.e(TAG, "failed to take next burst");
-									Log.e(TAG, "reason: " + e.getReason());
-									Log.e(TAG, "message: " + e.getMessage());
-								}
-								e.printStackTrace();
-								jpeg_cb = null;
-								if( take_picture_error_cb != null ) {
-									take_picture_error_cb.onError();
-									take_picture_error_cb = null;
-								}
-							}
-							handler.postDelayed(new Runnable(){
-								@Override
-								public void run(){
-									if( MyDebug.LOG )
-										Log.d(TAG, "take picture after delay for next expo");
-									if( camera != null ) { // make sure camera wasn't released in the meantime
-										try {
-											captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
-										}
-										catch(CameraAccessException e) {
-											if( MyDebug.LOG ) {
-												Log.e(TAG, "failed to take next burst");
-												Log.e(TAG, "reason: " + e.getReason());
-												Log.e(TAG, "message: " + e.getMessage());
-											}
-											e.printStackTrace();
-											jpeg_cb = null;
-											if( take_picture_error_cb != null ) {
-												take_picture_error_cb.onError();
-												take_picture_error_cb = null;
-											}
-										}
+							if( burst_type != BurstType.BURSTTYPE_FOCUS ) {
+								try {
+									if( camera != null && captureSession != null ) { // make sure camera wasn't released in the meantime
+										captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
 									}
-							   }
-							}, 500);
-							*/
+								}
+								catch(CameraAccessException e) {
+									if( MyDebug.LOG ) {
+										Log.e(TAG, "failed to take next burst");
+										Log.e(TAG, "reason: " + e.getReason());
+										Log.e(TAG, "message: " + e.getMessage());
+									}
+									e.printStackTrace();
+									jpeg_cb = null;
+									if( take_picture_error_cb != null ) {
+										take_picture_error_cb.onError();
+										take_picture_error_cb = null;
+									}
+								}
+							}
+							else {
+								if( MyDebug.LOG )
+									Log.d(TAG, "focus bracketing");
+
+								// code for focus bracketing
+								try {
+									float focus_distance = slow_burst_capture_requests.get(pending_burst_images.size()).get(CaptureRequest.LENS_FOCUS_DISTANCE);
+									if( MyDebug.LOG ) {
+										Log.d(TAG, "prepare preview for next focus_distance: " + focus_distance);
+									}
+									previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+									previewBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distance);
+
+									setRepeatingRequest(previewBuilder.build());
+									//captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
+								}
+								catch(CameraAccessException e) {
+									if( MyDebug.LOG ) {
+										Log.e(TAG, "failed to take next burst");
+										Log.e(TAG, "reason: " + e.getReason());
+										Log.e(TAG, "message: " + e.getMessage());
+									}
+									e.printStackTrace();
+									jpeg_cb = null;
+									if( take_picture_error_cb != null ) {
+										take_picture_error_cb.onError();
+										take_picture_error_cb = null;
+									}
+								}
+								handler.postDelayed(new Runnable(){
+									@Override
+									public void run(){
+										if( MyDebug.LOG )
+											Log.d(TAG, "take picture after delay for next focus bracket");
+										if( camera != null && captureSession != null ) { // make sure camera wasn't released in the meantime
+											try {
+												captureSession.capture(slow_burst_capture_requests.get(pending_burst_images.size()), previewCaptureCallback, handler);
+											}
+											catch(CameraAccessException e) {
+												if( MyDebug.LOG ) {
+													Log.e(TAG, "failed to take next burst");
+													Log.e(TAG, "reason: " + e.getReason());
+													Log.e(TAG, "message: " + e.getMessage());
+												}
+												e.printStackTrace();
+												jpeg_cb = null;
+												if( take_picture_error_cb != null ) {
+													take_picture_error_cb.onError();
+													take_picture_error_cb = null;
+												}
+											}
+										}
+								   }
+								}, 500);
+							}
 						}
 					}
 				}
@@ -990,7 +1098,17 @@ public class CameraController2 extends CameraController {
 				if( image != null ) {
 					if( MyDebug.LOG )
 						Log.d(TAG, "can now process the image");
-					processImage();
+					// should call processImage() on UI thread, to be consistent with onImageAvailable()->processImage()
+					// important to avoid crash when pause preview is option, tested in testTakePhotoRawWaitCaptureResult()
+					final Activity activity = (Activity)context;
+					activity.runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							if( MyDebug.LOG )
+								Log.d(TAG, "setCaptureResult UI thread call processImage()");
+							processImage();
+						}
+					});
 				}
 			}
 		}
@@ -1058,7 +1176,7 @@ public class CameraController2 extends CameraController {
 				return;
 			}
 			synchronized( image_reader_lock ) {
-				// see comment above in setCaptureResult() for why we sychonize
+				// see comment above in setCaptureResult() for why we synchronize
 				image = reader.acquireNextImage();
 				processImage();
 			}
@@ -1645,8 +1763,11 @@ public class CameraController2 extends CameraController {
 		try {
 			configs = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 		}
-		catch(IllegalArgumentException e) {
-			// have had crashes from Google Play - unclear what the cause is, but at least fail gracefully
+		catch(IllegalArgumentException | NullPointerException e) {
+			// have had IllegalArgumentException crashes from Google Play - unclear what the cause is, but at least fail gracefully
+			// similarly for NullPointerException - note, these aren't from characteristics being null, but from
+			// com.android.internal.util.Preconditions.checkArrayElementsNotNull (Preconditions.java:395) - all are from
+			// Nexus 7 (2013)s running Android 8.1, but again better to fail gracefully
 			e.printStackTrace();
 			throw new CameraControllerException();
 		}
@@ -1840,6 +1961,9 @@ public class CameraController2 extends CameraController {
 
 		int [] supported_focus_modes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES); // Android format
 		camera_features.supported_focus_values = convertFocusModesToValues(supported_focus_modes, camera_features.minimum_focus_distance); // convert to our format (also resorts)
+		if( camera_features.supported_focus_values != null && camera_features.supported_focus_values.contains("focus_mode_manual2") ) {
+			camera_features.supports_focus_bracketing = true;
+		}
 		camera_features.max_num_focus_areas = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF);
 
 		camera_features.is_exposure_lock_supported = true;
@@ -2488,6 +2612,220 @@ public class CameraController2 extends CameraController {
 		return convertAntiBanding(value2);
 	}
 
+	private String convertEdgeMode(int value2) {
+		String value;
+		switch( value2 ) {
+		case CameraMetadata.EDGE_MODE_FAST:
+			value = "fast";
+			break;
+		case CameraMetadata.EDGE_MODE_HIGH_QUALITY:
+			value = "high_quality";
+			break;
+		case CameraMetadata.EDGE_MODE_OFF:
+			value = "off";
+			break;
+		case CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG:
+			// we don't make use of zero shutter lag
+			value = null;
+			break;
+		default:
+			if( MyDebug.LOG )
+				Log.d(TAG, "unknown edge_mode: " + value2);
+			value = null;
+			break;
+		}
+		return value;
+	}
+
+	@Override
+	public SupportedValues setEdgeMode(String value) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setEdgeMode: " + value);
+		int [] values2 = characteristics.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES);
+		if( values2 == null ) {
+			return null;
+		}
+		List<String> values = new ArrayList<>();
+		values.add(EDGE_MODE_DEFAULT);
+		for(int value2 : values2) {
+			String this_value = convertEdgeMode(value2);
+			if( this_value != null ) {
+				values.add(this_value);
+			}
+		}
+		SupportedValues supported_values = checkModeIsSupported(values, value, EDGE_MODE_DEFAULT);
+		if( supported_values != null ) {
+			// for edge mode, if the requested value isn't available, we don't modify it at all
+			if( supported_values.selected_value.equals(value) ) {
+				boolean has_edge_mode = false;
+				int selected_value2 = CameraMetadata.EDGE_MODE_FAST;
+				// if EDGE_MODE_DEFAULT, this means to stick with the device default
+				if( !value.equals(EDGE_MODE_DEFAULT) ) {
+					switch(supported_values.selected_value) {
+						case "fast":
+							has_edge_mode = true;
+							selected_value2 = CameraMetadata.EDGE_MODE_FAST;
+							break;
+						case "high_quality":
+							has_edge_mode = true;
+							selected_value2 = CameraMetadata.EDGE_MODE_HIGH_QUALITY;
+							break;
+						case "off":
+							has_edge_mode = true;
+							selected_value2 = CameraMetadata.EDGE_MODE_OFF;
+							break;
+						default:
+							if( MyDebug.LOG )
+								Log.d(TAG, "unknown selected_value: " + supported_values.selected_value);
+							break;
+					}
+				}
+
+				if( camera_settings.has_edge_mode != has_edge_mode || camera_settings.edge_mode != selected_value2 ) {
+					camera_settings.has_edge_mode = has_edge_mode;
+					camera_settings.edge_mode = selected_value2;
+					if( camera_settings.setEdgeMode(previewBuilder) ) {
+						try {
+							setRepeatingRequest();
+						}
+						catch(CameraAccessException e) {
+							if( MyDebug.LOG ) {
+								Log.e(TAG, "failed to set edge_mode");
+								Log.e(TAG, "reason: " + e.getReason());
+								Log.e(TAG, "message: " + e.getMessage());
+							}
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
+		return supported_values;
+	}
+
+	@Override
+	public String getEdgeMode() {
+		if( previewBuilder.get(CaptureRequest.EDGE_MODE) == null )
+			return null;
+		int value2 = previewBuilder.get(CaptureRequest.EDGE_MODE);
+		return convertEdgeMode(value2);
+	}
+
+	private String convertNoiseReductionMode(int value2) {
+		String value;
+		switch( value2 ) {
+		case CameraMetadata.NOISE_REDUCTION_MODE_FAST:
+			value = "fast";
+			break;
+		case CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY:
+			value = "high_quality";
+			break;
+		case CameraMetadata.NOISE_REDUCTION_MODE_MINIMAL:
+			value = "minimal";
+			break;
+		case CameraMetadata.NOISE_REDUCTION_MODE_OFF:
+			value = "off";
+			break;
+		case CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG:
+			// we don't make use of zero shutter lag
+			value = null;
+			break;
+		default:
+			if( MyDebug.LOG )
+				Log.d(TAG, "unknown noise_reduction_mode: " + value2);
+			value = null;
+			break;
+		}
+		return value;
+	}
+
+	@Override
+	public SupportedValues setNoiseReductionMode(String value) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setNoiseReductionMode: " + value);
+		int [] values2 = characteristics.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES );
+		if( values2 == null ) {
+			return null;
+		}
+		List<String> values = new ArrayList<>();
+		values.add(NOISE_REDUCTION_MODE_DEFAULT);
+		for(int value2 : values2) {
+			String this_value = convertNoiseReductionMode(value2);
+			if( this_value != null ) {
+				values.add(this_value);
+			}
+		}
+		SupportedValues supported_values = checkModeIsSupported(values, value, NOISE_REDUCTION_MODE_DEFAULT);
+		if( supported_values != null ) {
+			// for noise reduction, if the requested value isn't available, we don't modify it at all
+			if( supported_values.selected_value.equals(value) ) {
+				boolean has_noise_reduction_mode = false;
+				int selected_value2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST;
+				// if NOISE_REDUCTION_MODE_DEFAULT, this means to stick with the device default
+				if( !value.equals(NOISE_REDUCTION_MODE_DEFAULT) ) {
+					switch(supported_values.selected_value) {
+						case "fast":
+							has_noise_reduction_mode = true;
+							selected_value2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST;
+							break;
+						case "high_quality":
+							has_noise_reduction_mode = true;
+							selected_value2 = CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY;
+							break;
+						case "minimal":
+							if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
+								has_noise_reduction_mode = true;
+								selected_value2 = CameraMetadata.NOISE_REDUCTION_MODE_MINIMAL;
+							}
+							else {
+								// shouldn't ever be here, as NOISE_REDUCTION_MODE_MINIMAL shouldn't be a supported value!
+								// treat as fast instead
+								Log.e(TAG, "noise reduction minimal, but pre-Android M!");
+								has_noise_reduction_mode = true;
+								selected_value2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST;
+							}
+							break;
+						case "off":
+							has_noise_reduction_mode = true;
+							selected_value2 = CameraMetadata.NOISE_REDUCTION_MODE_OFF;
+							break;
+						default:
+							if( MyDebug.LOG )
+								Log.d(TAG, "unknown selected_value: " + supported_values.selected_value);
+							break;
+					}
+				}
+
+				if( camera_settings.has_noise_reduction_mode != has_noise_reduction_mode || camera_settings.noise_reduction_mode != selected_value2 ) {
+					camera_settings.has_noise_reduction_mode = has_noise_reduction_mode;
+					camera_settings.noise_reduction_mode = selected_value2;
+					if( camera_settings.setNoiseReductionMode(previewBuilder) ) {
+						try {
+							setRepeatingRequest();
+						}
+						catch(CameraAccessException e) {
+							if( MyDebug.LOG ) {
+								Log.e(TAG, "failed to set noise_reduction_mode");
+								Log.e(TAG, "reason: " + e.getReason());
+								Log.e(TAG, "message: " + e.getMessage());
+							}
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
+		return supported_values;
+	}
+
+	@Override
+	public String getNoiseReductionMode() {
+		if( previewBuilder.get(CaptureRequest.NOISE_REDUCTION_MODE) == null )
+			return null;
+		int value2 = previewBuilder.get(CaptureRequest.NOISE_REDUCTION_MODE);
+		return convertNoiseReductionMode(value2);
+	}
+
 	@Override
 	public SupportedValues setISO(String value) {
 		// not supported for CameraController2 - but Camera2 devices that don't support manual ISO can call this,
@@ -2950,6 +3288,10 @@ public class CameraController2 extends CameraController {
 
 	/** For testing.
 	 */
+	public CaptureRequest.Builder testGetPreviewBuilder() {
+	    return previewBuilder;
+	}
+
 	public TonemapCurve testGetTonemapCurve() {
 		return previewBuilder.get(CaptureRequest.TONEMAP_CURVE);
 	}
@@ -3245,6 +3587,44 @@ public class CameraController2 extends CameraController {
 			e.printStackTrace();
 		} 
     	return true;
+	}
+
+	@Override
+	public void setFocusBracketingNImages(int n_images) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingNImages: " + n_images);
+		this.focus_bracketing_n_images = n_images;
+	}
+
+	@Override
+	public void setFocusBracketingAddInfinity(boolean focus_bracketing_add_infinity) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingAddInfinity: " + focus_bracketing_add_infinity);
+		this.focus_bracketing_add_infinity = focus_bracketing_add_infinity;
+	}
+
+	@Override
+	public void setFocusBracketingSourceDistance(float focus_bracketing_source_distance) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingSourceDistance: " + focus_bracketing_source_distance);
+		this.focus_bracketing_source_distance = focus_bracketing_source_distance;
+	}
+
+	@Override
+	public float getFocusBracketingSourceDistance() {
+		return this.focus_bracketing_source_distance;
+	}
+
+	@Override
+	public void setFocusBracketingTargetDistance(float focus_bracketing_target_distance) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "setFocusBracketingTargetDistance: " + focus_bracketing_target_distance);
+		this.focus_bracketing_target_distance = focus_bracketing_target_distance;
+	}
+
+	@Override
+	public float getFocusBracketingTargetDistance() {
+		return this.focus_bracketing_target_distance;
 	}
 
 	/** Decides whether we should be using fake precapture mode.
@@ -4466,6 +4846,65 @@ public class CameraController2 extends CameraController {
 		}
 	}
 
+	public static List<Float> setupFocusBracketingDistances(float source, float target, int count) {
+		List<Float> focus_distances = new ArrayList<>();
+		float focus_distance_s = source;
+		float focus_distance_e = target;
+		final float max_focus_bracket_distance_c = 0.1f; // 10m
+		focus_distance_s = Math.max(focus_distance_s, max_focus_bracket_distance_c); // since we'll dealing with 1/distance, use Math.max
+		focus_distance_e = Math.max(focus_distance_e, max_focus_bracket_distance_c); // since we'll dealing with 1/distance, use Math.max
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "focus_distance_s: " + focus_distance_s);
+			Log.d(TAG, "focus_distance_e: " + focus_distance_e);
+		}
+		// we want to interpolate linearly in distance, not 1/distance
+		float real_focus_distance_s = 1.0f/focus_distance_s;
+		float real_focus_distance_e = 1.0f/focus_distance_e;
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "real_focus_distance_s: " + real_focus_distance_s);
+			Log.d(TAG, "real_focus_distance_e: " + real_focus_distance_e);
+		}
+		for(int i=0;i<count;i++) {
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "i: " + i);
+			}
+			// for first and last, we still use the real focus distances; for intermediate values, we interpolate
+			// with first/last clamped to max of 10m (to avoid taking reciprocal of 0)
+			float distance;
+			if( i == 0 ) {
+				distance = source;
+			}
+			else if( i == count-1 ) {
+				distance = target;
+			}
+			else {
+				//float alpha = ((float)i)/(count-1.0f);
+				// rather than linear interpolation, we use log, see https://stackoverflow.com/questions/5215459/android-mediaplayer-setvolume-function
+				// this gives more shots are closer focus distances
+				int value = i;
+				if( real_focus_distance_s > real_focus_distance_e ) {
+					// if source is further than target, we still want the interpolation distances to be the same, but in reversed order
+					value = count-1-i;
+				}
+				float alpha = (float)(1.0-Math.log(count-value)/Math.log(count));
+				if( real_focus_distance_s > real_focus_distance_e ) {
+					alpha = 1.0f-alpha;
+				}
+				float real_distance = (1.0f-alpha)*real_focus_distance_s + alpha*real_focus_distance_e;
+				if( MyDebug.LOG ) {
+					Log.d(TAG, "    alpha: " + alpha);
+					Log.d(TAG, "    real_distance: " + real_distance);
+				}
+				distance = 1.0f/real_distance;
+			}
+			if( MyDebug.LOG ) {
+				Log.d(TAG, "    distance: " + distance);
+			}
+			focus_distances.add(distance);
+		}
+		return focus_distances;
+	}
+
 	private void takePictureBurstBracketing() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "takePictureBurstBracketing");
@@ -4627,6 +5066,7 @@ public class CameraController2 extends CameraController {
 
 			}
 			else {
+				// BURSTTYPE_FOCUS
                 if( MyDebug.LOG )
                     Log.d(TAG, "focus bracketing");
 
@@ -4639,19 +5079,31 @@ public class CameraController2 extends CameraController {
 					test_fake_flash_photo++;
 				}
 
-				// focus bracketing is only supported if LENS_INFO_MINIMUM_FOCUS_DISTANCE is non-null
-				//float min_focus_distance = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-				//float max_focus_distance = 0.0f;
+				stillBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); // just in case
 
-				// initial request is at the current focus distance
-				requests.add( stillBuilder.build() );
+				if( Math.abs(camera_settings.focus_distance - focus_bracketing_source_distance) < 1.0e-5 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "current focus matches source");
+				}
+				else if( Math.abs(camera_settings.focus_distance - focus_bracketing_target_distance) < 1.0e-5 ) {
+					if( MyDebug.LOG )
+						Log.d(TAG, "current focus matches target");
+				}
+				else {
+					Log.d(TAG, "current focus matches neither source nor target");
+				}
 
-				stillBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
-
-				// then focus at infinity
-				stillBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.0f);
-				stillBuilder.setTag(RequestTag.CAPTURE); // set capture tag for last only
-				requests.add( stillBuilder.build() );
+				List<Float> focus_distances = setupFocusBracketingDistances(focus_bracketing_source_distance, focus_bracketing_target_distance, focus_bracketing_n_images);
+				if( focus_bracketing_add_infinity ) {
+					focus_distances.add(0.0f);
+				}
+				for(int i=0;i<focus_distances.size();i++) {
+					stillBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distances.get(i));
+					if( i == focus_distances.size()-1 ) {
+						stillBuilder.setTag(RequestTag.CAPTURE); // set capture tag for last only
+					}
+					requests.add( stillBuilder.build() );
+				}
 			}
 
 			/*
@@ -4746,6 +5198,7 @@ public class CameraController2 extends CameraController {
 			}
 
 			if( burst_for_noise_reduction ) {
+				// must be done after calling setupBuilder(), so we override the default EDGE_MODE and NOISE_REDUCTION_MODE
 				if( MyDebug.LOG )
 					Log.d(TAG, "optimise settings for burst_for_noise_reduction");
 				stillBuilder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
@@ -5955,20 +6408,23 @@ public class CameraController2 extends CameraController {
 				}
 			}*/
 
-			if( face_detection_listener != null && previewBuilder != null && previewBuilder.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE) != null && previewBuilder.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE) != CaptureRequest.STATISTICS_FACE_DETECT_MODE_OFF ) {
-				Rect sensor_rect = getViewableRect();
-				android.hardware.camera2.params.Face [] camera_faces = result.get(CaptureResult.STATISTICS_FACES);
-				if( camera_faces != null ) {
-					if( camera_faces.length == 0 && last_faces_detected == 0 ) {
-						// no point continually calling the callback if 0 faces detected (same behaviour as CameraController1)
-					}
-					else {
-						last_faces_detected = camera_faces.length;
-						CameraController.Face [] faces = new CameraController.Face[camera_faces.length];
-						for(int i=0;i<camera_faces.length;i++) {
-							faces[i] = convertFromCameraFace(sensor_rect, camera_faces[i]);
+			if( face_detection_listener != null && previewBuilder != null ) {
+				Integer face_detect_mode = previewBuilder.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE);
+				if( face_detect_mode != null && face_detect_mode != CaptureRequest.STATISTICS_FACE_DETECT_MODE_OFF ) {
+					Rect sensor_rect = getViewableRect();
+					android.hardware.camera2.params.Face [] camera_faces = result.get(CaptureResult.STATISTICS_FACES);
+					if( camera_faces != null ) {
+						if( camera_faces.length == 0 && last_faces_detected == 0 ) {
+							// no point continually calling the callback if 0 faces detected (same behaviour as CameraController1)
 						}
-						face_detection_listener.onFaceDetection(faces);
+						else {
+							last_faces_detected = camera_faces.length;
+							CameraController.Face [] faces = new CameraController.Face[camera_faces.length];
+							for(int i=0;i<camera_faces.length;i++) {
+								faces[i] = convertFromCameraFace(sensor_rect, camera_faces[i]);
+							}
+							face_detection_listener.onFaceDetection(faces);
+						}
 					}
 				}
 			}
@@ -6026,6 +6482,7 @@ public class CameraController2 extends CameraController {
 				test_capture_results++;
 				modified_from_camera_settings = false;
 				if( onRawImageAvailableListener != null ) {
+				    //test_wait_capture_result = true;
 					if( test_wait_capture_result ) {
 						// for RAW capture, we require the capture result before creating DngCreator
 						// but for testing purposes, we need to test the possibility where onImageAvailable() for

@@ -15,6 +15,7 @@ import java.util.TimerTask;
 import net.sourceforge.opencamera.CameraController.CameraController;
 import net.sourceforge.opencamera.CameraController.RawImage;
 import net.sourceforge.opencamera.Preview.ApplicationInterface;
+import net.sourceforge.opencamera.Preview.BasicApplicationInterface;
 import net.sourceforge.opencamera.Preview.Preview;
 import net.sourceforge.opencamera.Preview.VideoProfile;
 import net.sourceforge.opencamera.UI.DrawPreview;
@@ -49,7 +50,7 @@ import android.widget.ImageButton;
 
 /** Our implementation of ApplicationInterface, see there for details.
  */
-public class MyApplicationInterface implements ApplicationInterface {
+public class MyApplicationInterface extends BasicApplicationInterface {
 	private static final String TAG = "MyApplicationInterface";
 
 	// note, okay to change the order of enums in future versions, as getPhotoMode() does not rely on the order for the saved photo mode
@@ -58,6 +59,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		DRO, // single image "fake" HDR
     	HDR, // HDR created from multiple (expo bracketing) images
     	ExpoBracketing, // take multiple expo bracketed images, without combining to a single image
+		FocusBracketing, // take multiple focus bracketed images, without combining to a single image
 		FastBurst,
 		NoiseReduction
     }
@@ -119,7 +121,6 @@ public class MyApplicationInterface implements ApplicationInterface {
 
 	// camera properties which are saved in bundle, but not stored in preferences (so will be remembered if the app goes into background, but not after restart)
 	private int cameraId = 0;
-	private float focus_distance = 0.0f;
 	// camera properties that aren't saved even in the bundle; these should also be reset in reset()
 	private int zoom_factor = 0; // don't save zoom, as doing so tends to confuse users; other camera applications don't seem to save zoom when pause/resuming
 
@@ -150,9 +151,6 @@ public class MyApplicationInterface implements ApplicationInterface {
     		cameraId = savedInstanceState.getInt("cameraId", 0);
 			if( MyDebug.LOG )
 				Log.d(TAG, "found cameraId: " + cameraId);
-			focus_distance = savedInstanceState.getFloat("focus_distance", 0.0f);
-			if( MyDebug.LOG )
-				Log.d(TAG, "found focus_distance: " + focus_distance);
         }
 
 		if( MyDebug.LOG )
@@ -169,9 +167,6 @@ public class MyApplicationInterface implements ApplicationInterface {
 		if( MyDebug.LOG )
 			Log.d(TAG, "save cameraId: " + cameraId);
     	state.putInt("cameraId", cameraId);
-		if( MyDebug.LOG )
-			Log.d(TAG, "save focus_distance: " + focus_distance);
-    	state.putFloat("focus_distance", focus_distance);
 	}
 	
 	void onDestroy() {
@@ -291,6 +286,10 @@ public class MyApplicationInterface implements ApplicationInterface {
 
     @Override
 	public String getFocusPref(boolean is_video) {
+		if( getPhotoMode() == PhotoMode.FocusBracketing && !main_activity.getPreview().isVideo() ) {
+			// alway run in manual focus mode for focus bracketing
+			return "focus_mode_manual2";
+		}
 		return sharedPreferences.getString(PreferenceKeys.getFocusPreferenceKey(cameraId, is_video), "");
     }
 
@@ -322,6 +321,16 @@ public class MyApplicationInterface implements ApplicationInterface {
 	@Override
 	public String getAntiBandingPref() {
 		return sharedPreferences.getString(PreferenceKeys.AntiBandingPreferenceKey, CameraController.ANTIBANDING_DEFAULT);
+	}
+
+	@Override
+	public String getEdgeModePref() {
+		return sharedPreferences.getString(PreferenceKeys.EdgeModePreferenceKey, CameraController.EDGE_MODE_DEFAULT);
+	}
+
+	@Override
+	public String getNoiseReductionModePref() {
+		return sharedPreferences.getString(PreferenceKeys.NoiseReductionModePreferenceKey, CameraController.NOISE_REDUCTION_MODE_DEFAULT);
 	}
 
 	@Override
@@ -420,7 +429,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 		// at 100% quality for post-processing, the final image will then be saved at the user requested
 		// setting
 		PhotoMode photo_mode = getPhotoMode();
-		if( photo_mode == PhotoMode.DRO )
+		if( main_activity.getPreview().isVideo() )
+			; // for video photo snapshot mode, the photo modes for 100% quality won't be enabled
+		else if( photo_mode == PhotoMode.DRO )
 			return 100;
 		else if( photo_mode == PhotoMode.HDR )
 			return 100;
@@ -831,7 +842,7 @@ public class MyApplicationInterface implements ApplicationInterface {
     	return sharedPreferences.getBoolean(PreferenceKeys.RequireLocationPreferenceKey, false);
     }
     
-    private boolean getGeodirectionPref() {
+    boolean getGeodirectionPref() {
     	return sharedPreferences.getBoolean(PreferenceKeys.GPSDirectionPreferenceKey, false);
     }
     
@@ -870,6 +881,10 @@ public class MyApplicationInterface implements ApplicationInterface {
     private String getStampGPSFormatPref() {
     	return sharedPreferences.getString(PreferenceKeys.StampGPSFormatPreferenceKey, "preference_stamp_gpsformat_default");
     }
+
+    private String getUnitsDistancePref() {
+    	return sharedPreferences.getString(PreferenceKeys.UnitsDistancePreferenceKey, "preference_units_distance_m");
+	}
     
     private String getTextStampPref() {
     	return sharedPreferences.getString(PreferenceKeys.TextStampPreferenceKey, "");
@@ -934,6 +949,10 @@ public class MyApplicationInterface implements ApplicationInterface {
 			if( main_activity.getPreview().supportsExpoBracketing() && this.isExpoBracketingPref() ) {
 				n_raw = 0;
 				n_jpegs = this.getExpoBracketingNImagesPref();
+			}
+			else if( main_activity.getPreview().supportsFocusBracketing() && this.isFocusBracketingPref() ) {
+				n_raw = 0;
+				n_jpegs = this.getFocusBracketingNImagesPref();
 			}
 			else if( main_activity.getPreview().supportsBurst() && this.isCameraBurstPref() ) {
 				n_raw = 0;
@@ -1010,14 +1029,20 @@ public class MyApplicationInterface implements ApplicationInterface {
     }
     
     @Override
-	public float getFocusDistancePref() {
-    	return focus_distance;
+	public float getFocusDistancePref(boolean is_target_distance) {
+    	return sharedPreferences.getFloat(is_target_distance ? PreferenceKeys.FocusBracketingTargetDistancePreferenceKey : PreferenceKeys.FocusDistancePreferenceKey, 0.0f);
     }
     
     @Override
 	public boolean isExpoBracketingPref() {
     	PhotoMode photo_mode = getPhotoMode();
 		return photo_mode == PhotoMode.HDR || photo_mode == PhotoMode.ExpoBracketing;
+	}
+
+    @Override
+	public boolean isFocusBracketingPref() {
+    	PhotoMode photo_mode = getPhotoMode();
+		return photo_mode == PhotoMode.FocusBracketing;
 	}
 
     @Override
@@ -1104,6 +1129,30 @@ public class MyApplicationInterface implements ApplicationInterface {
 		return n_stops;
     }
 
+    @Override
+	public int getFocusBracketingNImagesPref() {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getFocusBracketingNImagesPref");
+		int n_images;
+		String n_images_s = sharedPreferences.getString(PreferenceKeys.FocusBracketingNImagesPreferenceKey, "3");
+		try {
+			n_images = Integer.parseInt(n_images_s);
+		}
+		catch(NumberFormatException exception) {
+			if( MyDebug.LOG )
+				Log.e(TAG, "n_images_s invalid format: " + n_images_s);
+			n_images = 3;
+		}
+		if( MyDebug.LOG )
+			Log.d(TAG, "n_images = " + n_images);
+		return n_images;
+	}
+
+    @Override
+	public boolean getFocusBracketingAddInfinityPref() {
+		return sharedPreferences.getBoolean(PreferenceKeys.FocusBracketingAddInfinityPreferenceKey, false);
+	}
+
 	/** Returns the current photo mode.
 	 *  Note, this always should return the true photo mode - if we're in video mode and taking a photo snapshot while
 	 *  video recording, the caller should override. We don't override here, as this preference may be used to affect how
@@ -1122,6 +1171,9 @@ public class MyApplicationInterface implements ApplicationInterface {
 		boolean expo_bracketing = photo_mode_pref.equals("preference_photo_mode_expo_bracketing");
 		if( expo_bracketing && main_activity.supportsExpoBracketing() )
 			return PhotoMode.ExpoBracketing;
+		boolean focus_bracketing = photo_mode_pref.equals("preference_photo_mode_focus_bracketing");
+		if( focus_bracketing && main_activity.supportsFocusBracketing() )
+			return PhotoMode.FocusBracketing;
 		boolean fast_burst = photo_mode_pref.equals("preference_photo_mode_fast_burst");
 		if( fast_burst && main_activity.supportsFastBurst() )
 			return PhotoMode.FastBurst;
@@ -1327,6 +1379,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			final String preference_stamp_dateformat = this.getStampDateFormatPref();
 			final String preference_stamp_timeformat = this.getStampTimeFormatPref();
 			final String preference_stamp_gpsformat = this.getStampGPSFormatPref();
+			final String preference_units_distance = this.getUnitsDistancePref();
 			final boolean store_location = getGeotaggingPref();
 			final boolean store_geo_direction = getGeodirectionPref();
 			class SubtitleVideoTimerTask extends TimerTask {
@@ -1376,7 +1429,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					String time_stamp = TextFormatter.getTimeString(preference_stamp_timeformat, current_date);
 					Location location = store_location ? getLocation() : null;
 					double geo_direction = store_geo_direction && main_activity.getPreview().hasGeoDirection() ? main_activity.getPreview().getGeoDirection() : 0.0;
-					String gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, store_location && location!=null, location, store_geo_direction && main_activity.getPreview().hasGeoDirection(), geo_direction);
+					String gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, preference_units_distance, store_location && location!=null, location, store_geo_direction && main_activity.getPreview().hasGeoDirection(), geo_direction);
 					if( MyDebug.LOG ) {
 						Log.d(TAG, "date_stamp: " + date_stamp);
 						Log.d(TAG, "time_stamp: " + time_stamp);
@@ -1820,7 +1873,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 			if( MyDebug.LOG )
 				Log.d(TAG, "play beep!");
 			boolean is_last = remaining_time <= 1000;
-			main_activity.playSound(is_last ? R.raw.beep_hi : R.raw.beep);
+			main_activity.getSoundPoolManager().playSound(is_last ? R.raw.beep_hi : R.raw.beep);
 		}
 		if( sharedPreferences.getBoolean(PreferenceKeys.getTimerSpeakPreferenceKey(), false) ) {
 			if( MyDebug.LOG )
@@ -1859,9 +1912,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		editor.putString(PreferenceKeys.getFocusPreferenceKey(cameraId, is_video), focus_value);
 		editor.apply();
 		// focus may be updated by preview (e.g., when switching to/from video mode)
-    	final int visibility = main_activity.getPreview().getCurrentFocusValue() != null && main_activity.getPreview().getCurrentFocusValue().equals("focus_mode_manual2") ? View.VISIBLE : View.INVISIBLE;
-	    View focusSeekBar = main_activity.findViewById(R.id.focus_seekbar);
-	    focusSeekBar.setVisibility(visibility);
+		main_activity.setManualFocusSeekBarVisibility(false);
     }
 
     @Override
@@ -1977,21 +2028,21 @@ public class MyApplicationInterface implements ApplicationInterface {
 	public void requestCameraPermission() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "requestCameraPermission");
-		main_activity.requestCameraPermission();
+		main_activity.getPermissionHandler().requestCameraPermission();
     }
     
     @Override
 	public void requestStoragePermission() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "requestStoragePermission");
-		main_activity.requestStoragePermission();
+		main_activity.getPermissionHandler().requestStoragePermission();
     }
     
     @Override
 	public void requestRecordAudioPermission() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "requestRecordAudioPermission");
-		main_activity.requestRecordAudioPermission();
+		main_activity.getPermissionHandler().requestRecordAudioPermission();
     }
     
     @Override
@@ -2009,8 +2060,10 @@ public class MyApplicationInterface implements ApplicationInterface {
     }
 
     @Override
-	public void setFocusDistancePref(float focus_distance) {
-		this.focus_distance = focus_distance;
+	public void setFocusDistancePref(float focus_distance, boolean is_target_distance) {
+		SharedPreferences.Editor editor = sharedPreferences.edit();
+		editor.putFloat(is_target_distance ? PreferenceKeys.FocusBracketingTargetDistancePreferenceKey : PreferenceKeys.FocusDistancePreferenceKey, focus_distance);
+		editor.apply();
 	}
 
     private int getStampFontColor() {
@@ -2159,7 +2212,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		int image_quality = getSaveImageQualityPref();
 		if( MyDebug.LOG )
 			Log.d(TAG, "image_quality: " + image_quality);
-        boolean do_auto_stabilise = getAutoStabilisePref() && main_activity.getPreview().hasLevelAngle();
+        boolean do_auto_stabilise = getAutoStabilisePref() && main_activity.getPreview().hasLevelAngleStable();
 		double level_angle = do_auto_stabilise ? main_activity.getPreview().getLevelAngle() : 0.0;
 		if( do_auto_stabilise && main_activity.test_have_angle )
 			level_angle = main_activity.test_angle;
@@ -2176,6 +2229,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		String preference_stamp_dateformat = this.getStampDateFormatPref();
 		String preference_stamp_timeformat = this.getStampTimeFormatPref();
 		String preference_stamp_gpsformat = this.getStampGPSFormatPref();
+		String preference_units_distance = this.getUnitsDistancePref();
 		boolean store_location = getGeotaggingPref() && getLocation() != null;
 		Location location = store_location ? getLocation() : null;
 		boolean store_geo_direction = main_activity.getPreview().hasGeoDirection() && getGeodirectionPref();
@@ -2242,7 +2296,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					mirror,
 					current_date,
 					iso,
-					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
 					sample_factor);
@@ -2263,7 +2317,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 					mirror,
 					current_date,
 					iso,
-					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat,
+					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
 					sample_factor);
@@ -2317,7 +2371,7 @@ public class MyApplicationInterface implements ApplicationInterface {
 		PhotoMode photo_mode = getPhotoMode();
 		if( main_activity.getPreview().isVideo() ) {
 			if( MyDebug.LOG )
-				Log.d(TAG, "snapshop mode");
+				Log.d(TAG, "snapshot mode");
 			// must be in photo snapshot while recording video mode, only support standard photo mode
 			photo_mode = PhotoMode.Standard;
 		}
@@ -2332,8 +2386,8 @@ public class MyApplicationInterface implements ApplicationInterface {
 		}
 		else {
 			if( MyDebug.LOG ) {
-				Log.d(TAG, "exposure bracketing mode mode");
-				if( photo_mode != PhotoMode.ExpoBracketing )
+				Log.d(TAG, "exposure/focus bracketing mode mode");
+				if( photo_mode != PhotoMode.ExpoBracketing && photo_mode != PhotoMode.FocusBracketing )
 					Log.e(TAG, "onBurstPictureTaken called with unexpected photo mode?!: " + photo_mode);
 			}
 			
