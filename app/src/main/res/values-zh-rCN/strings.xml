@@ -42,6 +42,7 @@
     <string name="started_recording_video">已开始录制视频</string>
     <string name="sorry">对不起</string>
     <string name="failed_to_save_photo">保存照片失败</string>
+    <string name="failed_to_save_photo_raw">保存 RAW 照片失败</string>
     <string name="failed_to_auto_stabilise">自动稳定失败</string>
     <string name="failed_to_start_camera_preview">启动相机预览失败</string>
     <string name="taking_photo">拍照</string>
@@ -118,6 +119,7 @@
     <string name="preference_save_photo_prefix_summary">用于保存照片文件名的前缀</string>
     <string name="preference_save_video_prefix">保存视频前缀</string>
     <string name="preference_save_video_prefix_summary">用于保存视频文件名的前缀</string>
+    <string name="preference_save_zulu_time">文件名的时间格式</string>
     <string name="preference_show_when_locked">锁定时显示相机</string>
     <string name="preference_show_when_locked_summary">如果开启，Open Camera 将仍然在任何锁屏之上显示 (你仍然必须解锁来访问设置，图库等)</string>
     <string name="preference_startup_focus">启动时执行自动对焦</string>
@@ -160,6 +162,8 @@
     <string name="preference_show_toasts_summary">是否显示弹出的 \"toast\" 消息</string>
     <string name="preference_thumbnail_animation">显示缩略图动画</string>
     <string name="preference_thumbnail_animation_summary">当拍照时显示移动缩略图动画</string>
+    <string name="preference_take_photo_border">拍照时显示边框</string>
+    <string name="preference_take_photo_border_summary">在屏幕上显示一个边框表明正在拍照</string>
     <string name="preference_keep_display_on">保持屏幕常亮</string>
     <string name="preference_keep_display_on_summary">如果开启，当 Open Camera 的主界面激活时，屏幕将不会关闭。</string>
     <string name="preference_max_brightness">强制最大亮度</string>
@@ -172,6 +176,7 @@
     <string name="preference_resolution">相机分辨率</string>
     <string name="preference_quality">图像质量</string>
     <string name="preference_quality_summary">设置保存的照片图像的图像质量（建议值是90%%）\n%s</string>
+    <string name="preference_raw">RAW</string>
     <string name="preference_location">存储位置数据 (地理标记)</string>
     <string name="preference_location_summary">在照片/视频中存储 GPS 位置数据</string>
     <string name="preference_gps_direction">存储罗盘方向</string>
@@ -191,6 +196,8 @@
     <string name="preference_stamp_font_color_summary">在照片上戳记文本时所用的字体颜色</string>
     <string name="preference_stamp_style">文本样式</string>
     <string name="preference_stamp_style_summary">在照片上戳记文本时所用的样式</string>
+    <string name="preference_background_photo_saving">使用后台线程</string>
+    <string name="preference_background_photo_saving_summary">是否在后台线程中保存照片（为了更快的操作）</string>
     <string name="video_quality">视频分辨率</string>
     <string name="preference_force_video_4k">强制 4K UHD 视频 (实验)</string>
     <string name="preference_force_video_4k_summary">为后置相机录像启用 3840x2160 分辨率 - 仅当你的设备支持时才能工作，并且如果不支持可能崩溃！</string>
@@ -272,13 +279,7 @@
     <string name="speech_recognizer_started">说 \"茄子\"</string>
     <string name="audio_listener_started">发出大的声音</string>
     <string name="preference_online_help_summary">在你的浏览器中打开 Open Camera 网站</string>
-    <string name="preference_take_photo_border">拍照时显示边框</string>
-    <string name="preference_take_photo_border_summary">在屏幕上显示一个边框表明正在拍照</string>
 
-    <string name="preference_background_photo_saving">使用后台线程</string>
-    <string name="preference_background_photo_saving_summary">是否在后台线程中保存照片（为了更快的操作）</string>
-    <string name="preference_raw_summary">是否以 RAW(DNG) 格式保存 </string>
-    <string name="preference_save_zulu_time_summary">是否使用本地或UTC（世界协调时间）时间来命名照片和视频</string>
     <string name="auto_stabilise_info">自动稳定将会自动旋转照片，以使它们呈现层次。\n\n注意，这意味着图像将以稍微低一点的分辨率出现（由于旋转和裁剪的需要）。</string>
     <string name="raw_info">DNG 文件包含来自你相机的完整未压缩和未处理的信息。\n\n大多数相册应用程序无法识别 DNG，应该用专门的应用程序，如 Snapseed 或 Lightroom来处理它们。\n\n注意，各种处理选项，如“戳记照片”和“自动水平”只能被应用于 JPEG 图像，而不能应用于 DNG 图像。\n\nDNG 文件占用很多空间；文件管理器应用程序可用来帮助传输或删除它们。</string>
     <string name="preference_hdr_save_expo">为 HDR 模式保存所有图像</string>
@@ -334,7 +335,6 @@
     <string name="dark">暗</string>
     <string name="dont_show_again">不再显示</string>
     <string name="exposure_shutter_speed">快门速度</string>
-    <string name="failed_to_save_photo_raw">保存 RAW 照片失败</string>
     <string name="gb_abbreviation">GB</string>
     <string name="no_permission">权限不可用</string>
     <string name="permission_rationale_title">需要权限</string>
@@ -357,8 +357,6 @@
     <string name="preference_show_take_photo_summary">显示拍摄照片和录制视频的图标。 如果你的设备有一个硬件快门按钮，你宁愿使用它。</string>
     <string name="preference_category_stamp">照片戳记</string>
     <string name="preference_expo_bracketing_stops">曝光包围停留点</string>
-    <string name="preference_raw">RAW</string>
-    <string name="preference_save_zulu_time">文件名的时间格式</string>
     <string name="resume_video">恢复录像</string>
     <string name="video_pause">视频暂停</string>
     <string name="video_resume">视频恢复</string>
@@ -438,15 +436,6 @@
     <string name="photo_mode_standard_full">标准</string>
     <string name="photo_mode_fast_burst_full">快速连拍</string>
     <string name="photo_mode_noise_reduction_full">降噪</string>
-    <string name="preference_video_fps_15">15</string>
-    <string name="preference_video_fps_24">24</string>
-    <string name="preference_video_fps_25">25</string>
-    <string name="preference_video_fps_30">30</string>
-    <string name="preference_video_fps_60">60</string>
-    <string name="preference_video_fps_96">96</string>
-    <string name="preference_video_fps_100">100</string>
-    <string name="preference_video_fps_120">120</string>
-    <string name="preference_video_fps_240">240</string>
     <string name="preference_fast_burst_n_images">照片数量</string>
     <string name="preference_fast_burst_n_images_entries_2">2</string>
     <string name="preference_fast_burst_n_images_entries_3">3</string>
@@ -463,7 +452,6 @@
     <string name="preference_stamp_dateformat_mmddyyyy">mm/dd/yyyy</string>
     <string name="photo_mode_hdr">HDR</string>
     <string name="photo_mode_fast_burst">快速连拍</string>
-    <string name="preference_slow_motion">慢镜头</string>
 
     <string name="flash_off">关闭闪光</string>
     <string name="flash_auto">自动闪光</string>
@@ -533,21 +521,28 @@
     <string name="preference_video_bitrate_150000000">150Mbps</string>
     <string name="preference_video_bitrate_200000000">200Mbps</string>
 
-    <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
-    <string name="whats_new_text"><b>v1.41:</b>\n\n
-        <ul>
-            <li>User interface improvements: icons to switch photo/video mode, and switch camera, are
-                next to the shutter button for easier one-handed use; ISO controls are now moved
-                entirely to the exposure icon.\n</li>
-            <li>Take photos while recording video (on supported devices).\n</li>
-            <li>HDR improvements (ghost removal, and brightening of too dark images).\n</li>
-            <li>Performance improvements and bug fixes.\n</li>
-        </ul>
-    </string>
+
     <string name="no_burst">无连拍</string>
     <string name="preference_show_video_max_amp">显示音频电平表</string>
     <string name="preference_show_video_max_amp_summary">是否在录制视频时显示屏幕音频电平</string>
     <string name="preference_focus_bracketing_n_images">照片数量</string>
+    <string name="preference_focus_bracketing_n_images_entries_2">2</string>
+    <string name="preference_focus_bracketing_n_images_entries_3">3</string>
+    <string name="preference_focus_bracketing_n_images_entries_4">4</string>
+    <string name="preference_focus_bracketing_n_images_entries_5">5</string>
+    <string name="preference_focus_bracketing_n_images_entries_6">6</string>
+    <string name="preference_focus_bracketing_n_images_entries_8">8</string>
+    <string name="preference_focus_bracketing_n_images_entries_10">10</string>
+    <string name="preference_focus_bracketing_n_images_entries_12">12</string>
+    <string name="preference_focus_bracketing_n_images_entries_15">15</string>
+    <string name="preference_focus_bracketing_n_images_entries_20">20</string>
+    <string name="preference_focus_bracketing_n_images_entries_25">25</string>
+    <string name="preference_focus_bracketing_n_images_entries_30">30</string>
+    <string name="preference_focus_bracketing_n_images_entries_40">40</string>
+    <string name="preference_focus_bracketing_n_images_entries_50">50</string>
+    <string name="preference_focus_bracketing_n_images_entries_100">100</string>
+    <string name="preference_focus_bracketing_n_images_entries_200">200</string>
+
     <string name="photo_mode_focus_bracketing_full">对焦包围</string>
     <string name="photo_mode_focus_bracketing">对焦 {}</string>
     <string name="focus_bracketing_source_distance">对焦包围源距离</string>
@@ -573,7 +568,7 @@
     <string name="noise_reduction_mode_minimal">最小</string>
     <string name="noise_reduction_mode_fast">快速</string>
     <string name="noise_reduction_mode_high_quality">高质量</string>
-    <string name="preference_screen_processing_settings">正在处理设置...</string>
+    <string name="preference_screen_processing_settings">处理设置...</string>
     <string name="preference_noise_reduction_mode">降噪算法</string>
     <string name="preference_noise_reduction_mode_summary">相机驱动程序应该使用的算法来应用降噪。 降噪算法试图通过去除捕获过程中添加的过多噪声来改善图像质量，尤其是在黑暗条件下。（请注意，这与降噪照片模式无关，实际上在NR照片模式下会忽略此设置。）%s</string>
     <string name="preference_edge_mode_summary">相机驱动程序应该用于应用边缘增强的算法。 边缘增强可提高捕获图像的清晰度和细节。（在NR照片模式下忽略此设置。）%s</string>
@@ -629,11 +624,30 @@
     <string name="preference_burst_interval_1h">1小时</string>
     <string name="preference_burst_interval_2h">2小时</string>
     <string name="preference_video_max_filesize_default">设备默认值</string>
+    <string name="preference_video_max_filesize_100mb">100MB</string>
+    <string name="preference_video_max_filesize_200mb">200MB</string>
+    <string name="preference_video_max_filesize_300mb">300MB</string>
+    <string name="preference_video_max_filesize_500mb">500MB</string>
+    <string name="preference_video_max_filesize_1gb">1GB</string>
+    <string name="preference_video_max_filesize_2gb">2GB</string>
+    <string name="preference_video_max_filesize_5gb">5GB</string>
+    <string name="preference_video_max_filesize_9gb">9GB</string>
     <string name="cancelled_focus_bracketing">取消了对焦包围</string>
     <string name="preference_crop_guide_none">无</string>
+    <string name="preference_crop_guide_1">1 (1:1)</string>
+    <string name="preference_crop_guide_1_25">1.25 (5:4)</string>
+    <string name="preference_crop_guide_1_33">1.33 (4:3)</string>
+    <string name="preference_crop_guide_1_4">1.4 (7:4)</string>
+    <string name="preference_crop_guide_1_5">1.5 (3:2)</string>
+    <string name="preference_crop_guide_1_78">1.78 (16:9)</string>
+    <string name="preference_crop_guide_1_85">1.85 (37:20)</string>
+    <string name="preference_crop_guide_2">2 (2:1)</string>
+    <string name="preference_crop_guide_2_33">2.33 (21:9)</string>
+    <string name="preference_crop_guide_2_35">2.35 (47:20)</string>
+    <string name="preference_crop_guide_2_4">2.4 (12:5)</string>
     <string name="preference_audio_noise_control_sensitivity_3">+3（高灵敏度）</string>
     <string name="preference_audio_noise_control_sensitivity_2">+2</string>
-    <string name="preference_audio_noise_control_sensitivity_1">+2</string>
+    <string name="preference_audio_noise_control_sensitivity_1">+1</string>
     <string name="preference_audio_noise_control_sensitivity_0">0（默认）</string>
     <string name="preference_audio_noise_control_sensitivity_m1">-1</string>
     <string name="preference_audio_noise_control_sensitivity_m2">-2</string>
@@ -686,4 +700,56 @@
     <string name="exposure_unlock">解锁曝光</string>
     <string name="preference_nr_mode_low_light_message">弱光模式：请保持相机稳定</string>
     <string name="preference_video_log_fine">精细</string>
+    <string name="photo_mode_panorama">全景</string>
+    <string name="photo_mode_panorama_full">全景</string>
+    <string name="preference_screen_remote_control">蓝牙LE遥控...</string>
+    <string name="preference_enable_remote">启用蓝牙LE遥控</string>
+    <string name="preference_enable_remote_summary">启用蓝牙LE(BLE)遥控设备</string>
+    <string name="preference_remote_type">遥控设备类型</string>
+    <string name="ble_not_supported">不支持BLE</string>
+    <string name="scan_ble">BLE设备扫描</string>
+    <string name="bluetooth_not_supported">不支持蓝牙。</string>
+    <string name="unknown_device">未知设备</string>
+    <string name="preference_remote_disconnect_screen_dim">如果远程断开，则屏幕变暗</string>
+    <string name="preference_remote_disconnect_screen_dim_summary">提示：在启动Open Camera之前将默认亮度设置为最低级别。</string>
+    <string name="preference_water_type">使用海水深度计算</string>
+    <string name="preference_water_type_summary">对于水下外壳，如果选择了正确的水类型，则可提高精度。</string>
+    <string name="remote_connected">远程已连接</string>
+    <string name="preference_remote_type_kraken">Kraken智能住宅</string>
+    <string name="preference_stamp_geo_address">使用地址</string>
+    <string name="preference_stamp_geo_address_summary">如果可能，请在标记GPS位置时使用地址。 此选项需要Internet连接。%s</string>
+    <string name="preference_stamp_geo_address_both">除GPS坐标外，如果可能，还要显示地址</string>
+    <string name="preference_stamp_geo_address_no">不显示地址</string>
+    <string name="preference_show_store_location">显示存储位置数据图标</string>
+    <string name="preference_show_store_location_summary">是否显示用于启用或禁用位置数据的屏幕图标（地理标记）</string>
+    <string name="preference_location_enable">存储位置数据</string>
+    <string name="preference_location_disable">停止存储位置数据</string>
+    <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
+    <string name="whats_new_text">
+        [This dialog is shown when Open Camera is updated. You can disable it under
+        Settings/On screen GUI/Show What\'s New dialog.]
+        \n\n<b>v1.45:</b>\n\n
+        <ul>
+            <li>New optional layout for user-interface (Settings/On screen GUI/UI placement/"Icons along top").\n</li>
+            <li>New options to enable on-screen icons for enabling face detection, auto-level, photo stamp, custom text stamp, white balance lock (Settings/On screen GUI/).\n</li>
+            <li>New "Low light" mode for Noise Reduction photo mode. (Camera2 API only.)\n</li>
+            <li>Improvements for Noise Reduction, DRO and HDR photo modes.\n</li>
+            <li>Hold down shutter button in standard or fast burst photo modes to take a continuous burst. (Camera2 API only.)\n</li>
+            <li>Support for WebP and PNG (Settings/Photo settings/"Image format").\n</li>
+            <li>Support for different video file formats (Settings/Video settings/"Video format").\n</li>
+            <li>New options to save and restore all settings (Settings/"Settings manager").\n</li>
+            <li>"Say cheese" voice control now remains on.\n</li>
+            <li>Timelapse capture rates of 120x and 240x.\n</li>
+            <li>Focus bracketing mode now supports up to 200 images.\n</li>
+            <li>More auto-repeat options.\n</li>
+            <li>Larger options for maximum filesize for video (up to 9GB).\n</li>
+            <li>2:1 crop guide.\n</li>
+            <li>New "fine" setting for video flat (log) profile.\n</li>
+            <li>New lower noise sensitivity for "loud noise" audio trigger.\n</li>
+            <li>Vietnamese translation (thanks to Khánh Trần).\n</li>
+            <li>Allow Camera2 mode to be used on more devices.\n</li>
+            <li>Other improvements and bug fixes.\n</li>
+        </ul>
+    </string>
+    <string name="preference_stamp_geo_address_prefer">地址优先于GPS坐标</string>
 </resources>
