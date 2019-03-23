@@ -11,6 +11,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -33,6 +36,8 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -40,6 +45,10 @@ import android.os.Build;
 import android.renderscript.Allocation;
 import android.support.annotation.RequiresApi;
 import android.util.Log;
+import android.util.Xml;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlSerializer;
 
 /** Handles the saving (and any required processing) of photos.
  */
@@ -72,9 +81,11 @@ public class ImageSaver extends Thread {
 	private final static int queue_cost_dng_c = 6;
 	//private final static int queue_cost_dng_c = 1;
 
-	// for testing:
-	public static volatile boolean test_small_queue_size;
-	public static volatile boolean test_slow_saving;
+	// for testing; must be volatile for test project reading the state
+	// n.b., avoid using static, as static variables are shared between different instances of an application,
+	// and won't be reset in subsequent tests in a suite!
+	public static volatile boolean test_small_queue_size; // needs to be static, as it needs to be set before activity is created to take effect
+	public volatile boolean test_slow_saving;
 	public volatile boolean test_queue_blocked;
 
 	static class Request {
@@ -87,7 +98,8 @@ public class ImageSaver extends Thread {
 		enum ProcessType {
 			NORMAL,
 			HDR,
-			AVERAGE
+			AVERAGE,
+			PANORAMA
 		}
 		final ProcessType process_type; // for type==JPEG
 		final boolean force_suffix; // affects filename suffixes for saving jpeg_images: if true, filenames will always be appended with a suffix like _0, even if there's only 1 image in jpeg_images
@@ -119,6 +131,7 @@ public class ImageSaver extends Thread {
 		final int image_quality;
 		final boolean do_auto_stabilise;
 		final double level_angle;
+		final List<float []> gyro_rotation_matrix; // used for panorama (one 3x3 matrix per jpeg_images entry), otherwise can be null
 		final boolean is_front_facing;
 		final boolean mirror;
 		final Date current_date;
@@ -134,6 +147,7 @@ public class ImageSaver extends Thread {
 		final String preference_stamp_dateformat;
 		final String preference_stamp_timeformat;
 		final String preference_stamp_gpsformat;
+		final String preference_stamp_geo_address;
 		final String preference_units_distance;
 		final boolean store_location;
 		final Location location;
@@ -153,7 +167,7 @@ public class ImageSaver extends Thread {
 			boolean image_capture_intent, Uri image_capture_intent_uri,
 			boolean using_camera2,
 			ImageFormat image_format, int image_quality,
-			boolean do_auto_stabilise, double level_angle,
+			boolean do_auto_stabilise, double level_angle, List<float []> gyro_rotation_matrix,
 			boolean is_front_facing,
 			boolean mirror,
 			Date current_date,
@@ -161,7 +175,7 @@ public class ImageSaver extends Thread {
 			int iso,
 			long exposure_time,
 			float zoom_factor,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_stamp_geo_address, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -180,6 +194,7 @@ public class ImageSaver extends Thread {
 			this.image_quality = image_quality;
 			this.do_auto_stabilise = do_auto_stabilise;
 			this.level_angle = level_angle;
+			this.gyro_rotation_matrix = gyro_rotation_matrix;
 			this.is_front_facing = is_front_facing;
 			this.mirror = mirror;
 			this.current_date = current_date;
@@ -195,6 +210,7 @@ public class ImageSaver extends Thread {
 			this.preference_stamp_dateformat = preference_stamp_dateformat;
 			this.preference_stamp_timeformat = preference_stamp_timeformat;
 			this.preference_stamp_gpsformat = preference_stamp_gpsformat;
+			this.preference_stamp_geo_address = preference_stamp_geo_address;
 			this.preference_units_distance = preference_units_distance;
 			this.store_location = store_location;
 			this.location = location;
@@ -233,6 +249,8 @@ public class ImageSaver extends Thread {
 		if( MyDebug.LOG )
 			Log.d(TAG, "large max memory = " + large_heap_memory + "MB");
 		int max_queue_size;
+		if( MyDebug.LOG )
+			Log.d(TAG, "test_small_queue_size?: " + test_small_queue_size);
 		if( test_small_queue_size ) {
 			large_heap_memory = 0;
 		}
@@ -373,8 +391,8 @@ public class ImageSaver extends Thread {
 			hdrProcessor.onDestroy();
 		}
 	}
-	@Override
 
+	@Override
 	public void run() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "starting ImageSaver thread...");
@@ -467,7 +485,7 @@ public class ImageSaver extends Thread {
 			int iso,
 			long exposure_time,
 			float zoom_factor,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_stamp_geo_address, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -496,7 +514,7 @@ public class ImageSaver extends Thread {
 				iso,
 				exposure_time,
 				zoom_factor,
-				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
+				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
 				store_location, location, store_geo_direction, geo_direction,
 				custom_tag_artist,
 				custom_tag_copyright,
@@ -535,7 +553,7 @@ public class ImageSaver extends Thread {
 				0,
 				0,
 				1.0f,
-				null, null, 0, 0, null, null, null, null, null,
+				null, null, 0, 0, null, null, null, null, null, null,
 				false, null, false, 0.0,
 				null, null,
 				1);
@@ -544,18 +562,19 @@ public class ImageSaver extends Thread {
 	private Request pending_image_average_request = null;
 
 	void startImageAverage(boolean do_in_background,
+			Request.ProcessType processType,
 			Request.SaveBase save_base,
 			boolean image_capture_intent, Uri image_capture_intent_uri,
 			boolean using_camera2,
 			Request.ImageFormat image_format, int image_quality,
-			boolean do_auto_stabilise, double level_angle,
+			boolean do_auto_stabilise, double level_angle, boolean want_gyro_matrices,
 			boolean is_front_facing,
 			boolean mirror,
 			Date current_date,
 			int iso,
 			long exposure_time,
 			float zoom_factor,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_stamp_geo_address, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -565,7 +584,7 @@ public class ImageSaver extends Thread {
 			Log.d(TAG, "do_in_background? " + do_in_background);
 		}
 		pending_image_average_request = new Request(Request.Type.JPEG,
-				Request.ProcessType.AVERAGE,
+				processType,
 				false,
 				0,
 				save_base,
@@ -574,7 +593,7 @@ public class ImageSaver extends Thread {
 				image_capture_intent, image_capture_intent_uri,
 				using_camera2,
 				image_format, image_quality,
-				do_auto_stabilise, level_angle,
+				do_auto_stabilise, level_angle, want_gyro_matrices ? new ArrayList<float []>() : null,
 				is_front_facing,
 				mirror,
 				current_date,
@@ -582,14 +601,14 @@ public class ImageSaver extends Thread {
 				iso,
 				exposure_time,
 				zoom_factor,
-				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
+				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
 				store_location, location, store_geo_direction, geo_direction,
 				custom_tag_artist,
 				custom_tag_copyright,
 				sample_factor);
 	}
 
-	void addImageAverage(byte [] image) {
+	void addImageAverage(byte [] image, float [] gyro_rotation_matrix) {
 		if( MyDebug.LOG )
 			Log.d(TAG, "addImageAverage");
 		if( pending_image_average_request == null ) {
@@ -597,6 +616,11 @@ public class ImageSaver extends Thread {
 			return;
 		}
 		pending_image_average_request.jpeg_images.add(image);
+		if( gyro_rotation_matrix != null ) {
+			float [] copy = new float[gyro_rotation_matrix.length];
+			System.arraycopy(gyro_rotation_matrix, 0, copy, 0, gyro_rotation_matrix.length);
+			pending_image_average_request.gyro_rotation_matrix.add(copy);
+		}
 		if( MyDebug.LOG )
 			Log.d(TAG, "image average request images: " + pending_image_average_request.jpeg_images.size());
 	}
@@ -644,7 +668,7 @@ public class ImageSaver extends Thread {
 			int iso,
 			long exposure_time,
 			float zoom_factor,
-			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_units_distance,
+			String preference_stamp, String preference_textstamp, int font_size, int color, String pref_style, String preference_stamp_dateformat, String preference_stamp_timeformat, String preference_stamp_gpsformat, String preference_stamp_geo_address, String preference_units_distance,
 			boolean store_location, Location location, boolean store_geo_direction, double geo_direction,
 			String custom_tag_artist,
 			String custom_tag_copyright,
@@ -667,7 +691,7 @@ public class ImageSaver extends Thread {
 				image_capture_intent, image_capture_intent_uri,
 				using_camera2,
 				image_format, image_quality,
-				do_auto_stabilise, level_angle,
+				do_auto_stabilise, level_angle, null,
 				is_front_facing,
 				mirror,
 				current_date,
@@ -675,7 +699,7 @@ public class ImageSaver extends Thread {
 				iso,
 				exposure_time,
 				zoom_factor,
-				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
+				preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
 				store_location, location, store_geo_direction, geo_direction,
 				custom_tag_artist,
 				custom_tag_copyright,
@@ -774,7 +798,7 @@ public class ImageSaver extends Thread {
 			false, null,
 			false,
 			Request.ImageFormat.STD, 0,
-			false, 0.0,
+			false, 0.0, null,
 			false,
 			false,
 			null,
@@ -782,7 +806,7 @@ public class ImageSaver extends Thread {
 			0,
 			0,
 			1.0f,
-			null, null, 0, 0, null, null, null, null, null,
+			null, null, 0, 0, null, null, null, null, null, null,
 			false, null, false, 0.0,
 			null, null,
 			1);
@@ -798,8 +822,8 @@ public class ImageSaver extends Thread {
 			Log.d(TAG, "waitUntilDone");
 		synchronized( this ) {
 			if( MyDebug.LOG ) {
-				Log.d(TAG, "queue is size " + queue.size());
-				Log.d(TAG, "images still to save " + n_images_to_save);
+				Log.d(TAG, "waitUntilDone: queue is size " + queue.size());
+				Log.d(TAG, "waitUntilDone: images still to save " + n_images_to_save);
 			}
 			while( n_images_to_save > 0 ) {
 				if( MyDebug.LOG )
@@ -993,7 +1017,160 @@ public class ImageSaver extends Thread {
 		}
 		return hdr_alpha;
 	}
-	
+
+	private final static String gyro_info_doc_tag = "open_camera_gyro_info";
+	private final static String gyro_info_image_tag = "image";
+	private final static String gyro_info_vector_tag = "vector";
+	private final static String gyro_info_vector_right_type = "X";
+	private final static String gyro_info_vector_up_type = "Y";
+	private final static String gyro_info_vector_screen_type = "Z";
+
+	private void writeGyroDebugXml(Writer writer, Request request) throws IOException {
+		XmlSerializer xmlSerializer = Xml.newSerializer();
+
+		xmlSerializer.setOutput(writer);
+		xmlSerializer.startDocument("UTF-8", true);
+		xmlSerializer.startTag(null, gyro_info_doc_tag);
+
+		float [] inVector = new float[3];
+		float [] outVector = new float[3];
+		for(int i=0;i<request.gyro_rotation_matrix.size();i++) {
+			xmlSerializer.startTag(null, gyro_info_image_tag);
+			xmlSerializer.attribute(null, "index", "" + i);
+
+			GyroSensor.setVector(inVector, 1.0f, 0.0f, 0.0f); // vector pointing in "right" direction
+			GyroSensor.transformVector(outVector, request.gyro_rotation_matrix.get(i), inVector);
+			xmlSerializer.startTag(null, gyro_info_vector_tag);
+			xmlSerializer.attribute(null, "type", gyro_info_vector_right_type);
+			xmlSerializer.attribute(null, "x", "" + outVector[0]);
+			xmlSerializer.attribute(null, "y", "" + outVector[1]);
+			xmlSerializer.attribute(null, "z", "" + outVector[2]);
+			xmlSerializer.endTag(null, gyro_info_vector_tag);
+
+			GyroSensor.setVector(inVector, 0.0f, 1.0f, 0.0f); // vector pointing in "up" direction
+			GyroSensor.transformVector(outVector, request.gyro_rotation_matrix.get(i), inVector);
+			xmlSerializer.startTag(null, gyro_info_vector_tag);
+			xmlSerializer.attribute(null, "type", gyro_info_vector_up_type);
+			xmlSerializer.attribute(null, "x", "" + outVector[0]);
+			xmlSerializer.attribute(null, "y", "" + outVector[1]);
+			xmlSerializer.attribute(null, "z", "" + outVector[2]);
+			xmlSerializer.endTag(null, gyro_info_vector_tag);
+
+			GyroSensor.setVector(inVector, 0.0f, 0.0f, -1.0f); // vector pointing behind the device's screen
+			GyroSensor.transformVector(outVector, request.gyro_rotation_matrix.get(i), inVector);
+			xmlSerializer.startTag(null, gyro_info_vector_tag);
+			xmlSerializer.attribute(null, "type", gyro_info_vector_screen_type);
+			xmlSerializer.attribute(null, "x", "" + outVector[0]);
+			xmlSerializer.attribute(null, "y", "" + outVector[1]);
+			xmlSerializer.attribute(null, "z", "" + outVector[2]);
+			xmlSerializer.endTag(null, gyro_info_vector_tag);
+
+			xmlSerializer.endTag(null, gyro_info_image_tag);
+		}
+
+		xmlSerializer.endTag(null, gyro_info_doc_tag);
+		xmlSerializer.endDocument();
+		xmlSerializer.flush();
+	}
+
+	public static class GyroDebugInfo {
+		public static class GyroImageDebugInfo {
+			public float [] vectorRight; // X axis
+			public float [] vectorUp; // Y axis
+			public float [] vectorScreen; // vector into the screen - actually the -Z axis
+		}
+
+		public List<GyroImageDebugInfo> image_info;
+
+		public GyroDebugInfo() {
+			image_info = new ArrayList<>();
+		}
+	}
+
+	public static boolean readGyroDebugXml(InputStream inputStream, GyroDebugInfo info) {
+		try {
+			XmlPullParser parser = Xml.newPullParser();
+			parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
+			parser.setInput(inputStream, null);
+			parser.nextTag();
+
+			parser.require(XmlPullParser.START_TAG, null, gyro_info_doc_tag);
+			GyroDebugInfo.GyroImageDebugInfo image_info = null;
+
+			while( parser.next() != XmlPullParser.END_DOCUMENT ) {
+				switch( parser.getEventType() ) {
+					case XmlPullParser.START_TAG: {
+						String name = parser.getName();
+						if( MyDebug.LOG ) {
+							Log.d(TAG, "start tag, name: " + name);
+						}
+
+						switch( name ) {
+							case gyro_info_image_tag:
+								info.image_info.add( image_info = new GyroDebugInfo.GyroImageDebugInfo() );
+								break;
+							case gyro_info_vector_tag:
+								if( image_info == null ) {
+									Log.e(TAG, "vector tag outside of image tag");
+									return false;
+								}
+								String type = parser.getAttributeValue(null, "type");
+								String x_s = parser.getAttributeValue(null, "x");
+								String y_s = parser.getAttributeValue(null, "y");
+								String z_s = parser.getAttributeValue(null, "z");
+								float [] vector = new float[3];
+								vector[0] = Float.parseFloat(x_s);
+								vector[1] = Float.parseFloat(y_s);
+								vector[2] = Float.parseFloat(z_s);
+								switch( type ) {
+									case gyro_info_vector_right_type:
+										image_info.vectorRight = vector;
+										break;
+									case gyro_info_vector_up_type:
+										image_info.vectorUp = vector;
+										break;
+									case gyro_info_vector_screen_type:
+										image_info.vectorScreen = vector;
+										break;
+									default:
+										Log.e(TAG, "unknown type in vector tag: " + type);
+										return false;
+								}
+								break;
+						}
+						break;
+					}
+					case XmlPullParser.END_TAG: {
+						String name = parser.getName();
+						if( MyDebug.LOG ) {
+							Log.d(TAG, "end tag, name: " + name);
+						}
+
+						switch( name ) {
+							case gyro_info_image_tag:
+								image_info = null;
+								break;
+						}
+						break;
+					}
+				}
+			}
+		}
+        catch(Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+		finally {
+			try {
+				inputStream.close();
+			}
+			catch(IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return true;
+	}
+
 	/** May be run in saver thread or picture callback thread (depending on whether running in background).
 	 */
 	private boolean saveImageNow(final Request request) {
@@ -1296,6 +1473,80 @@ public class ImageSaver extends Thread {
     		}
 			hdr_bitmap.recycle();
 	        System.gc();
+		}
+		else if( request.process_type == Request.ProcessType.PANORAMA ) {
+			if( MyDebug.LOG )
+				Log.d(TAG, "panorama");
+
+			// save text file with gyro info
+			if( !request.image_capture_intent ) {
+				/*final StringBuilder gyro_text = new StringBuilder();
+				gyro_text.append("Panorama gyro debug info\n");
+				gyro_text.append("n images: " + request.gyro_rotation_matrix.size() + ":\n");
+
+				float [] inVector = new float[3];
+				float [] outVector = new float[3];
+				for(int i=0;i<request.gyro_rotation_matrix.size();i++) {
+					gyro_text.append("Image " + i + ":\n");
+
+					GyroSensor.setVector(inVector, 1.0f, 0.0f, 0.0f); // vector pointing in "right" direction
+					GyroSensor.transformVector(outVector, request.gyro_rotation_matrix.get(i), inVector);
+					gyro_text.append("    X: " + outVector[0] + " , " + outVector[1] + " , " + outVector[2] + "\n");
+
+					GyroSensor.setVector(inVector, 0.0f, 1.0f, 0.0f); // vector pointing in "up" direction
+					GyroSensor.transformVector(outVector, request.gyro_rotation_matrix.get(i), inVector);
+					gyro_text.append("    Y: " + outVector[0] + " , " + outVector[1] + " , " + outVector[2] + "\n");
+
+					GyroSensor.setVector(inVector, 0.0f, 0.0f, -1.0f); // vector pointing behind the device's screen
+					GyroSensor.transformVector(outVector, request.gyro_rotation_matrix.get(i), inVector);
+					gyro_text.append("    -Z: " + outVector[0] + " , " + outVector[1] + " , " + outVector[2] + "\n");
+
+				}*/
+
+				try {
+					StringWriter writer = new StringWriter();
+
+					writeGyroDebugXml(writer, request);
+
+					StorageUtils storageUtils = main_activity.getStorageUtils();
+					File saveFile = null;
+					/*Uri saveUri = null;
+					if( storageUtils.isUsingSAF() ) {
+						saveUri = storageUtils.createOutputMediaFileSAF(StorageUtils.MEDIA_TYPE_GYRO_INFO, "", "xml", request.current_date);
+					}
+					else*/ {
+						saveFile = storageUtils.createOutputMediaFile(StorageUtils.MEDIA_TYPE_GYRO_INFO, "", "xml", request.current_date);
+						if( MyDebug.LOG )
+							Log.d(TAG, "save to: " + saveFile.getAbsolutePath());
+					}
+
+					OutputStream outputStream = new FileOutputStream(saveFile);
+					try {
+						//outputStream.write(gyro_text.toString().getBytes());
+						outputStream.write(writer.toString().getBytes(Charset.forName("UTF-8")));
+					}
+					finally {
+						outputStream.close();
+					}
+
+					if( saveFile != null ) {
+						storageUtils.broadcastFile(saveFile, false, false, false);
+					}
+				}
+				catch(IOException e) {
+					Log.e(TAG, "failed to write gyro text file");
+					e.printStackTrace();
+				}
+			}
+
+			// for now, just save all the images:
+			String suffix = "_";
+			success = saveImages(request, suffix, false, true, true);
+
+			/*saveBaseImages(request, "_");
+			main_activity.savingImage(true);
+
+			main_activity.savingImage(false);*/
 		}
 		else {
 			// see note above how we used to use "_EXP" for the suffix for multiple images
@@ -1640,8 +1891,64 @@ public class ImageSaver extends Thread {
 					if( gps_stamp.length() > 0 ) {
 						if( MyDebug.LOG )
 							Log.d(TAG, "stamp with location_string: " + gps_stamp);
-						applicationInterface.drawTextWithBackground(canvas, p, gps_stamp, color, Color.BLACK, width - offset_x, ypos, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, draw_shadowed);
-						ypos -= diff_y;
+
+						Address address = null;
+						if( request.store_location && !request.preference_stamp_geo_address.equals("preference_stamp_geo_address_no") ) {
+							// try to find an address
+							if( Geocoder.isPresent() ) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "geocoder is present");
+								Geocoder geocoder = new Geocoder(main_activity, Locale.getDefault());
+								try {
+									List<Address> addresses = geocoder.getFromLocation(request.location.getLatitude(), request.location.getLongitude(), 1);
+									if( addresses != null && addresses.size() > 0 ) {
+										address = addresses.get(0);
+										if( MyDebug.LOG ) {
+											Log.d(TAG, "address: " + address);
+											Log.d(TAG, "max line index: " + address.getMaxAddressLineIndex());
+										}
+									}
+								}
+								catch(Exception e) {
+									Log.e(TAG, "failed to read from geocoder");
+									e.printStackTrace();
+								}
+							}
+							else {
+								if( MyDebug.LOG )
+									Log.d(TAG, "geocoder not present");
+							}
+						}
+
+						if( address == null || request.preference_stamp_geo_address.equals("preference_stamp_geo_address_both") ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "display gps coords");
+							// want GPS coords (either in addition to the address, or we don't have an address)
+							// we'll also enter here if store_location is false, but we have geo direction to display
+							applicationInterface.drawTextWithBackground(canvas, p, gps_stamp, color, Color.BLACK, width - offset_x, ypos, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, draw_shadowed);
+							ypos -= diff_y;
+						}
+						else if( request.store_geo_direction ) {
+							if( MyDebug.LOG )
+								Log.d(TAG, "not displaying gps coords, but need to display geo direction");
+							// we are displaying an address instead of GPS coords, but we still need to display the geo direction
+							gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, request.preference_units_distance, false, null, request.store_geo_direction, request.geo_direction);
+							if( gps_stamp.length() > 0 ) {
+								if( MyDebug.LOG )
+									Log.d(TAG, "gps_stamp is now: " + gps_stamp);
+								applicationInterface.drawTextWithBackground(canvas, p, gps_stamp, color, Color.BLACK, width - offset_x, ypos, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, draw_shadowed);
+								ypos -= diff_y;
+							}
+						}
+
+						if( address != null ) {
+							for(int i=0;i<=address.getMaxAddressLineIndex();i++) {
+								// write in reverse order
+								String addressLine = address.getAddressLine(address.getMaxAddressLineIndex()-i);
+								applicationInterface.drawTextWithBackground(canvas, p, addressLine, color, Color.BLACK, width - offset_x, ypos, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, draw_shadowed);
+								ypos -= diff_y;
+							}
+						}
 					}
 				}
 				if( text_stamp ) {

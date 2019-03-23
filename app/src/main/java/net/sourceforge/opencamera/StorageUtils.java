@@ -41,7 +41,8 @@ public class StorageUtils {
 
     static final int MEDIA_TYPE_IMAGE = 1;
     static final int MEDIA_TYPE_VIDEO = 2;
-    static final int MEDIA_TYPE_PREFS = 3;
+	static final int MEDIA_TYPE_PREFS = 3;
+	static final int MEDIA_TYPE_GYRO_INFO = 4;
 
 	private final Context context;
 	private final MyApplicationInterface applicationInterface;
@@ -520,6 +521,7 @@ public class StorageUtils {
 		}
 		String mediaFilename;
 		switch (type) {
+			case MEDIA_TYPE_GYRO_INFO: // gyro info files have same name as the photo (but different extension)
 			case MEDIA_TYPE_IMAGE: {
 				String prefix = sharedPreferences.getString(PreferenceKeys.getSavePhotoPrefixPreferenceKey(), "IMG_");
 				mediaFilename = prefix + timeStamp + suffix + index + extension;
@@ -690,6 +692,9 @@ public class StorageUtils {
 				}
 				break;
 			case MEDIA_TYPE_PREFS:
+				mimeType = "text/xml";
+				break;
+			case MEDIA_TYPE_GYRO_INFO:
 				mimeType = "text/xml";
 				break;
 			default:

@@ -82,6 +82,7 @@
 <li><a href="#nr_vs_hdr">NR vs HDR</a></li>
 <li><a href="#settings">Settings</a></li>
 <li><a href="#widgets">Widgets and tiles</a></li>
+<li><a href="#remote_control">Remote control</a></li>
 <li><a href="#faq">FAQ</a></li>
 <li><a href="#contact">Contacting me (bugs etc)</a></li>
 </ul>
@@ -623,6 +624,10 @@ distances to bracket between. Note not supported when recording video.</p>
 	resultant photos. See
 	<a href="#custom_text">Settings/Photo settings/"Custom text"</a> for more details.</p>
 
+<p><b>Show store location data icon</b> - Whether to display an on-screen icon for enabling or disabling storing location
+	data (geotagging). See <a href="#store_location_data">Settings/Location settings/"Store location data (geotagging)"</a>
+	for more details.</p>
+
 <p><b>Show auto white balance lock icon</b> - Whether to display an on-screen icon for locking or unlocking auto white
 	balance.</p>
 
@@ -808,6 +813,11 @@ extra control over the date and time formatting. Also used for Video settings/"V
 <p><b>GPS stamp format</b> - If "Stamp photos" is enabled, this allows extra control over the GPS
 formatting. Also used for Video settings/"Video subtitles".</p>
 
+<p><b>Use addresses</b> - If "Stamp photos" and "Store location data" is enabled, this allows the location
+	to be displayed on the resultant photo in the form of an address, either as well as or instead of GPS
+	coordinates. Note that an Internet connection is required for this to succeed. Also used for
+	Video settings/"Video subtitles".</p>
+
 <p><b>Distance unit</b> - If "Stamp photos" is enabled, this controls whether to use metres (m) or
 feet (ft) when recording the GPS altitude. Also used for Video settings/"Video subtitles".</p>
 
@@ -888,9 +898,11 @@ will stop after the specified time (unless already stopped earlier).</p>
 the video automatically stop and restart the specified number of times. So this can be used to take a video for a long
 period, broken up into multiple video files. If a max duration has not been set, then this option has no effect.</p>
 
-<p><b>Maximum file size of video</b> - This allows to set a maximum file size for videos. Note that almost all Android devices
+<p><b>Maximum file size of video</b> - This allows to set a maximum file size for videos. Note that many Android devices
 set a maximum file size (typically around 2GB or 4GB), and there is no way Open Camera can work around such a limitation (and
-using exFAT doesn't get round it). But this option allows you to set a smaller value. Note that the value is approximate - typically
+using exFAT doesn't get round it). This option allows you to set a smaller maximum file size - note that it can only
+be used to reduce the device's maximum file size (so if a device has a 2GB limit, you can't increase it by setting this option to
+a larger value). Note that the value is approximate - typically
 the resultant videos may be slightly smaller. Note that if you using this option together
 with "Max duration of video", then - if "Restart on maximum file size" is enabled - hitting the maximum file size will cause a
 restart that doesn't reset the max duration timer, nor does it count as one of the number of restarts. E.g., if you requested a
@@ -955,7 +967,7 @@ video is still recording.</p>
 
 <p><b>Location settings</b> - Select to access the following controls:</p>
 
-<p><b>Store location data (Geotagging)</b> - If selected, then photos will be tagged with the current
+<p><a name="store_location_data"></a><b>Store location data (Geotagging)</b> - If selected, then photos will be tagged with the current
 location. Location data will also be stored in videos (though only for devices that record in MPEG4 or
 3GPP formats).</p>
 
@@ -1044,6 +1056,29 @@ is enabled.</p>
 
 <p>On Android 7.1, Open Camera supports application shortcuts. Press and hold the Open Camera icon
 to show additional shortcut options.</p>
+
+<p><a name="remote_control"></a><b>Remote control</b></p>
+
+<p>Some remote control buttons and selfie sticks work by transmitting a volume key command, which
+by default will take a photo, but you can change this from the <a href="#settings">Settings</a>.</p>
+
+<p>Open Camera also supports some remote control via a Bluetooth or USB keyboard:</p>
+<ul>
+	<li>Function key or numeric keypad "*": toggle popup menu</li>
+	<li>"/": toggle exposure menu</li>
+	<li>Space or numeric keypad "5": Activate shutter (take photo/video), unless the exposure or popup menu is open,
+	and you are in highlight selection mode (see below).</li>
+	<li>Up/down arrows, or numeric keypad "8" and "2": if the exposure or popup menu is open, this enters highlight selection
+	mode:<ul>
+			<li>For the popup menu, move the highlighted row up or down to select a row, then press Space/"5", then you can change
+				the selected icon in that row with the up/down arrows, then press Space/"5" again to select the button.</li>
+			<li>For the exposure menu, move the highlighted row up or down to select a row, then press Space/"5", then you
+			can change the selected value or slider with the up/down arrows.</li>
+		</ul>
+
+	</li>
+	<li>"+" or "-": Zoom in or out.</li>
+</ul>
 
 <p><a name="faq"></a><b>Frequently Asked Questions</b></p>
 

@@ -1,13 +1,13 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 28
     compileOptions.encoding = 'UTF-8'
 
     defaultConfig {
         applicationId "net.sourceforge.opencamera"
         minSdkVersion 15
-        targetSdkVersion 27
+        targetSdkVersion 28
 
         renderscriptTargetApi 20
         //renderscriptSupportModeEnabled true // don't use support library as it bloats the APK, and we don't need pre-4.4 support
@@ -27,9 +27,15 @@ android {
     lintOptions {
         checkReleaseBuilds false
     }
+
+    // needed to use android.test package (ActivityInstrumentationTestCase2 etc) when targetting sdk 28 (Android 9) -
+    // see https://developer.android.com/training/testing/set-up-project
+    useLibrary 'android.test.runner'
+    useLibrary 'android.test.base'
+    //useLibrary 'android.test.mock'
 }
 
 dependencies {
-    implementation 'com.android.support:support-v4:27.1.1'
+    implementation 'com.android.support:support-v4:28.0.0'
     testImplementation 'junit:junit:4.12'
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -30,6 +31,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaRecorder;
@@ -61,7 +64,8 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     	ExpoBracketing, // take multiple expo bracketed images, without combining to a single image
 		FocusBracketing, // take multiple focus bracketed images, without combining to a single image
 		FastBurst,
-		NoiseReduction
+		NoiseReduction,
+		Panorama
     }
     
 	private final MainActivity main_activity;
@@ -71,7 +75,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 	private final DrawPreview drawPreview;
 	private final ImageSaver imageSaver;
 
-	private final static float panorama_pics_per_screen = 2.0f;
+	private final static float panorama_pics_per_screen = 3.0f;
 
 	private File last_video_file = null;
 	private Uri last_video_file_saf = null;
@@ -927,6 +931,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     	return sharedPreferences.getString(PreferenceKeys.StampGPSFormatPreferenceKey, "preference_stamp_gpsformat_default");
     }
 
+    private String getStampGeoAddressPref() {
+		return sharedPreferences.getString(PreferenceKeys.StampGeoAddressPreferenceKey, "preference_stamp_geo_address_no");
+	}
+
     private String getUnitsDistancePref() {
     	return sharedPreferences.getString(PreferenceKeys.UnitsDistancePreferenceKey, "preference_units_distance_m");
 	}
@@ -1029,7 +1037,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     	// even if the queue isn't full, we may apply additional limits
 		int n_images_to_save = imageSaver.getNImagesToSave();
 		PhotoMode photo_mode = getPhotoMode();
-		if( photo_mode == PhotoMode.FastBurst ) {
+		if( photo_mode == PhotoMode.FastBurst || photo_mode == PhotoMode.Panorama ) {
 			// only allow one fast burst at a time, so require queue to be empty
 			if( n_images_to_save > 0 ) {
 				if( MyDebug.LOG )
@@ -1262,6 +1270,9 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 		boolean noise_reduction = photo_mode_pref.equals("preference_photo_mode_noise_reduction");
 		if( noise_reduction && main_activity.supportsNoiseReduction() )
 			return PhotoMode.NoiseReduction;
+		boolean panorama = photo_mode_pref.equals("preference_photo_mode_panorama");
+		if( panorama && main_activity.supportsPanorama() )
+			return PhotoMode.Panorama;
 		return PhotoMode.Standard;
     }
 
@@ -1381,8 +1392,6 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 		drawPreview.onContinuousFocusMove(start);
 	}
 
-    private int n_panorama_pics = 0;
-
 	void startPanorama() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "startPanorama");
@@ -1395,13 +1404,19 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 			Log.d(TAG, "stopPanorama");
 		gyroSensor.stopRecording();
 		clearPanoramaPoint();
+
+		boolean image_capture_intent = isImageCaptureIntent();
+		boolean do_in_background = saveInBackground(image_capture_intent);
+		imageSaver.finishImageAverage(do_in_background);
 	}
 
 	void setNextPanoramaPoint() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setNextPanoramaPoint");
-		float camera_angle_y = main_activity.getPreview().getViewAngleY();
+		float camera_angle_y = main_activity.getPreview().getViewAngleY(false);
 		n_panorama_pics++;
+		if( MyDebug.LOG )
+			Log.d(TAG, "n_panorama_pics is now: " + n_panorama_pics);
 		float angle = (float) Math.toRadians(camera_angle_y) * n_panorama_pics;
 		setNextPanoramaPoint((float) Math.sin(angle / panorama_pics_per_screen), 0.0f, (float) -Math.cos(angle / panorama_pics_per_screen));
 	}
@@ -1410,20 +1425,25 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 		if( MyDebug.LOG )
 			Log.d(TAG, "setNextPanoramaPoint : " + x + " , " + y + " , " + z);
 
-		final float target_angle = 2.0f * 0.01745329252f;
+		//final float target_angle = 1.0f * 0.01745329252f;
+		final float target_angle = 0.5f * 0.01745329252f;
 		gyroSensor.setTarget(x, y, z, target_angle, new GyroSensor.TargetCallback() {
 			@Override
 			public void onAchieved() {
 				if( MyDebug.LOG )
 					Log.d(TAG, "TargetCallback.onAchieved");
-				clearPanoramaPoint();
+				// Clear the target so we avoid risk of multiple callbacks - but note we don't call
+				// clearPanoramaPoint(), as we don't want to call drawPreview.clearGyroDirectionMarker()
+				// at this stage (looks better to keep showing the target market on-screen whilst photo
+				// is being taken, user more likely to keep the device still).
+				gyroSensor.clearTarget();
 				main_activity.takePicturePressed(false, false);
 			}
 		});
 		drawPreview.setGyroDirectionMarker(x, y, z);
 	}
 
-	void clearPanoramaPoint() {
+	private void clearPanoramaPoint() {
 		if( MyDebug.LOG )
 			Log.d(TAG, "clearPanoramaPoint");
 		gyroSensor.clearTarget();
@@ -1476,6 +1496,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 			final String preference_stamp_timeformat = this.getStampTimeFormatPref();
 			final String preference_stamp_gpsformat = this.getStampGPSFormatPref();
 			final String preference_units_distance = this.getUnitsDistancePref();
+			final String preference_stamp_geo_address = this.getStampGeoAddressPref();
 			final boolean store_location = getGeotaggingPref();
 			final boolean store_geo_direction = getGeodirectionPref();
 			class SubtitleVideoTimerTask extends TimerTask {
@@ -1531,19 +1552,75 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 						Log.d(TAG, "time_stamp: " + time_stamp);
 						Log.d(TAG, "gps_stamp: " + gps_stamp);
 					}
-					String datetime_stamp = "";
-					if( date_stamp.length() > 0 )
-						datetime_stamp += date_stamp;
-					if( time_stamp.length() > 0 ) {
-						if( datetime_stamp.length() > 0 )
-							datetime_stamp += " ";
-						datetime_stamp += time_stamp;
-					}
+
+                    String datetime_stamp = "";
+                    if( date_stamp.length() > 0 )
+                        datetime_stamp += date_stamp;
+                    if( time_stamp.length() > 0 ) {
+                        if( datetime_stamp.length() > 0 )
+                            datetime_stamp += " ";
+                        datetime_stamp += time_stamp;
+                    }
+
+                    // build subtitles
 					String subtitles = "";
 					if( datetime_stamp.length() > 0 )
 						subtitles += datetime_stamp + "\n";
-					if( gps_stamp.length() > 0 )
-						subtitles += gps_stamp + "\n";
+
+					if( gps_stamp.length() > 0 ) {
+                        Address address = null;
+                        if( store_location && !preference_stamp_geo_address.equals("preference_stamp_geo_address_no") ) {
+                            // try to find an address
+                            if( Geocoder.isPresent() ) {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "geocoder is present");
+                                Geocoder geocoder = new Geocoder(main_activity, Locale.getDefault());
+                                try {
+                                    List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+                                    if( addresses != null && addresses.size() > 0 ) {
+                                        address = addresses.get(0);
+                                        if( MyDebug.LOG ) {
+                                            Log.d(TAG, "address: " + address);
+                                            Log.d(TAG, "max line index: " + address.getMaxAddressLineIndex());
+                                        }
+                                    }
+                                }
+                                catch(Exception e) {
+                                    Log.e(TAG, "failed to read from geocoder");
+                                    e.printStackTrace();
+                                }
+                            }
+                            else {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "geocoder not present");
+                            }
+                        }
+
+                        if( address != null ) {
+                            for(int i=0;i<=address.getMaxAddressLineIndex();i++) {
+                                // write in forward order
+                                String addressLine = address.getAddressLine(i);
+                                subtitles += addressLine + "\n";
+                            }
+                        }
+
+                        if( address == null || preference_stamp_geo_address.equals("preference_stamp_geo_address_both") ) {
+                            if( MyDebug.LOG )
+                                Log.d(TAG, "display gps coords");
+                            subtitles += gps_stamp + "\n";
+                        }
+                        else if( store_geo_direction ) {
+                            if( MyDebug.LOG )
+                                Log.d(TAG, "not displaying gps coords, but need to display geo direction");
+                            gps_stamp = main_activity.getTextFormatter().getGPSString(preference_stamp_gpsformat, preference_units_distance, false, null, store_geo_direction && main_activity.getPreview().hasGeoDirection(), geo_direction);
+                            if( gps_stamp.length() > 0 ) {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "gps_stamp is now: " + gps_stamp);
+                                subtitles += gps_stamp + "\n";
+                            }
+                        }
+                    }
+
 					if( subtitles.length() == 0 ) {
 						return;
 					}
@@ -1901,6 +1978,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     }
 
     private int n_capture_images = 0; // how many calls to onPictureTaken() since the last call to onCaptureStarted()
+	private int n_panorama_pics = 0;
 
 	@Override
 	public void onCaptureStarted() {
@@ -1926,6 +2004,11 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 			boolean image_capture_intent = isImageCaptureIntent();
 			boolean do_in_background = saveInBackground(image_capture_intent);
 			imageSaver.finishImageAverage(do_in_background);
+		}
+		else if( photo_mode == MyApplicationInterface.PhotoMode.Panorama && gyroSensor.isRecording() ) {
+			if (MyDebug.LOG)
+				Log.d(TAG, "set next panorama point");
+			this.setNextPanoramaPoint();
 		}
 
 		// call this, so that if pause-preview-after-taking-photo option is set, we remove the "taking photo" border indicator straight away
@@ -2335,6 +2418,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 		String preference_stamp_dateformat = this.getStampDateFormatPref();
 		String preference_stamp_timeformat = this.getStampTimeFormatPref();
 		String preference_stamp_gpsformat = this.getStampGPSFormatPref();
+		String preference_stamp_geo_address = this.getStampGeoAddressPref();
 		String preference_units_distance = this.getUnitsDistancePref();
 		boolean store_location = getGeotaggingPref() && getLocation() != null;
 		Location location = store_location ? getLocation() : null;
@@ -2390,8 +2474,13 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 			// must be in photo snapshot while recording video mode, only support standard photo mode
 			photo_mode = PhotoMode.Standard;
 		}
-		if( photo_mode == PhotoMode.NoiseReduction ) {
-			if( n_capture_images == 1 ) {
+		if( photo_mode == PhotoMode.NoiseReduction || photo_mode == PhotoMode.Panorama ) {
+			boolean first_image = false;
+			if( photo_mode == PhotoMode.Panorama )
+				first_image = n_panorama_pics == 0;
+			else
+				first_image = n_capture_images == 1;
+			if( first_image ) {
 				ImageSaver.Request.SaveBase save_base = ImageSaver.Request.SaveBase.SAVEBASE_NONE;
 				String save_base_preference = sharedPreferences.getString(PreferenceKeys.NRSaveExpoPreferenceKey, "preference_nr_save_no");
 				switch( save_base_preference ) {
@@ -2404,23 +2493,31 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 				}
 
 				imageSaver.startImageAverage(true,
+					photo_mode == PhotoMode.NoiseReduction ? ImageSaver.Request.ProcessType.AVERAGE : ImageSaver.Request.ProcessType.PANORAMA,
 					save_base,
 					image_capture_intent, image_capture_intent_uri,
 					using_camera2,
 					image_format, image_quality,
-					do_auto_stabilise, level_angle,
+					do_auto_stabilise, level_angle, photo_mode == PhotoMode.Panorama,
 					is_front_facing,
 					mirror,
 					current_date,
 					iso,
 					exposure_time,
 					zoom_factor,
-					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
+					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
 					sample_factor);
 			}
-			imageSaver.addImageAverage(images.get(0));
+
+			float [] gyro_rotation_matrix = null;
+			if( photo_mode == PhotoMode.Panorama ) {
+				gyro_rotation_matrix = new float[9];
+				this.gyroSensor.getRotationMatrix(gyro_rotation_matrix);
+			}
+
+			imageSaver.addImageAverage(images.get(0), gyro_rotation_matrix);
 			success = true;
 		}
 		else {
@@ -2449,7 +2546,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 					iso,
 					exposure_time,
 					zoom_factor,
-					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_units_distance,
+					preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
 					store_location, location, store_geo_direction, geo_direction,
 					custom_tag_artist, custom_tag_copyright,
 					sample_factor);

@@ -131,6 +131,8 @@ public class PreferenceKeys {
 
 	public static final String StampGPSFormatPreferenceKey = "preference_stamp_gpsformat";
 
+	public static final String StampGeoAddressPreferenceKey = "preference_stamp_geo_address";
+
 	public static final String UnitsDistancePreferenceKey = "preference_units_distance";
 
 	public static final String TextStampPreferenceKey = "preference_textstamp";
@@ -144,6 +146,14 @@ public class PreferenceKeys {
 	public static final String VideoSubtitlePref = "preference_video_subtitle";
 
 	public static final String FrontCameraMirrorKey = "preference_front_camera_mirror";
+
+	public static final String EnableRemote = "preference_enable_remote";
+
+	public static final String RemoteName = "preference_remote_device_name";
+
+	public static final String RemoteType = "preference_remote_type";
+
+	public static final String WaterType = "preference_water_type";
 
 	//public static final String BackgroundPhotoSavingPreferenceKey = "preference_background_photo_saving";
 
@@ -164,6 +174,8 @@ public class PreferenceKeys {
 	public static final String ThumbnailAnimationPreferenceKey = "preference_thumbnail_animation";
 
 	public static final String TakePhotoBorderPreferenceKey = "preference_take_photo_border";
+
+	public static final String DimWhenDisconnectedPreferenceKey = "preference_remote_disconnect_screen_dim";
 
     public static String getShowWhenLockedPreferenceKey() {
     	return "preference_show_when_locked";
@@ -218,6 +230,8 @@ public class PreferenceKeys {
 	public static final String ShowStampPreferenceKey = "preference_show_stamp";
 
 	public static final String ShowTextStampPreferenceKey = "preference_show_textstamp";
+
+	public static final String ShowStoreLocationPreferenceKey = "preference_show_store_location";
 
 	public static final String ShowWhiteBalanceLockPreferenceKey = "preference_show_white_balance_lock";
 

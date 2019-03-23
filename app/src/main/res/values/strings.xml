@@ -212,7 +212,7 @@
     <string name="preference_video_restart">Restart video after max duration</string>
     <string name="preference_video_restart_summary">If the video has stopped after hitting the maximum duration (if set), this option will make the video restart, up to the specified number of times\n%s</string>
     <string name="preference_video_max_filesize">Maximum file size of video</string>
-    <string name="preference_video_max_filesize_summary">The video recording will stop and/or restart (see option below) when the (approximate) maximum file size is reached. Note that almost all Android devices have a maximum file size for videos (typically around 2GB or 4GB), but this option allows setting a specific value.\n%s</string>
+    <string name="preference_video_max_filesize_summary">The video recording will stop and/or restart (see option below) when the (approximate) maximum file size is reached. Note that many Android devices have a maximum file size for videos (typically around 2GB or 4GB), but this option allows setting a specific value. Note that this option can\'t be used to increase a device\'s built-in maximum.\n%s</string>
     <string name="preference_video_restart_max_filesize">Restart on maximum file size</string>
     <string name="preference_video_restart_max_filesize_summary">Whether to automatically restart when the maximum file size is reached (whether the device default max file size, or user specified)</string>
     <string name="preference_record_audio">Record audio</string>
@@ -778,6 +778,37 @@
     <string name="exposure_unlock">Unlock exposure</string>
 
     <string name="preference_nr_mode_low_light_message">Low light mode: please hold the camera steady</string>
+
+    <string name="photo_mode_panorama">Pano</string> <!-- keep short, as this shows in the popup menu; probably shouldn't be translated? -->
+    <string name="photo_mode_panorama_full">Panorama</string>
+
+    <string name="preference_screen_remote_control">Bluetooth LE remote control...</string>
+    <string name="preference_enable_remote">Enable Bluetooth LE remote control</string>
+    <string name="preference_enable_remote_summary">Enable Bluetooth LE (BLE) remote control devices</string>
+    <string name="preference_remote_type">Remote device type</string>
+
+    <string name="ble_not_supported">BLE not supported</string>
+    <string name="scan_ble">BLE Device Scan</string>
+    <string name="bluetooth_not_supported">Bluetooth not supported.</string>
+    <string name="unknown_device">Unknown device</string>
+    <string name="preference_remote_disconnect_screen_dim">Dim screen if remote disconnects</string>
+    <string name="preference_remote_disconnect_screen_dim_summary">Hint: set default brightness to minimum level before starting Open Camera.</string>
+    <string name="preference_water_type">Use Saltwater for depth calculations</string>
+    <string name="preference_water_type_summary">For underwater housings, improves accuracy if correct water type is selected.</string>
+    <string name="remote_connected">Remote connected</string>
+
+    <string name="preference_remote_type_kraken">Kraken Smart Housing</string>
+
+    <string name="preference_stamp_geo_address">Use addresses</string>
+    <string name="preference_stamp_geo_address_summary">If possible, use an address when stamping GPS locations. This option requires an Internet connection.\n%s</string>
+    <string name="preference_stamp_geo_address_both">Display address if possible, in addition to GPS coords</string>
+    <string name="preference_stamp_geo_address_prefer">Prefer address to GPS coords</string>
+    <string name="preference_stamp_geo_address_no">Don\'t display address</string>
+
+    <string name="preference_show_store_location">Show store location data icon</string>
+    <string name="preference_show_store_location_summary">Whether to show an on-screen icon for enabling or disabling location data (geotagging)</string>
+    <string name="preference_location_enable">Store location data</string>
+    <string name="preference_location_disable">Stop storing location data</string>
 
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text">

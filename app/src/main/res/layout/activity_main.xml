@@ -209,6 +209,7 @@
         android:visibility="gone"
         />
 
+
     <ImageButton
         android:id="@+id/white_balance_lock"
         android:layout_width="@dimen/onscreen_button_size"
@@ -221,6 +222,21 @@
         android:backgroundTint="@color/icons_background_tint"
         android:backgroundTintMode="src_in"
         android:onClick="clickedWhiteBalanceLock"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/store_location"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/preference_location_enable"
+        android:src="@drawable/ic_gps_fixed_white_48dp"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedStoreLocation"
         android:visibility="gone"
         />
 
@@ -324,6 +340,20 @@
         android:backgroundTint="@color/icons_background_tint"
         android:backgroundTintMode="src_in"
         android:onClick="clickedAudioControl"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/kraken_icon"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/remote_connected"
+        android:src="@drawable/ic_kraken_icon"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
         android:visibility="gone"
         />
 

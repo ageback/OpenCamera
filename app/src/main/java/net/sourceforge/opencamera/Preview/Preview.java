@@ -75,9 +75,11 @@ import android.view.SurfaceHolder;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.WindowManager;
 import android.view.View.MeasureSpec;
 import android.view.accessibility.AccessibilityManager;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 /** This class was originally named due to encapsulating the camera preview,
@@ -253,7 +255,6 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 	private final ToastBoxer focus_toast = new ToastBoxer();
 	private final ToastBoxer take_photo_toast = new ToastBoxer();
 	private final ToastBoxer pause_video_toast = new ToastBoxer();
-	private final ToastBoxer seekbar_toast = new ToastBoxer();
 
 	private int ui_rotation;
 
@@ -3764,7 +3765,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					int id = R.string.focus_distance;
 					if( this.supports_focus_bracketing && applicationInterface.isFocusBracketingPref() )
 						id = is_target_distance ? R.string.focus_bracketing_target_distance : R.string.focus_bracketing_source_distance;
-		    		showToast(seekbar_toast, getResources().getString(id) + " " + focus_distance_s);
+		    		showToast(getResources().getString(id) + " " + focus_distance_s, true);
 				}
 			}
 		}
@@ -3794,7 +3795,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			if( camera_controller.setExposureCompensation(new_exposure) ) {
 				// now save
 				applicationInterface.setExposureCompensationPref(new_exposure);
-	    		showToast(seekbar_toast, getExposureCompensationString(new_exposure), 96);
+	    		showToast(getExposureCompensationString(new_exposure), 96, true);
 			}
 		}
 	}
@@ -3809,7 +3810,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			if( camera_controller.setWhiteBalanceTemperature(new_temperature) ) {
 				// now save
 				applicationInterface.setWhiteBalanceTemperaturePref(new_temperature);
-				showToast(seekbar_toast, getResources().getString(R.string.white_balance) + " " + new_temperature, 96);
+				showToast(getResources().getString(R.string.white_balance) + " " + new_temperature, 96, true);
 			}
 		}
 	}
@@ -3845,7 +3846,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			if( camera_controller.setISO(new_iso) ) {
 				// now save
 				applicationInterface.setISOPref("" + new_iso);
-	    		showToast(seekbar_toast, getISOString(new_iso), 96);
+	    		showToast(getISOString(new_iso), 96, true);
 			}
 		}
 	}
@@ -3861,7 +3862,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			if( camera_controller.setExposureTime(new_exposure_time) ) {
 				// now save
 				applicationInterface.setExposureTimePref(new_exposure_time);
-	    		showToast(seekbar_toast, getExposureTimeString(new_exposure_time), 96);
+	    		showToast(getExposureTimeString(new_exposure_time), 96, true);
 			}
 		}
 	}
@@ -5453,7 +5454,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		}
 	}
 
-	/** Take photo. The caller should aready have set the phase to PHASE_TAKING_PHOTO.
+	/** Take photo. The caller should already have set the phase to PHASE_TAKING_PHOTO.
 	 */
 	private void takePhoto(boolean skip_autofocus, final boolean continuous_fast_burst) {
 		if( MyDebug.LOG )
@@ -6548,14 +6549,82 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 
 	/** Returns the horizontal angle of view in degrees (when unzoomed).
 	 */
-	public float getViewAngleX() {
+	/*public float getViewAngleX() {
 		return this.view_angle_x;
+	}*/
+
+	/** Returns the vertical angle of view in degrees (when unzoomed).
+	 */
+	/*public float getViewAngleY() {
+		return this.view_angle_y;
+	}*/
+
+	/** Returns the horizontal angle of view in degrees (when unzoomed).
+	 */
+	public float getViewAngleX(boolean for_preview) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getViewAngleX: " + for_preview);
+		CameraController.Size size = for_preview ? this.getCurrentPreviewSize() : this.getCurrentPictureSize();
+		if( size == null ) {
+			Log.e(TAG, "can't find view angle x size");
+			return this.view_angle_x;
+		}
+		float view_aspect_ratio = view_angle_x/view_angle_y;
+		float actual_aspect_ratio = ((float)size.width)/(float)size.height;
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "view_angle_x: " + view_angle_x);
+			Log.d(TAG, "view_angle_y: " + view_angle_y);
+			Log.d(TAG, "view_aspect_ratio: " + view_aspect_ratio);
+			Log.d(TAG, "actual_aspect_ratio: " + actual_aspect_ratio);
+		}
+		if( Math.abs(actual_aspect_ratio - view_aspect_ratio) < 1.0e-5f ) {
+			return this.view_angle_x;
+		}
+		else if( actual_aspect_ratio > view_aspect_ratio ) {
+			return this.view_angle_x;
+		}
+		else {
+			float aspect_ratio_scale = actual_aspect_ratio/view_aspect_ratio;
+			//float actual_view_angle_x = view_angle_x*aspect_ratio_scale;
+			float actual_view_angle_x = (float)Math.toDegrees(2.0 * Math.atan(aspect_ratio_scale * Math.tan(Math.toRadians(view_angle_x) / 2.0)));
+			if( MyDebug.LOG )
+				Log.d(TAG, "actual_view_angle_x: " + actual_view_angle_x);
+			return actual_view_angle_x;
+		}
 	}
 
 	/** Returns the vertical angle of view in degrees (when unzoomed).
 	 */
-	public float getViewAngleY() {
-		return this.view_angle_y;
+	public float getViewAngleY(boolean for_preview) {
+		if( MyDebug.LOG )
+			Log.d(TAG, "getViewAngleY: " + for_preview);
+		CameraController.Size size = for_preview ? this.getCurrentPreviewSize() : this.getCurrentPictureSize();
+		if( size == null ) {
+			Log.e(TAG, "can't find view angle y size");
+			return this.view_angle_y;
+		}
+		float view_aspect_ratio = view_angle_x/view_angle_y;
+		float actual_aspect_ratio = ((float)size.width)/(float)size.height;
+		if( MyDebug.LOG ) {
+			Log.d(TAG, "view_angle_x: " + view_angle_x);
+			Log.d(TAG, "view_angle_y: " + view_angle_y);
+			Log.d(TAG, "view_aspect_ratio: " + view_aspect_ratio);
+			Log.d(TAG, "actual_aspect_ratio: " + actual_aspect_ratio);
+		}
+		if( Math.abs(actual_aspect_ratio - view_aspect_ratio) < 1.0e-5f ) {
+			return this.view_angle_y;
+		}
+		else if( actual_aspect_ratio > view_aspect_ratio ) {
+			float aspect_ratio_scale = view_aspect_ratio/actual_aspect_ratio;
+			//float actual_view_angle_y = view_angle_y*aspect_ratio_scale;
+			float actual_view_angle_y = (float)Math.toDegrees(2.0 * Math.atan(aspect_ratio_scale * Math.tan(Math.toRadians(view_angle_y) / 2.0)));
+			if( MyDebug.LOG )
+				Log.d(TAG, "actual_view_angle_y: " + actual_view_angle_y);
+			return actual_view_angle_y;
+		}
+		else {
+			return this.view_angle_y;
+		}
 	}
 
 	public List<CameraController.Size> getSupportedPreviewSizes() {
@@ -6804,96 +6873,131 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 			Log.d(TAG, "onSaveInstanceState");
 	}
 
-    public void showToast(final ToastBoxer clear_toast, final int message_id) {
-    	showToast(clear_toast, getResources().getString(message_id));
-    }
+	private class RotatedTextView extends View {
+		private String [] lines;
+		private int offset_y;
+		private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+		private final Rect bounds = new Rect();
+		private final Rect sub_bounds = new Rect();
+		private final RectF rect = new RectF();
 
-    public void showToast(final ToastBoxer clear_toast, final String message) {
-    	showToast(clear_toast, message, 32);
-    }
+		RotatedTextView(String text, int offset_y, Context context) {
+			super(context);
 
-    private void showToast(final ToastBoxer clear_toast, final String message, final int offset_y_dp) {
-		if( !applicationInterface.getShowToastsPref() ) {
-			return;
+			this.lines = text.split("\n");
+			this.offset_y = offset_y;
 		}
-    	
-		class RotatedTextView extends View {
-			private String [] lines;
-			private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-			private final Rect bounds = new Rect();
-			private final Rect sub_bounds = new Rect();
-			private final RectF rect = new RectF();
 
-			RotatedTextView(String text, Context context) {
-				super(context);
+		void setText(String text) {
+			this.lines = text.split("\n");
+		}
 
-				this.lines = text.split("\n");
-			}
-			
-			void setText(String text) {
-				this.lines = text.split("\n");
-			}
+		void setOffsetY(int offset_y) {
+			this.offset_y = offset_y;
+		}
 
-			@Override 
-			protected void onDraw(Canvas canvas) {
-				final float scale = Preview.this.getResources().getDisplayMetrics().density;
-				paint.setTextSize(14 * scale + 0.5f); // convert dps to pixels
-				paint.setShadowLayer(1, 0, 1, Color.BLACK);
-				//paint.getTextBounds(text, 0, text.length(), bounds);
-				boolean first_line = true;
-				for(String line : lines) {
-					paint.getTextBounds(line, 0, line.length(), sub_bounds);
+		@Override
+		protected void onDraw(Canvas canvas) {
+			final float scale = Preview.this.getResources().getDisplayMetrics().density;
+			paint.setTextSize(14 * scale + 0.5f); // convert dps to pixels
+			paint.setShadowLayer(1, 0, 1, Color.BLACK);
+			//paint.getTextBounds(text, 0, text.length(), bounds);
+			boolean first_line = true;
+			for(String line : lines) {
+				paint.getTextBounds(line, 0, line.length(), sub_bounds);
 					/*if( MyDebug.LOG ) {
 						Log.d(TAG, "line: " + line + " sub_bounds: " + sub_bounds);
 					}*/
-					if( first_line ) {
-						bounds.set(sub_bounds);
-						first_line = false;
-					}
-					else {
-						bounds.top = Math.min(sub_bounds.top, bounds.top);
-						bounds.bottom = Math.max(sub_bounds.bottom, bounds.bottom);
-						bounds.left = Math.min(sub_bounds.left, bounds.left);
-						bounds.right = Math.max(sub_bounds.right, bounds.right);
-					}
+				if( first_line ) {
+					bounds.set(sub_bounds);
+					first_line = false;
 				}
-				// above we've worked out the maximum bounds of each line - this is useful for left/right, but for the top/bottom
-				// we would rather use a consistent height no matter what the text is (otherwise we have the problem of varying
-				// gap between lines, depending on what the characters are).
-				final String reference_text = "Ap";
-				paint.getTextBounds(reference_text, 0, reference_text.length(), sub_bounds);
-				bounds.top = sub_bounds.top;
-				bounds.bottom = sub_bounds.bottom;
+				else {
+					bounds.top = Math.min(sub_bounds.top, bounds.top);
+					bounds.bottom = Math.max(sub_bounds.bottom, bounds.bottom);
+					bounds.left = Math.min(sub_bounds.left, bounds.left);
+					bounds.right = Math.max(sub_bounds.right, bounds.right);
+				}
+			}
+			// above we've worked out the maximum bounds of each line - this is useful for left/right, but for the top/bottom
+			// we would rather use a consistent height no matter what the text is (otherwise we have the problem of varying
+			// gap between lines, depending on what the characters are).
+			final String reference_text = "Ap";
+			paint.getTextBounds(reference_text, 0, reference_text.length(), sub_bounds);
+			bounds.top = sub_bounds.top;
+			bounds.bottom = sub_bounds.bottom;
 				/*if( MyDebug.LOG ) {
 					Log.d(TAG, "bounds: " + bounds);
 				}*/
-				int height = bounds.bottom - bounds.top; // height of each line
-				bounds.bottom += ((lines.length-1) * height)/2;
-				bounds.top -= ((lines.length-1) * height)/2;
-				final int padding = (int) (14 * scale + 0.5f); // padding for the shaded rectangle; convert dps to pixels
-				final int offset_y = (int) (offset_y_dp * scale + 0.5f); // convert dps to pixels
-				canvas.save();
-				canvas.rotate(ui_rotation, canvas.getWidth()/2.0f, canvas.getHeight()/2.0f);
+			int height = bounds.bottom - bounds.top; // height of each line
+			bounds.bottom += ((lines.length-1) * height)/2;
+			bounds.top -= ((lines.length-1) * height)/2;
+			final int padding = (int) (14 * scale + 0.5f); // padding for the shaded rectangle; convert dps to pixels
+			canvas.save();
+			canvas.rotate(ui_rotation, canvas.getWidth()/2.0f, canvas.getHeight()/2.0f);
 
-				rect.left = canvas.getWidth()/2 - bounds.width()/2 + bounds.left - padding;
-				rect.top = canvas.getHeight()/2 + bounds.top - padding + offset_y;
-				rect.right = canvas.getWidth()/2 - bounds.width()/2 + bounds.right + padding;
-				rect.bottom = canvas.getHeight()/2 + bounds.bottom + padding + offset_y;
+			rect.left = canvas.getWidth()/2 - bounds.width()/2 + bounds.left - padding;
+			rect.top = canvas.getHeight()/2 + bounds.top - padding + offset_y;
+			rect.right = canvas.getWidth()/2 - bounds.width()/2 + bounds.right + padding;
+			rect.bottom = canvas.getHeight()/2 + bounds.bottom + padding + offset_y;
 
-				paint.setStyle(Paint.Style.FILL);
-				paint.setColor(Color.rgb(50, 50, 50));
-				//canvas.drawRect(rect, paint);
-				final float radius = (24 * scale + 0.5f); // convert dps to pixels
-				canvas.drawRoundRect(rect, radius, radius, paint);
+			paint.setStyle(Paint.Style.FILL);
+			paint.setColor(Color.rgb(50, 50, 50));
+			//canvas.drawRect(rect, paint);
+			final float radius = (24 * scale + 0.5f); // convert dps to pixels
+			canvas.drawRoundRect(rect, radius, radius, paint);
 
-				paint.setColor(Color.WHITE);
-				int ypos = canvas.getHeight()/2 + offset_y - ((lines.length-1) * height)/2;
-				for(String line : lines) {
-					canvas.drawText(line, canvas.getWidth()/2 - bounds.width()/2, ypos, paint);
-					ypos += height;
-				}
-				canvas.restore();
-			} 
+			paint.setColor(Color.WHITE);
+			int ypos = canvas.getHeight()/2 + offset_y - ((lines.length-1) * height)/2;
+			for(String line : lines) {
+				canvas.drawText(line, canvas.getWidth()/2 - bounds.width()/2, ypos, paint);
+				ypos += height;
+			}
+			canvas.restore();
+		}
+	}
+
+	private final Handler fake_toast_handler = new Handler();
+	private RotatedTextView active_fake_toast = null;
+
+	public void showToast(final ToastBoxer clear_toast, final int message_id) {
+		showToast(clear_toast, getResources().getString(message_id), false);
+	}
+
+	public void showToast(final ToastBoxer clear_toast, final String message) {
+		showToast(clear_toast, message, false);
+	}
+
+	public void showToast(final String message, final boolean use_fake_toast) {
+		showToast(null, message, use_fake_toast);
+	}
+
+	public void showToast(final ToastBoxer clear_toast, final String message, final boolean use_fake_toast) {
+		showToast(clear_toast, message, 32, use_fake_toast);
+	}
+
+	private void showToast(final String message, final int offset_y_dp, final boolean use_fake_toast) {
+		showToast(null, message, offset_y_dp, use_fake_toast);
+	}
+
+	/** Displays a "toast", but has several advantages over calling Android's Toast API directly.
+	 *  We use a custom view, to rotate the toast to account for the device orientation (since
+	 *  Open Camera always runs in landscape).
+	 * @param clear_toast    Only relevant if use_fake_toast is false. If non-null, calls to this method
+	 *                       with the same clear_toast value will overwrite the previous ones rather than
+	 *                       being queued. Note that toasts no longer seem to be queued anyway on
+	 *                       Android 9+.
+	 * @param message        The message to display.
+	 * @param offset_y_dp    The y-offset from the centre of the screen.
+	 * @param use_fake_toast If true, don't use Android's Toast system at all. This is due to problems on
+	 *                       Android 9+ where rapidly displaying toasts (e.g., to display values from a
+	 *                       seekbar being modified) cause problems where toast sometimes disappear (this
+	 *                       happens whether using clear_toast or not). Note that using use_fake_toast
+	 *                       means that the toasts don't have the fade out effect.
+	 */
+	private void showToast(final ToastBoxer clear_toast, final String message, final int offset_y_dp, final boolean use_fake_toast) {
+		if( !applicationInterface.getShowToastsPref() ) {
+			return;
 		}
 
 		if( MyDebug.LOG )
@@ -6901,8 +7005,43 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 		final Activity activity = (Activity)this.getContext();
 		// We get a crash on emulator at least if Toast constructor isn't run on main thread (e.g., the toast for taking a photo when on timer).
 		// Also see http://stackoverflow.com/questions/13267239/toast-from-a-non-ui-thread
+		// Also for the use_fake_toast code, running the creation code, and the postDelayed code, on the UI thread avoids threading issues
 		activity.runOnUiThread(new Runnable() {
 			public void run() {
+				final float scale = Preview.this.getResources().getDisplayMetrics().density;
+				final int offset_y = (int) (offset_y_dp * scale + 0.5f); // convert dps to pixels
+
+				if( use_fake_toast ) {
+					if( active_fake_toast != null ) {
+						// re-use existing fake toast
+						active_fake_toast.setText(message);
+						active_fake_toast.setOffsetY(offset_y);
+						active_fake_toast.invalidate(); // make sure the view is redrawn
+						fake_toast_handler.removeCallbacksAndMessages(null);
+					}
+					else {
+						active_fake_toast = new RotatedTextView(message, offset_y, activity);
+						Activity activity = (Activity) Preview.this.getContext();
+						final FrameLayout rootLayout = activity.findViewById(android.R.id.content);
+						rootLayout.addView(active_fake_toast);
+					}
+
+					fake_toast_handler.postDelayed(new Runnable() {
+						@Override
+						public void run() {
+							if( MyDebug.LOG )
+								Log.d(TAG, "remove fake toast: " + active_fake_toast);
+							ViewParent parent = active_fake_toast.getParent();
+							if( parent != null ) {
+								((ViewGroup)parent).removeView(active_fake_toast);
+							}
+							active_fake_toast = null;
+						}
+					}, 2000); // supposedly matches Toast.LENGTH_SHORT
+
+					return;
+				}
+
 				/*if( clear_toast != null && clear_toast.toast != null )
 					clear_toast.toast.cancel();
 
@@ -6929,6 +7068,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 					// for performance, important to reuse the same view, instead of creating a new one (otherwise we get jerky preview update e.g. for changing manual focus slider)
 					RotatedTextView view = (RotatedTextView)toast.getView();
 					view.setText(message);
+					view.setOffsetY(offset_y);
 					view.invalidate(); // make sure the toast is redrawn
 					toast.setView(view);
 				}
@@ -6943,7 +7083,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
 						Log.d(TAG, "created new toast: " + toast);
 					if( clear_toast != null )
 						clear_toast.toast = toast;
-					View text = new RotatedTextView(message, activity);
+					View text = new RotatedTextView(message, offset_y, activity);
 					toast.setView(text);
 					last_toast_time_ms = time_now;
 				}
