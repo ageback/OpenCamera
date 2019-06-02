@@ -100,7 +100,7 @@
 </script>
 <!-- end adsense code -->
 
-<p><a name="quickstart"></a><b>Quickstart</b></p>
+<p><a name="quickstart"><b>Quickstart</b></a></p>
 
 <p>Simply point, and press the blue camera icon <img src="take_photo.png" alt="Take Photo icon" width="32" height="32"> to take a photo.
 If your device supports focus areas, you can touch the part of the screen you want to focus. Touching an area will also
@@ -116,7 +116,7 @@ icon will also show a thumbnail for the most recent image/video.</p>
 <p>The screen display is kept on when Open Camera is running as the foreground app (if
 you want to switch off the display, do so on your device manually).</p>
 
-<p><a name="user_interface"></a><b>On-Screen User Interface</b></p>
+<p><a name="user_interface"><b>On-Screen User Interface</b></a></p>
 
 <p><img src="take_photo.png" alt="Take Photo icon" width="32" height="32"><b>Take photo</b> - Click to take
 a photo. In some cases, you can also hold (long press) for a continuous burst:</p>
@@ -239,7 +239,7 @@ Settings/Timer.</li>
 <li><b>Repeat</b> - Take a repeated set of photos when the take photo button is pressed. The time
 interval between each repeated photo can be set under Settings/"Repeat mode interval".</li>
 <li><b>Grid</b> - Whether to display one of a choice of grids on the camera preview. Also available
-under Settings/On screen GUI/"Show a grid".</li>
+under Settings/Camera preview/"Show a grid".</li>
 <li><b>White balance</b> - Choose a method to control how the white balance is set. See
 <a href="http://digital-photography-school.com/introduction-to-white-balance">here</a> for an
 explanation of white balance. (Only available if the camera supports different white balance
@@ -284,7 +284,7 @@ it's just that location data won't be stored in the photo). A dot shows to the t
 indicate the accuracy (green for accurate, yellow for less accurate). If the location isn't available,
 a dash will be shown through the gps icon.</p>
 
-<p><a name="auto_stabilise"></a><b>Auto-level feature</b></p>
+<p><a name="auto_stabilise"><b>Auto-level feature</b></a></p>
 
 <p>All Android cameras will rotate the photo depending on the orientation of the camera, but only to the nearest 90 degrees - so the
 photos look right whether you hold the device in "portrait" or "landscape" mode. But Open Camera has the option to rotate the
@@ -308,7 +308,7 @@ feature.</p>
 
 <p>Note that auto-stabilising will not occur if the device is pointing up or down.</p>
 
-<p><a name="noise_reduction"></a><b>Noise Reduction</b></p>
+<p><a name="noise_reduction"><b>Noise Reduction</b></a></p>
 
 <p>In Noise Reduction photo mode, Open Camera takes a burst of photos which are then automatically merged, to improve photo quality.
 This is particularly useful in low light scenes to reduce noise. The image below shows an example with one of the input burst photos
@@ -343,7 +343,7 @@ camera as steady as possible.</p>
 
 <p>See my <a href="https://sourceforge.net/p/opencamera/blog/2018/09/noise-reduction-photo-mode/">blog post</a> for more details.</p>
 
-<p><a name="dro"></a><b>DRO</b></p>
+<p><a name="dro"><b>DRO</b></a></p>
 
 <p>Dynamic Range Optimisation (DRO) is a technique that optimises the dynamic range available in the image. In particular, dark
 regions will have their brightness boosted to bring out the detail. This mode is useful for capturing scenes with a wide range
@@ -352,13 +352,13 @@ see <a href="#dro_vs_hdr">DRO vs HDR</a>.</p>
 
 <p>Note that if Camera2 API is used, DRO will give improved quality in bright scenes.</p>
 
-<p><a name="hdr"></a><b>HDR</b></p>
+<p><a name="hdr"><b>HDR</b></a></p>
 
 <p>High Dynamic Range Imaging (HDR) is a technique where the camera takes multiple shots at different exposures, and combines them
 into a single image. A typical problem in photography is that a scene may contain a brightness range that is wider than what can be
 captured in a single shot. Varying the exposure (whether by touching on the screen, or exposure compentation or manual exposure) might
 make darker regions brighter, but leave other areas over-exposured. Or reducing the exposure to prevent over-exposure may result in
-the rest of the scene being too dark. HDR uses an algorithm to combine the best parts of each image, and adjusts the colours so that
+the rest of the scene being too dark. HDR uses an algorithm to combine the best parts of each image, and adjusts the colors so that
 the full range of brightness values are captured in the scene:</p>
 
 <p><a href="hdr_image_test8.jpg">
@@ -376,7 +376,7 @@ the grass. Meanwhile the tree branches in the foreground is a bit too dark.</p>
 to reduce the problem, but this isn't perfect.</li>
 <li>Although Open Camera applies auto-alignment to the images, it's still best to try to hold your device steady while the photo is
 being taken.</li>
-<li>HDR can sometimes result in less accurate colour reproduction (due to trying to estimate the colours from multiple exposures).</li>
+<li>HDR can sometimes result in less accurate color reproduction (due to trying to estimate the colors from multiple exposures).</li>
 <li>Some Android camera apps use "HDR" to mean "apply a whacky-looking filter". Whilst HDR filters can be used to apply a rather
 unreal or vivid image, for now Open Camera's HDR is more geared towards capturing the range of exposures. Also note that many camera
 apps that advertise "HDR" don't even make use of multiple images - this is more a case of filtering, than HDR.</li>
@@ -386,7 +386,7 @@ is generally little benefit to using Open Camera's HDR mode on these devices. Se
 <li>See <a href="http://www.androidauthority.com/how-to-use-hdr-android-173210/">this guide</a> for more information on HDR.</li>
 </ul>
 
-<p><a name="dro_vs_hdr"></a><b>DRO vs HDR</b></p>
+<p><a name="dro_vs_hdr"><b>DRO vs HDR</b></a></p>
 
 <p>Both DRO and HDR share in common that they are ways to handle wide ranges of brightness. They each have their pros and cons:</p>
 <ul>
@@ -396,7 +396,7 @@ is generally little benefit to using Open Camera's HDR mode on these devices. Se
 three separate images, rather than reprocessing a single image.</li>
 </ul>
 
-<p><a name="nr_vs_hdr"></a><b>NR vs HDR</b></p>
+<p><a name="nr_vs_hdr"><b>NR vs HDR</b></a></p>
 
 <p>In scenes with high dynamic range, HDR should do better at capturing the high dynamic range (although NR should still be better
 than Standard photo mode). Though NR still has the advantage that it is less prone to ghosting and misalignment. NR is also better
@@ -413,7 +413,7 @@ in the sky in the Noise Reduction result, but the HDR mode does even better.</p>
 <p>In summary: NR is better if you just want a "works best in most cases" option. HDR may be a better choice specifically in
 scenes with high dynamic range, that also don't have movement in the scene.</p>
 
-<p><a name="settings"></a><b>Settings</b></p>
+<p><a name="settings"><b>Settings</b></a></p>
 
 <!--<p><b>Camera Effects:</b></p>-->
 
@@ -440,7 +440,7 @@ if the device has enough memory.)</p>-->
 
 <p><b>Camera Controls:</b></p>
 
-<p><a name="face_detection"></a><b>Face detection</b> - If this is enabled, then the camera will automatically try to detect faces, and use
+<p><a name="face_detection"><b>Face detection</b></a> - If this is enabled, then the camera will automatically try to detect faces, and use
 them for the focus, metering (exposure) and white balance. Faces will be drawn as yellow squares when detected.</p>
 <ul>
 	<li>If this option is enabled, then you will not be able to touch to manually select the focus area, and
@@ -462,18 +462,6 @@ is selected, note that this does not include the time taken to auto-focus and ta
 delay" still means there will be some time between each photo. If you want to take a burst of photos, use the
 Fast Burst photo mode, or long press the "take photo" button in Standard or Fast Burst photo modes.
 (Burst mode only supported on some devices; requires Camera2 API to be enabled).</p>
-
-<p><b>Ghost image</b> - You can overlay a previous photo. This is useful for aligning photos (e.g., for stop
-	motion animation).</p>
-<ul>
-	<li><b>Last photo taken</b> - When you take a photo, a ghost of that photo will be displayed. The ghost is
-		reset either by leaving and returning to Open Camera, switching between photo/video modes, or turning
-		this option off.</li>
-	<li><b>Selected image</b> - Select a specific image on your device to be displayed as a ghost (requires
-	Android 5). Note that for this option, the ghost image will not be displayed if Open Camera is running
-	when your device is locked. If the image doesn't show at all, it may be that Open Camera was unable to
-	load the selected image.</li>
-</ul>
 
 <p><b>More camera controls...</b> - Select to access the following controls:</p>
 
@@ -520,13 +508,17 @@ see the "Max duration of video" option.</p>
 <p><b>Audio control sensitivity</b> - This controls how sensitive Open Camera is to noises, if "Audio control" is set to "Loud noise".
 If you find it's taking photos too often unintentionally, or isn't responding to your sounds, try adjusting this option.</p>
 
+<p><b>Bluetooth LE remote control</b> - Open Camera supports connecting to the Kraken Smart Housing via the options in
+these settings. Once connected via Bluetooth, it should be possible to control Open Camera from the device. The on-screen
+display of Open Camera will also display information from the Kraken (temperature and depth).</p>
+
 <p><b>Lock photo/video orientation</b> - Normally the orientation of the photo/video will be rotated by some multiple of
 90 degree such that the orientation looks right - e.g. if your device is held in portrait, the resultant image/video will
 be in portrait. This option allows fixing the camera to either be in portrait or landscape. Note that if
 <a href="#auto_stabilise">auto-level</a> is also enabled, it will have the effect of aligning photos to the nearest
 90 degrees.</p>
 
-<p><a name="save_location"></a><b>Save location</b> - Select the folder to store the photos in. Click on a folder
+<p><a name="save_location"><b>Save location</b></a> - Select the folder to store the photos in. Click on a folder
 (or "Parent Folder") to navigate through the filesystem. Select "New Folder" to create a new folder in the currently
 displayed folder. Select "Use Folder" to choose the currently displayed folder. Note that on Android, there are some
 folders that cannot be written to - Open Camera will display a message if you try to use one of these folders. Once
@@ -573,23 +565,121 @@ rely on your device's ability to detect which orientation it's being held (the a
 be calibated correctly. If so, you can use this option to calibrate the acceleromer (or reset the calibration back to the
 default behaviour).</p>
 
-<p><b>On screen GUI...</b> - Select to access the following controls:</p>
+<p><b>Camera preview...</b> - Select to access the following controls:</p>
 
 <p><b>Preview size</b> - By default, Open Camera matches the aspect ratio of the preview (the image that is
-displayed on the phone/tablet's display) with that of the photo resolution ("Match photo size (WYSIWYG)" mode). The
-advantage is that what you see in the preview will match what will be in the resultant photo
-("What-You-See-Is-What-You-Get") - though this may mean you will have "black bars" on the display in order to do
-this. If instead you select "Maximise preview size", then the camera preview will be as large as possible, trying to
-fill the available space. However if the resolution of the photo is a different aspect ratio to that of your device,
-this will result in the preview being cropped. In video mode, the preview is always in WYSIWYG mode.</p>
+	displayed on the phone/tablet's display) with that of the photo resolution ("Match photo size (WYSIWYG)" mode). The
+	advantage is that what you see in the preview will match what will be in the resultant photo
+	("What-You-See-Is-What-You-Get") - though this may mean you will have "black bars" on the display in order to do
+	this. If instead you select "Maximise preview size", then the camera preview will be as large as possible, trying to
+	fill the available space. However if the resolution of the photo is a different aspect ratio to that of your device,
+	this will result in the preview being cropped. In video mode, the preview is always in WYSIWYG mode.</p>
 <ul>
-<li>Note that Android 4.4.3 <a href="https://code.google.com/p/android/issues/detail?id=70830">introduced a bug</a>
-which means that the aspect ratio will be wrong if you select "Maximise preview size" (i.e., the preview will look
-squished). To avoid this problem, stick with "Match photo size".</li>
-<li>Also note that even in "Match photo size" mode, on some devices and resolutions, it may not be possible to match
-the preview to the resultant photo/video exactly; in such cases, Open Camera will try to match as closely as
-possible.</li>
+	<li>Note that Android 4.4.3 <a href="https://code.google.com/p/android/issues/detail?id=70830">introduced a bug</a>
+		which means that the aspect ratio will be wrong if you select "Maximise preview size" (i.e., the preview will look
+		squished). To avoid this problem, stick with "Match photo size".</li>
+	<li>Also note that even in "Match photo size" mode, on some devices and resolutions, it may not be possible to match
+		the preview to the resultant photo/video exactly; in such cases, Open Camera will try to match as closely as
+		possible.</li>
 </ul>
+
+<p><b>Ghost image</b> - You can overlay a previous photo. This is useful for aligning photos (e.g., for stop
+	motion animation).</p>
+<ul>
+	<li><b>Last photo taken</b> - When you take a photo, a ghost of that photo will be displayed. The ghost is
+		reset either by leaving and returning to Open Camera, switching between photo/video modes, or turning
+		this option off.</li>
+	<li><b>Selected image</b> - Select a specific image on your device to be displayed as a ghost (requires
+		Android 5). Note that for this option, the ghost image will not be displayed if Open Camera is running
+		when your device is locked. If the image doesn't show at all, it may be that Open Camera was unable to
+		load the selected image.</li>
+</ul>
+
+<p><b>Focus assist</b> - If enabled, this will show a zoomed in view on the camera preview when in manual focus mode, and you
+	are changing the manual focus distance. Similarly in focus bracketing mode, the preview will zoom in when changing the focus
+	distances to bracket between. Note not supported when recording video.</p>
+
+<p><b>Show zoom</b> - Whether to display the current zoom level of the camera (when zoomed in).</p>
+
+<p><b>Show angle</b> - Whether to display the orientation angle of the device's camera.</p>
+
+<p><b>Show angle line</b> - Whether to display a horizontal "level" line that visually indicates the orientation of the device.</p>
+
+<p><b>Show pitch lines</b> - Whether to display horizontal pitch lines that visually indicate the pitch of the device.</p>
+
+<p><b>Angle highlight color</b> - This controls the color to be used for the angle display and "level" line when the camera is nearly
+	level; and also for the 0 degree pitch line when the camera is held at nearly zero pitch.</p>
+
+<p><b>Show compass direction</b> - Whether to display the compass direction of the device's camera.</p>
+
+<p><b>Show compass direction lines</b> - Whether to display vertical lines that visually indicate the compass direction of the device.</p>
+
+<p><b>Show battery</b> - Whether to display the current battery level.</p>
+
+<p><b>Show time</b> - Whether to display the current time.</p>
+
+<p><b>Show free memory</b> - Whether to display the remaining storage space of the device.</p>
+
+<p><b>Show ISO</b> - If selected, the current ISO, exposure time and frame rate (FPS) will be displayed (only available if Camera2
+	API is used). The text will be shown in red when the auto-exposure routine is scanning. In flash auto mode, a flash symbol will
+	also indicate when flash will fire. Note that this is not an absolute guarantee - when you take a photo, the camera will make an
+	updated decision on whether to fire the flash, which in some cases may disagree with whether the flash symbol was displayed.</p>
+
+<p><b>Show a histogram</b> - Allows displaying an on-screen histogram (only available if Camera2 API is used). Note that the
+	histogram reflects the currently display on-screen preview, and will not necessarily be accurate for the final resultant photograph,
+	especially if modes such as NR, DRO, HDR are used. Also note that displaying a histogram may use more battery.
+	The follow options are available:</p>
+<ul>
+	<li>RGB Colors - Displays a histogram for each color channel.</li>
+	<li>Luminance - The brightness is computed as a weighted average of the RGB components: 0.299*R + 0.587G + 0.114*B.</li>
+	<li>Value - The brightness is computed as the maximum of the RGB components.</li>
+	<li>Intensity - The brightness is computed as an unweighted average of the RGB components.</li>
+	<li>Lightness - The brightness is computed as an average of the minimum and maximum of the RGB components.</li>
+</ul>
+
+<p><b>Show zebra stripes</b> - Allows displaying on-screen zebra stripes (also known as
+	<a href="https://en.wikipedia.org/wiki/Zebra_patterning">zebra patterning</a>) to show whether the
+	image is over-exposed (only available if Camera2 API is used). Note when using photo modes NR and HDR,
+	a region that is shown as over-exposed on-screen may not necessarily be over-exposed in the resultant image,
+	since these modes are able to better handle a high dynamic range. Also note that enabling zebra stripes
+	may use more battery.</p>
+
+<p><b>Focus peaking</b> - Allows displaying on-screen highlights to indicate edges (contours) that are in-focus
+	(only available if Camera2 API is used). This is particularly useful in conjunction with manual focus mode, to help show
+	which regions of the image are in focus. Note that enabling focus peaking may use more battery.</p>
+
+<p><b>Focus peaking color</b> - This controls the color to be used for the highlights when Focus Peaking is enabled.</p>
+
+<p><b>Show audio level meter</b> - If selected, when recording video an on-screen meter will display the current audio level.</p>
+
+<p><b>Show a grid</b> - Whether to display one of a choice of grids on the camera preview. Grids are useful in photography to help
+	compose your image. Options are:</p>
+<ul>
+	<li>3x3 - helps with applying the <a href="http://en.wikipedia.org/wiki/Rule_of_thirds">rule of thirds</a>.</li>
+	<li>Phi 3x3 - 3x3 grid with ratios 1:0.618:1.</li>
+	<li>4x2</li>
+	<li>Crosshair</li>
+	<li>Golden - displays a <a href="http://en.wikipedia.org/wiki/Golden_spiral">Golden spiral</a> (or technically,
+		a Fibonacci spiral). You can <a href="https://www.apogeephoto.com/how-to-use-the-golden-ratio-to-improve-your-photography/">use
+			this to improve your photography</a>.</li>
+	<li>Golden Triangles</li>
+	<li>Diagonals</li>
+</ul>
+
+<p><b>Show a crop guide</b> - A crop guide is a rectangle displayed on-screen, which has the specified aspect ratio
+	(if different to the photo/video aspect ratio). This is useful if you plan to crop the resultant photos or videos
+	to a particular aspect ratio. For photos, the crop-guide requires "Preview size" to be set to WYSIWYG mode.</p>
+
+<p><b>Show thumbnail animation</b> - Whether to display the moving thumbnail animation when taking a photo.</p>
+
+<p><b>Show border when taking photo</b> - Whether to display a border effect when taking a photo.</p>
+
+<p><b>Rotate preview</b> - this option rotates the on-screen preview by 180 degrees (i.e., upside down). Most users
+	won't ever need this, but this option can be useful if you are using Open Camera with equipment such as zoom lenses
+	which invert the image. Note that this doesn't rotate the resultant photos/videos - you'll still have to rotate those
+	yourself afterwards - but this will correct the preview so that you can still see what you are shooting properly.</p>
+
+<p><b>On screen GUI...</b> - Select to access the following controls:</p>
 
 <p><b>UI placement</b> - Allows you to choose between various layouts for the on-screen user interface icons.</p>
 
@@ -607,12 +697,11 @@ mode probably isn't useful for most people (since you need to exit immersive mod
 to only have the preview showing.</li>
 </ul>
 
-<p><b>Focus assist</b> - If enabled, this will show a zoomed in view on the camera preview when in manual focus mode, and you
-are changing the manual focus distance. Similarly in focus bracketing mode, the preview will zoom in when changing the focus
-distances to bracket between. Note not supported when recording video.</p>
-
 <p><b>Show face detection icon</b> - Whether to display an on-screen icon for enabling or disabling face detection. See
 	<a href="#auto_stabilise">Auto-level feature</a> above for more details.</p>
+
+<p><b>Show flash icon</b> - Whether to display an on-screen icon for cycling through flash modes. If this is enabled, then
+flash modes won't show on the popup menu. Also note that it is not possible to enable the torch with this method.</p>
 
 <p><b>Show auto-level icon</b> - Whether to display an on-screen icon for enabling or disabling auto-level. See
 	<a href="#face_detection">Settings/"Face detection"</a> above for more details.</p>
@@ -628,12 +717,13 @@ distances to bracket between. Note not supported when recording video.</p>
 	data (geotagging). See <a href="#store_location_data">Settings/Location settings/"Store location data (geotagging)"</a>
 	for more details.</p>
 
+<p><b>Show RAW icon</b> - Whether to display an on-screen icon for cycling through RAW modes (Standard, Standard+RAW, RAW only).
+	<a href="#raw">See Settings/Photo settings/"RAW"</a> for more details.</p>
+
 <p><b>Show auto white balance lock icon</b> - Whether to display an on-screen icon for locking or unlocking auto white
 	balance.</p>
 
 <p><b>Show auto exposure lock icon</b> - Whether to display an on-screen icon for locking or unlocking auto exposure.</p>
-
-<p><b>Show zoom</b> - Whether to display the current zoom level of the camera (when zoomed in).</p>
 
 <p><b>Show zoom -/+ controls</b> - Whether to display -/+ buttons to control zoom.</p>
 
@@ -644,55 +734,7 @@ distances to bracket between. Note not supported when recording video.</p>
 icon for taking a photo (or recording video). Uncheck if you'd
 rather take photos by other methods (e.g., if your device has a hardware shutter button, or using the volume keys).</p>
 
-<p><b>Show angle</b> - Whether to display the orientation angle of the device's camera.</p>
-
-<p><b>Show angle line</b> - Whether to display a horizontal "level" line that visually indicates the orientation of the device.</p>
-
-<p><b>Show pitch lines</b> - Whether to display horizontal pitch lines that visually indicate the pitch of the device.</p>
-
-<p><b>Angle highlight color</b> - This controls the color to be used for the angle display and "level" line when the camera is nearly
-level; and also for the 0 degree pitch line when the camera is held at nearly zero pitch.</p>
-
-<p><b>Show compass direction</b> - Whether to display the compass direction of the device's camera.</p>
-
-<p><b>Show compass direction lines</b> - Whether to display vertical lines that visually indicate the compass direction of the device.</p>
-
-<p><b>Show battery</b> - Whether to display the current battery level.</p>
-
-<p><b>Show time</b> - Whether to display the current time.</p>
-
-<p><b>Show free memory</b> - Whether to display the remaining storage space of the device.</p>
-
-<p><b>Show ISO</b> - If selected, the current ISO, exposure time and frame rate (FPS) will be displayed (only available if Camera2
-API is used). The text will be shown in red when the auto-exposure routine is scanning. In flash auto mode, a flash symbol will
-also indicate when flash will fire. Note that this is not an absolute guarantee - when you take a photo, the camera will make an
-updated decision on whether to fire the flash, which in some cases may disagree with whether the flash symbol was displayed.</p>
-
-<p><b>Show audio level meter</b> - If selected, when recording video an on-screen meter will display the current audio level.</p>
-
-<p><b>Show a grid</b> - Whether to display one of a choice of grids on the camera preview. Grids are useful in photography to help
-compose your image. Options are:</p>
-<ul>
-<li>3x3 - helps with applying the <a href="http://en.wikipedia.org/wiki/Rule_of_thirds">rule of thirds</a>.</li>
-<li>Phi 3x3 - 3x3 grid with ratios 1:0.618:1.</li>
-<li>4x2</li>
-<li>Crosshair</li>
-<li>Golden - displays a <a href="http://en.wikipedia.org/wiki/Golden_spiral">Golden spiral</a> (or technically,
-a Fibonacci spiral). You can <a href="https://www.apogeephoto.com/how-to-use-the-golden-ratio-to-improve-your-photography/">use
-this to improve your photography</a>.</li>
-<li>Golden Triangles</li>
-<li>Diagonals</li>
-</ul>
-
-<p><b>Show a crop guide</b> - A crop guide is a rectangle displayed on-screen, which has the specified aspect ratio
-(if different to the photo/video aspect ratio). This is useful if you plan to crop the resultant photos or videos
-to a particular aspect ratio. For photos, the crop-guide requires "Preview size" to be set to WYSIWYG mode.</p>
-
 <p><b>Show "toast" messages</b> - Whether to display "toasts" (these are the popup messages that appear with information).</p>
-
-<p><b>Show thumbnail animation</b> - Whether to display the moving thumbnail animation when taking a photo.</p>
-
-<p><b>Show border when taking photo</b> - Whether to display a border effect when taking a photo.</p>
 
 <p><b>Show What's New dialog</b> - When updating to a major new version, Open Camera displays a dialog explaining the new
 features and other options. You can disable this dialog from being displayed if you prefer.</p>
@@ -700,11 +742,6 @@ features and other options. You can disable this dialog from being displayed if 
 <p><b>Keep display on</b> - Whether to force keeping the screen display on, while the main Open Camera UI is active.</p>
 
 <p><b>Force maximum brightness</b> - Whether to force the screen display to maximum brightness.</p>
-
-<p><b>Rotate preview</b> - this option rotates the on-screen preview by 180 degrees (i.e., upside down). Most users
-won't ever need this, but this option can be useful if you are using Open Camera with equipment such as zoom lenses
-which invert the image. Note that this doesn't rotate the resultant photos/videos - you'll still have to rotate those
-yourself afterwards - but this will correct the preview so that you can still see what you are shooting properly.</p>
 
 <p><b>Photo and Video Settings:</b></p>
 
@@ -731,7 +768,7 @@ compression. Also note this option has no effect if "Image format" is set to PNG
 	lossy compression. The only way to have truly lossless is via RAW (see option below).</li>
 </ul>
 
-<p><b>RAW</b> - Only available if Camera2 API is used. If set to "Standard and DNG (RAW)", then photos
+<p><a name="raw"><b>RAW</b></a> - Only available if Camera2 API is used. If set to "Standard and DNG (RAW)", then photos
 will also be saved in RAW (DNG) format. If set to "DNG (RAW) only" (requires Android 7), then photos
 will only be saved in DNG format. DNG stands for
 <a href="https://en.wikipedia.org/wiki/Digital_Negative">"digital negative"</a>, and contains the full
@@ -757,8 +794,16 @@ uncompressed and unprocessed information from your camera. Please note the follo
 	options will not show on the popup menu.</li>
 	<li>Options to store extra Exif tags ("Store compass direction", "Artist", "Copyright") are only supported for
 	JPEG format.</li>
-	<li>RAW images will only be saved in the Standard or DRO photo modes.</li>
+	<li>Some devices only support saving RAW images in the Standard or DRO photo modes. Higher end devices will also support saving RAW
+	images also in Expo Bracketing and Focus Bracketing modes, as well as HDR where "Save all images for HDR mode" is enabled.
+	The on-screen "RAW" icon will show if RAW is enabled for the current photo mode.</li>
 </ul>
+
+<p><b>Allow RAW for expo bracketing</b> - If this option is disabled, the RAW images won't ever be saved in expo bracketing or HDR
+	photo modes.</p>
+
+<p><b>Allow RAW for focus bracketing</b> - If this option is disabled, the RAW images won't ever be saved in focus bracketing photo
+	mode.</p>
 
 <p><b>Noise Reduction original images</b> - When using <a href="#noise_reduction">Noise Reduction</a> mode, if
 	this option is enabled, then the input images from the burst of images taken will be saved, as well as the
@@ -801,7 +846,7 @@ resultant photo, so the resultant photo matches the mirrored image you see on th
 <p><b>Copyright</b> - If text is entered in this setting, then the text will be stored in the image's Exif metadata as the
 	"Copyright" tag. Not supported for RAW photos (DNG format). (Requires Android 7.)</p>
 
-<p><a name="stamp_photos"></a><b>Stamp photos</b> - Option to add a date and timestamp to the resultant photos. If "Store
+<p><a name="stamp_photos"><b>Stamp photos</b></a> - Option to add a date and timestamp to the resultant photos. If "Store
 location data" is enabled (see "Location settings" below), then the current location latitude
 and longitude coordinates, and altitude, will also be stamped on the resultant photos (if the location is known).
 Similarly for "Store compass direction". Note that if this option is enabled, then it will take
@@ -821,7 +866,7 @@ formatting. Also used for Video settings/"Video subtitles".</p>
 <p><b>Distance unit</b> - If "Stamp photos" is enabled, this controls whether to use metres (m) or
 feet (ft) when recording the GPS altitude. Also used for Video settings/"Video subtitles".</p>
 
-<p><a name="custom_text"></a><b>Custom text</b> - Here you can enter some text to be stamped onto resultant photos (e.g.,
+<p><a name="custom_text"><b>Custom text</b></a> - Here you can enter some text to be stamped onto resultant photos (e.g.,
 this could be used for a copyright image). Note that if this option is enabled, then it will take
 longer to save the photo. Also note that this option is only supported for photos, not video.</p>
 
@@ -967,7 +1012,7 @@ video is still recording.</p>
 
 <p><b>Location settings</b> - Select to access the following controls:</p>
 
-<p><a name="store_location_data"></a><b>Store location data (Geotagging)</b> - If selected, then photos will be tagged with the current
+<p><a name="store_location_data"><b>Store location data (Geotagging)</b></a> - If selected, then photos will be tagged with the current
 location. Location data will also be stored in videos (though only for devices that record in MPEG4 or
 3GPP formats).</p>
 
@@ -1039,7 +1084,7 @@ this information to the clipboard.</p>
 <p><b>Reset settings</b> - Resets all Open Camera settings to their default. Selecting this option will cause
 Open Camera to restart. Note that this will not delete any saved settings (see above options).</p>
 
-<p><a name="widgets"></a><b>Widgets and tiles</b></p>
+<p><a name="widgets"><b>Widgets and tiles</b></a></p>
 
 <p>Open Camera comes with a "Take Photo" widget. You can place this on your homescreen. When clicked
 on, it lauches Open Camera and takes a photo immediately.</p>
@@ -1057,7 +1102,7 @@ is enabled.</p>
 <p>On Android 7.1, Open Camera supports application shortcuts. Press and hold the Open Camera icon
 to show additional shortcut options.</p>
 
-<p><a name="remote_control"></a><b>Remote control</b></p>
+<p><a name="remote_control"><b>Remote control</b></a></p>
 
 <p>Some remote control buttons and selfie sticks work by transmitting a volume key command, which
 by default will take a photo, but you can change this from the <a href="#settings">Settings</a>.</p>
@@ -1080,7 +1125,7 @@ by default will take a photo, but you can change this from the <a href="#setting
 	<li>"+" or "-": Zoom in or out.</li>
 </ul>
 
-<p><a name="faq"></a><b>Frequently Asked Questions</b></p>
+<p><a name="faq"><b>Frequently Asked Questions</b></a></p>
 
 <p><b>How can I save to my external SD card?</b> - This depends on your Android version:</p>
 <ul>
@@ -1092,7 +1137,7 @@ inside /storage/ (press "Parent Folder" until you're in "/storage/") or
 of the folders in there - note that confusingly it won't be "sdcard", but will be named something else,
 e.g., "extSdCard".</li>
 <li><b>Android 4.4</b> - Unfortunately it is not possible for 3rd party apps to write to external SD cards.
-<b>This is not a bug or missing feature in Open Camera</b>, rather that 
+<b>This is not a bug or missing feature in Open Camera</b>, rather that
 <a href="http://www.androidpolice.com/2014/02/17/external-blues-google-has-brought-big-changes-to-sd-cards-in-kitkat-and-even-samsung-may-be-implementing-them/">Google
 have blocked write access to external SD cards in Android 4.4</a>. There is one exception: if you use a
 folder in <small>Android/data/net.sourceforge.opencamera/</small> on your SD card (use the "New folder" option to create
@@ -1102,10 +1147,7 @@ if you use this method, and then uninstall!</li>
 <li><b>Android 5.0 onwards</b> - The restrictions on SD cards introduced in Android 4.4 still apply, however
 instead you can enable Settings/More camera controls/"Use Storage Access Framework", and this should allow you
 to save to external SD cards. If when choosing a folder, you only see "Recent", you may need to click on the
-three dots at the top right to open the menu, to enable showing the drives (e.g., "Show internal storage", and
-hopefully you'll see something similar for the SD card). Note that a known issue is that the on-screen "free memory"
-will still show the free internal storage rather than on the SD card (this is an Android limitation - when using
-Storage Access Framework, there doesn't seem to be a way to get the free space on the drive).</li>
+three dots at the top right to open the menu, to enable showing the drives (e.g., "Show internal storage".</li>
 <li><b>Android 6.0 onwards</b> - From Android 6, some devices support "Adoptable Storage" allowing you to
 <a href="https://www.androidcentral.com/adoptable-storage">select to use
 an SD card as internal storage</a>. Note that not all devices support this, even if running Android 6 or later. If your device
@@ -1208,7 +1250,7 @@ See <a href="https://feedback.photoshop.com/photoshop_family/topics/open-dng-fil
 for some suggestions.</p>
 
 <p><b>Why doesn't the preview display match the resultant photo/video? One of them is cropped.</b> - Firstly, make
-sure that Settings/On screen GUI/Preview size is set to "Match photo size (WYSIWYG)". However if that doesn't fix
+sure that Settings/Camera preview/Preview size is set to "Match photo size (WYSIWYG)". However if that doesn't fix
 the problem, this is a limitation on some devices and photo/video resolutions (it happens if the device doesn't offer
 a "preview" with the same aspect ratio as the chosen photo/video resolution). A workaround may be to try a different
 resolution for photos and/or videos.</p>
@@ -1232,10 +1274,11 @@ by going to Settings/On screen GUI/Force maximum brightness.</p>
 though different sticks work in different ways, so it's hard to guarantee this. Sticks and bluetooth remote controls
 which work by triggering a volume key press should work (and the behaviour can be configured by
 Settings/More camera controls/"Volume keys"). For example, the
-<a href="https://www.amazon.co.uk/gp/product/B017NA7V1U/">KobraTech TriFlex Mini</a>. And if you have a Mi Band 2 or
+<a href="https://www.amazon.co.uk/gp/product/B017NA7V1U/">KobraTech TriFlex Mini</a>. If you have a Mi Band 2 or
 Amazfit Bip/Arc, you can try using
 <a href="https://play.google.com/store/apps/details?id=com.miband2.mibandselfie">Mi Band 2 &amp; Amazfit Selfie</a> in
-conjunction with Open Camera.</p>
+conjunction with Open Camera. Open Camera also supports connecting to the Kraken Smart Housing via the options in
+"Settings/More camera controls/Bluetooth LE remote control".</p>
 
 <p><b>Why is auto-level slow?</b> - This feature requires doing a decompress of the JPEG data, followed by a
 rotation of a multi-megapixel image, then recompressing, which typically results in a short pause on most devices.
@@ -1279,7 +1322,7 @@ This is turned off by default as some <a href="devices.html">devices</a> have po
 "legacy" Camera2 support, which means it isn't any better than the original Camera API. Open Camera doesn't support
 enabling Camera2 on such devices.</p>
 
-<p><b>Does Open Camera support HDR+, or use the Pixel 2's Visual Core?</b> If you have a Google Pixel (2), then Open Camera
+<p><b>Does Open Camera support HDR+, or use the Pixel 2's Visual Core?</b> If you have a Google Pixel, then Open Camera
 should be using HDR+ when the following settings are set: Photo Mode Standard, flash off (or auto if the flash doesn't fire),
 white balance auto, color effect none, no exposure compensation, no manual ISO/exposure, no RAW. HDR+ should be
 supported in both old and Camera2 API. See
@@ -1299,8 +1342,8 @@ editing.</p>
 
 <p><b>I ran out of space while recording video, and the video is corrupted, how can I get it back?</b> - Firstly, this sadly
 isn't an Open Camera bug - it's an Android issue that the video recording API doesn't stop or report an error when storage
-runs out. As a workaround, Open Camera does try to stop videos when storage space is low, but due to Android limitations this
-isn't possible when using SD cards or Storage Access Framework. In order to recover a file, you can try
+runs out. As a workaround, Open Camera does try to stop videos when storage space is low (although note this workaround
+may not be feasible in some cases if saving to non-default locations). In order to recover a file, you can try
 <a href="https://play.google.com/store/apps/details?id=com.smamolot.mp4fix">MP4Fix Video Repair Tool</a>.</p>
 
 <p><b>My device ran out of power while recording video, and the video is corrupt! How can I get it back?</b> - This can happen if
@@ -1308,10 +1351,6 @@ the device is very slow at processing the video file after stopping, and this do
 Camera will stop the video in advance of the device shutting down to help reduce this risk (see "Critical battery check" option),
 but if this still happens, the best hope is to try MP4Fix, see the previous question. Note that if this happens, it isn't an
 Open Camera bug - it's a problem that will happen on any device where the device shuts off before the video can be processed.</p>
-
-<p><b>My save folder is on the SD card, so why does the free storage still show for internal memory?</b> - Open Camera tries
-to obtain the space of the drive being used, but there are no reliable ways to do this (especially Android 4.4 onwards), so
-this is an Android limitation.</p>
 
 <p><b>Does Open Camera support external USB cameras?</b> - Unfortunately Open Camera does not support USB cameras. These don't
 seem to use the standard Android camera APIs, and it would be a lot of work to add support for these.</p>
@@ -1325,10 +1364,10 @@ some devices may have a bug that I'm not aware of. Also bear in mind that some p
 and it's not possible to get an app that satisfies everyone (e.g., some camera apps hide everything behind popup menus
 that you swipe to enable; others have as much on screen as possible - I try to achieve a balance in Open Camera).</p>
 
-<p><b>Why is the UI cluttered?</b> - Under Settings/On screen GUI, there are options to disable various controls and
+<p><b>Why is the UI cluttered?</b> - Under Settings/"On screen GUI", there are options to disable various controls and
 so on from the main view.</p>
 
-<p><b>Can I use the Open Camera source code in my app?</b> - Open Camera is available under the GPL (see
+<p><a name="usesource"><b>Can I use the Open Camera source code in my app?</b></a> - Open Camera is available under the GPL (see
 <a href="index.html#licence">Licence</a>), and can be used for free, including commercially, if you follow the terms of that
 licence (this means making the source of your app available under a GPL-compatible licence). If you would like to
 use the Open Camera in a closed source app, please contact me for a closed source commercial licence, with details
@@ -1341,7 +1380,7 @@ Lenovo to ask them why they are using Open Camera's package name, and if there i
 let me know if you get a response!) Also see
 <a href="http://forum.xda-developers.com/vibe-p1/help/stereo-verify-t3454811">here</a> for further discussion.</p>
 
-<p><a name="contact"></a><b>Contacting me (bugs etc)</b></p>
+<p><a name="contact"><b>Contacting me (bugs etc)</b></a></p>
 
 <p>If you experience a crash, and Google offers to "Report", please do so (if you've installed via F-Droid,
 please see <a href="https://f-droid.org/wiki/page/Getting_logcat_messages_after_crash">here</a>).</p>

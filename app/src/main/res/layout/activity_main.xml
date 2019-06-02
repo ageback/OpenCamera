@@ -102,12 +102,14 @@
         android:background="@color/seekbar_background"
         />
 
+    <!-- n.b., layout_marginLeft is to make room for on-screen info lines in DrawPreview.onDrawInfoLines(), including the
+         histogram -->
     <SeekBar
         android:id="@+id/focus_seekbar"
         android:contentDescription="@string/focus_distance"
         android:layout_width="150dp"
         android:layout_height="50dp"
-        android:layout_marginLeft="75dp"
+        android:layout_marginLeft="135dp"
         android:layout_marginRight="0dp"
         android:layout_marginTop="0dp"
         android:layout_marginBottom="0dp"
@@ -115,12 +117,14 @@
         android:background="@color/seekbar_background"
         />
 
+    <!-- n.b., layout_marginLeft is to make room for on-screen info lines in DrawPreview.onDrawInfoLines(), including the
+         histogram -->
     <SeekBar
         android:id="@+id/focus_bracketing_target_seekbar"
         android:contentDescription="@string/focus_bracketing_target_distance"
         android:layout_width="150dp"
         android:layout_height="50dp"
-        android:layout_marginLeft="75dp"
+        android:layout_marginLeft="135dp"
         android:layout_marginRight="0dp"
         android:layout_marginTop="0dp"
         android:layout_marginBottom="0dp"
@@ -226,6 +230,21 @@
         />
 
     <ImageButton
+        android:id="@+id/cycle_raw"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/cycle_raw"
+        android:src="@drawable/raw_off_icon"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedCycleRaw"
+        android:visibility="gone"
+        />
+
+    <ImageButton
         android:id="@+id/store_location"
         android:layout_width="@dimen/onscreen_button_size"
         android:layout_height="@dimen/onscreen_button_size"
@@ -310,6 +329,21 @@
         android:backgroundTint="@color/icons_background_tint"
         android:backgroundTintMode="src_in"
         android:onClick="clickedAutoLevel"
+        android:visibility="gone"
+        />
+
+    <ImageButton
+        android:id="@+id/cycle_flash"
+        android:layout_width="@dimen/onscreen_button_size"
+        android:layout_height="@dimen/onscreen_button_size"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/cycle_flash"
+        android:src="@drawable/flash_off"
+        android:background="@color/icons_background"
+        android:backgroundTint="@color/icons_background_tint"
+        android:backgroundTintMode="src_in"
+        android:onClick="clickedCycleFlash"
         android:visibility="gone"
         />
 
@@ -412,7 +446,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
-                android:layout_marginTop="10dp"
                 android:text="@string/iso"
                 android:textStyle="bold"
                 />
@@ -422,8 +455,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:layout_marginBottom="20dp"
-                android:layout_below="@+id/iso_text"
                 >
             </RelativeLayout>
 
@@ -478,7 +509,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
-                android:layout_below="@+id/exposure_seekbar_text_dark"
+                android:layout_below="@+id/exposure_seekbar"
                 />
         </RelativeLayout>
 
