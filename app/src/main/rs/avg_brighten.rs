@@ -14,26 +14,54 @@ void setBlackLevel(float value) {
     white_level = 255.0f / (255.0f - black_level);
 }
 
-float gain;
-float gain_A, gain_B; // see comments below
-float gamma;
-float low_x;
-float mid_x;
-float max_x;
+static float gain;
+static float gain_A, gain_B; // see comments below
+static float gamma;
+static float low_x;
+static float mid_x;
+static float max_x;
+
+void setBrightenParameters(float _gain, float _gamma, float _low_x, float _mid_x, float _max_x) {
+    /* We want A and B s.t.:
+        float alpha = (value-low_x)/(mid_x-low_x);
+        float new_value = (1.0-alpha)*low_x + alpha*gain*mid_x;
+        We should be able to write this as new_value = A * value + B
+        alpha = value/(mid_x-low_x) - low_x/(mid_x-low_x)
+        new_value = low_x - value*low_x/(mid_x-low_x) + low_x^2/(mid_x-low_x) +
+            value*gain*mid_x/(mid_x-low_x) - gain*mid_x*low_x/(mid_x-low_x)
+        So A = (gain*mid_x - low_x)/(mid_x-low_x)
+        B = low_x + low_x^2/(mid_x-low_x) - gain*mid_x*low_x/(mid_x-low_x)
+        = (low_x*mid_x - low_x^2 + low_x^2 - gain*mid_x*low_x)/(mid_x-low_x)
+        = (low_x*mid_x - gain*mid_x*low_x)/(mid_x-low_x)
+        = low_x*mid_x*(1-gain)/(mid_x-low_x)
+     */
+    gain = _gain;
+    gamma = _gamma;
+    low_x = _low_x;
+    mid_x = _mid_x;
+    max_x = _max_x;
+
+	gain_A = 1.0f;
+	gain_B = 0.0f;
+    if( mid_x > low_x ) {
+        gain_A = (gain * mid_x - low_x) / (mid_x - low_x);
+        gain_B = low_x*mid_x*(1.0f-gain)/ (mid_x - low_x);
+    }
+}
 
 //float tonemap_scale;
 //float linear_scale;
 
 /* Simplified brighten algorithm for gain only.
  */
-uchar4 __attribute__((kernel)) avg_brighten_gain(uchar4 in) {
+/*uchar4 __attribute__((kernel)) avg_brighten_gain(uchar4 in) {
     float3 value = gain*convert_float3(in.rgb);
 
     uchar4 out;
     out.rgb = convert_uchar3(clamp(value+0.5f, 0.f, 255.f));
     out.a = 255;
     return out;
-}
+}*/
 
 uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y) {
     /*{
@@ -394,6 +422,38 @@ uchar4 __attribute__((kernel)) avg_brighten_f(float3 rgb, uint32_t x, uint32_t y
 
     // apply gamma correction
     //hdr = powr(hdr/255.0f, 0.454545454545f) * 255.0f;
+
+    uchar4 out;
+    out.rgb = convert_uchar3(clamp(hdr+0.5f, 0.f, 255.f));
+    out.a = 255;
+
+    return out;
+}
+
+/* Simplified brighten algorithm for gain/gamma only, used for DRO algorithm.
+ */
+uchar4 __attribute__((kernel)) dro_brighten(uchar4 rgb, uint32_t x, uint32_t y) {
+    // apply piecewise function of gain vs gamma
+    float3 hdr = convert_float3(rgb.rgb);
+    float value = fmax(hdr.r, hdr.g);
+    value = fmax(value, hdr.b);
+    if( value <= low_x ) {
+        // don't scale
+    }
+    else if( value <= mid_x ) {
+        //float alpha = (value-low_x)/(mid_x-low_x);
+        //float new_value = (1.0-alpha)*low_x + alpha*gain*mid_x;
+        // gain_A and gain_B should be set so that new_value meets the commented out code above
+        // This code is critical for performance!
+
+        hdr *= (gain_A + gain_B/value);
+    }
+    else {
+        float new_value = powr(value/max_x, gamma) * 255.0f;
+
+        float gamma_scale = new_value / value;
+        hdr *= gamma_scale;
+    }
 
     uchar4 out;
     out.rgb = convert_uchar3(clamp(hdr+0.5f, 0.f, 255.f));

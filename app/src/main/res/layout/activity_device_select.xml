@@ -7,7 +7,7 @@
     android:paddingTop="0dp"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingBottom="@dimen/activity_vertical_margin"
-    tools:context=".Remotecontrol.DeviceScanner">
+    tools:context=".remotecontrol.DeviceScanner">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,7 +18,7 @@
             android:id="@+id/currentRemote"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Current remote: " />
+            android:text="@string/bluetooth_current_remote" />
 
         <Button
             android:id="@+id/StartScanButton"
@@ -26,7 +26,7 @@
             android:layout_height="50dp"
             android:layout_gravity="right"
             android:layout_marginTop="0dp"
-            android:text="Scan" />
+            android:text="@string/bluetooth_scan" />
 
         <ListView
             android:id="@android:id/list"

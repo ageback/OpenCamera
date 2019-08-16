@@ -48,20 +48,77 @@
 <p>&lt; <small><a href="index.html">Main Page.</a></small></p>
 
 <pre>
-Version 1.46 (Work in progress)
+Version 1.47 (Work in progress)
+
+FIXED   Crashes related to histogram, zebra stripes, focus peaking - don't crash if we have
+        problems.
+FIXED   Don't close Open Camera if bluetooth service (for remote control) fails to initialise.
+FIXED   Crash related to focus assist if camera closed.
+
+Version 1.46 (2019/05/18)
 
 FIXED   Problems with toasts being displayed for seekbars on Android 9.
+FIXED   Face detection stopped working when recording video (on old Camera API).
 FIXED   Wasn't displaying crop guides in some cases (when the crop guide aspect ratio matched the
         photo/video resolution's aspect ratio, but this didn't match the preview's aspect ratio).
 FIXED   Improvement to on-screen placement of pitch and compass lines.
 FIXED   Toast for enabling/disabling face detection (via on-screen icon) was hidden by subsequent
         info toast from restarting the camera.
-FIXED   Crash on Camera2 related to still trying to take photo when camera already closing.
+FIXED   Fixed some crashes for old camera API.
+FIXED   Crashes related to multiple instances of Open Camera and Renderscript.releaseAllContexts().
+FIXED   Problem with Camera2 API where with manual exposure time, preview would display a maximum
+        exposure time of 1/12s rather than what the manual exposure time had been set to.
+FIXED   When using "red eye" flash, on-screen flash icon (with Camera2 API) was being shown all the
+        time, when this actually behaves similar to flash auto.
+FIXED   Avoid "capturing" text from being covered by focus bracketing sliders in focus bracketing
+        photo mode and landscape orientation.
+FIXED   Don't allow continuous fast burst mode (when holding down shutter button) in standard photo
+        mode with RAW only (previously this appeared to work, but no images were saved).
+FIXED   Crashes with Camera2 API related to multithreading issues.
+FIXED   Problem with camera preview and UI orientation if user switched to reverse landscape
+        orientation whilst in settings or an on-screen dialog was displayed.
+FIXED   When using "Icons along top" UI placement, on-screen text could appear below the icons
+        if icons showed above the camera preview, when popup menu opened.
+FIXED   Layout problem on Nexus 7 with "Icons along top" UI placement when going to settings and
+        back.
+FIXED   Free storage space should now be correct for external SD cards when using Storage Access
+        Framework.
+ADDED   New option Settings/Camera preview/"Show a histogram" to display an on-screen histogram.
+        (Camera2 API only.)
+ADDED   New option Settings/Camera preview/"Show zebra stripes" to display on-screen zebra stripes
+        to indicate over-exposed regions. (Camera2 API only.)
+ADDED   New option Settings/Camera preview/"Focus peaking" to display on-screen highlights to
+        indicate in-focus edges. (Camera2 API only.)
+ADDED   RAW/DNG now enabled on higher end devices for expo bracketing and focus bracketing photo
+        modes, as well as HDR when saving the base expo images. Use the new options Settings/Photo
+        settings/"Allow RAW for expo bracketing" and "Allow RAW for focus bracketing" if you want to
+        enable RAW for standard photo mode, but not for expo/focus bracketing modes.
 ADDED   New option Settings/Photo settings/"Use addresses" to display GPS coordinates in the form
         of an address (for photo stamp and video subtitles).
 ADDED   Support for remote control via bluetooth/USB keyboards.
 ADDED   New option under Settings/On screen GUI/ to enable on-screen icon for enabling location
         data.
+ADDED   New option under Settings/On screen GUI/ to enable on-screen icon for cycling through flash
+        modes (instead of on the popup menu).
+ADDED   New option under Settings/On screen GUI/ to enable on-screen icon for cycling through RAW
+        modes.
+ADDED   Support for the Kraken Smart Housing (thanks to Edouard Lafargue). See Settings/More camera
+        controls/"Bluetooth LE remote control...".
+ADDED   Added some more common manual shutter speeds (1/10 to 1/50 now changes in steps of 1/5).
+UPDATED Default UI layout is now "icons along top" (see Settings/On screen GUI/UI placement to
+        change back to old layouts.
+UPDATED Improved DRO algorithm for some scenes (e.g. stop making clouds so unnatural).
+UPDATED Noise Reduction "NR Mode" (normal or low light) is now preserved; the on-screen "NR" icon is
+        now highlighted in yellow in low light mode.
+UPDATED Separated some options under "Settings/On screen GUI" preference screen out into the new
+        screen "Camera preview".
+UPDATED Made exposure UI panel more compact.
+UPDATED On-screen icon for RAW now displayed as "RAW ONLY" if only saving RAW.
+UPDATED Display number of remaining images to save when "processing".
+UPDATED Play notification sound (if shutter sound not disabled) when focus bracketing completes.
+UPDATED Also added option for 150 focus bracketed images.
+UPDATED Code to try to prevent video corruption when running out of space now enabled when using
+        Storage Access Framework.
 
 Version 1.45.2 (2019/01/20)
 

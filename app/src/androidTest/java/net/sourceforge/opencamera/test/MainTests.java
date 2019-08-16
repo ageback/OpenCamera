@@ -32,6 +32,7 @@ public class MainTests {
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testAutoFocusCorners"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPopup"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPopupLeftLayout"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testRightLayout"));
         //suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPopupLayout")); // don't autotest for now, see comments for the test
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testSwitchResolution"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testFaceDetection"));
@@ -77,6 +78,7 @@ public class MainTests {
             suite.addTest(TestSuite.createTest(MainActivityTest.class, "testGPSString"));
         }
         if( MainActivityTest.test_camera2 ) {
+            suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPreviewBitmap"));
             suite.addTest(TestSuite.createTest(MainActivityTest.class, "testVideoFPSHighSpeed"));
         }
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {

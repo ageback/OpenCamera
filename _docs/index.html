@@ -123,6 +123,7 @@ browsers -->
 <li>Support for <a href="help.html#hdr">HDR</a> (with auto-alignment and ghost removal) and Exposure Bracketing.</li>
 <li>Support for Camera2 API: manual focus distance (with optional focus assist); manual ISO; manual exposure time; manual white balance temperature; burst mode; RAW (DNG) files; slow motion video.</li>
 <li>Noise reduction (including low light night mode) and Dynamic range optimisation modes for better quality photos.</li>
+<li>Options for on-screen histogram, zebra stripes, focus peaking.</li>
 <li>Focus bracketing mode.</li>
 <li>Support for <a href="https://play.google.com/store/apps/details?id=com.miband2.mibandselfie">Mi Band 2 &amp; Amazfit Selfie</a>.</li>
 <li>Small file size.</li>
@@ -216,7 +217,7 @@ Thanks!</p>
 <li><a href="history.html">History</a></li>
 </ul>
 
-<p><a name="requirements"></a><b>Requirements</b></p>
+<p><a name="requirements"><b>Requirements</b></a></p>
 
 <p>Open Camera requires Android 4.0.3 or better. I've tested Open Camera on my Nexus 6 (Android 5.0-7.0),
 Nexus 7 (2013) (Android 5.0-6.0) and Galaxy Nexus (Android 4.0.3-4.3). Some features may only be available
@@ -230,7 +231,7 @@ your wedding etc :)</p>
 
 <h2><a href="help.html">Instructions</a></h2>
 
-<p><a name="credits"></a><b>Credits</b></p>
+<p><a name="credits"><b>Credits</b></a></p>
 
 <p>Open Camera is written by Mark Harman. Additional credits:</p>
 <ul>
@@ -266,7 +267,7 @@ your wedding etc :)</p>
 <li>Earlier versions (pre-Material Design) have an icon/logo by Cosmin Saveanu ( <a href="http://aboutfoto.wordpress.com/">http://aboutfoto.wordpress.com/</a> ).</li>
 </ul>
 
-<p><a name="privacy"></a><b>Privacy policy</b></p>
+<p><a name="privacy"><b>Privacy policy</b></a></p>
 
 <p>Google Play requires me to disclose that Open Camera will record camera sensor and microphone data, which is used for the purpose
 of taking photos and recording videos. Microphone permission is also used for the optional "Audio control" options.</p>
@@ -274,8 +275,9 @@ of taking photos and recording videos. Microphone permission is also used for th
 <p>Open Camera requires permission to "access photos, media and files on your devices", as this permission is required for Android to
 save resultant photos and videos to your device.</p>
 
-<p>Location permission is required for geotagging of photos, but this is disabled by default. If enabled, your location is encoded
-in the saved image and video files (and it is only used for this purpose).</p>
+<p>Location permission is required for the geotagging option (for photos and videos, including stamp and subtitles options).
+    Geotagging is disabled by default, but if enabled, your location is encoded into saved image and video files.
+    Location permission is also required to connect to Bluetooth LE remote control devices.</p>
 
 <p>Bluetooth permission is required for communicating with some supported Bluetooth remote control devices.</p>
 
@@ -291,14 +293,14 @@ advertising by visiting <a href="https://www.google.co.uk/settings/ads">Google's
 <p>Also see <a href="https://www.google.com/policies/technologies/partner-sites/">"How Google uses information from sites or apps
 that use our services"</a>.</p>
 
-<p><a name="licence"></a><b>Licence</b></p>
+<p><a name="licence"><b>Licence</b></a></p>
 
 <p>Open Camera is released under the <a href="http://www.gnu.org/copyleft/gpl.html">GPL v3 or later</a>. The source code is
 available from
 <!-- use &#8203; to limit widths on continuous text to 30 characters, to avoid messing up view on mobile devices -->
 <a href="https://sourceforge.net/projects/opencamera/files/">https://sourceforge.net/&#8203;projects/opencamera/files/</a> .
 <!--The file exposure.png is also dual licensed under GPL v3 or later, and <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> or later (attribute to Mark Harman and please link to http://opencamera.sourceforge.net/ ).-->
-Also see <i>"Can I use the Open Camera source code in my app?"</i> under the <a href="help.html#faq">FAQ</a>.
+Also see <i>"Can I use the Open Camera source code in my app?"</i> under the <a href="help.html#usesource">FAQ</a>.
 </p>
 
 <p>The following files are used in Open Camera:</p>

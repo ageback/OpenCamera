@@ -127,7 +127,7 @@
         <item>immersive_mode_gui</item>
         <item>immersive_mode_everything</item>
     </string-array>
-    <string-array name="preference_angle_highlight_color_entries">
+    <string-array name="preference_angle_highlight_color_entries"> <!-- n.b., also used for focus peaking colors -->
         <item>Red</item>
         <item>Green</item>
         <item>Blue</item>
@@ -485,6 +485,7 @@
         <item>@string/preference_focus_bracketing_n_images_entries_40</item>
         <item>@string/preference_focus_bracketing_n_images_entries_50</item>
         <item>@string/preference_focus_bracketing_n_images_entries_100</item>
+        <item>@string/preference_focus_bracketing_n_images_entries_150</item>
         <item>@string/preference_focus_bracketing_n_images_entries_200</item>
     </string-array>
     <string-array name="preference_focus_bracketing_n_images_values">
@@ -503,6 +504,7 @@
         <item>40</item>
         <item>50</item>
         <item>100</item>
+        <item>150</item>
         <item>200</item>
     </string-array>
     <string-array name="flash_icons">
@@ -866,5 +868,43 @@
         <item>preference_stamp_geo_address_both</item>
         <item>preference_stamp_geo_address_prefer</item>
         <item>preference_stamp_geo_address_no</item>
+    </string-array>
+    <string-array name="preference_histogram_entries">
+        <item>@string/preference_histogram_off</item>
+        <item>@string/preference_histogram_rgb</item>
+        <item>@string/preference_histogram_luminance</item>
+        <item>@string/preference_histogram_value</item>
+        <item>@string/preference_histogram_intensity</item>
+        <item>@string/preference_histogram_lightness</item>
+    </string-array>
+    <string-array name="preference_histogram_values">
+        <item>preference_histogram_off</item>
+        <item>preference_histogram_rgb</item>
+        <item>preference_histogram_luminance</item>
+        <item>preference_histogram_value</item>
+        <item>preference_histogram_intensity</item>
+        <item>preference_histogram_lightness</item>
+    </string-array>
+    <string-array name="preference_zebra_stripes_entries">
+        <item>@string/preference_zebra_stripes_off</item>
+        <item>@string/preference_zebra_stripes_70pc</item>
+        <item>@string/preference_zebra_stripes_80pc</item>
+        <item>@string/preference_zebra_stripes_90pc</item>
+        <item>@string/preference_zebra_stripes_100pc</item>
+    </string-array>
+    <string-array name="preference_zebra_stripes_values">
+        <item>0</item>
+        <item>179</item>
+        <item>204</item>
+        <item>230</item>
+        <item>255</item>
+    </string-array>
+    <string-array name="preference_focus_peaking_entries">
+        <item>@string/preference_focus_peaking_off</item>
+        <item>@string/preference_focus_peaking_on</item>
+    </string-array>
+    <string-array name="preference_focus_peaking_values">
+        <item>preference_focus_peaking_off</item>
+        <item>preference_focus_peaking_on</item>
     </string-array>
 </resources>

@@ -13,19 +13,20 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import net.sourceforge.opencamera.CameraController.CameraController2;
+import net.sourceforge.opencamera.cameracontroller.CameraController2;
 import net.sourceforge.opencamera.HDRProcessor;
 import net.sourceforge.opencamera.HDRProcessorException;
 import net.sourceforge.opencamera.ImageSaver;
 import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyApplicationInterface;
+import net.sourceforge.opencamera.MyDebug;
 import net.sourceforge.opencamera.PreferenceKeys;
-import net.sourceforge.opencamera.Preview.VideoProfile;
+import net.sourceforge.opencamera.preview.VideoProfile;
 import net.sourceforge.opencamera.SaveLocationHistory;
-import net.sourceforge.opencamera.CameraController.CameraController;
-import net.sourceforge.opencamera.Preview.Preview;
-import net.sourceforge.opencamera.UI.FolderChooserDialog;
-import net.sourceforge.opencamera.UI.PopupView;
+import net.sourceforge.opencamera.cameracontroller.CameraController;
+import net.sourceforge.opencamera.preview.Preview;
+import net.sourceforge.opencamera.ui.FolderChooserDialog;
+import net.sourceforge.opencamera.ui.PopupView;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -74,7 +75,6 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     public static final boolean test_camera2 = false;
     //public static final boolean test_camera2 = true;
 
-    @SuppressWarnings("deprecation")
     public MainActivityTest() {
         super("net.sourceforge.opencamera", MainActivity.class);
     }
@@ -545,11 +545,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     private void subTestSaveFlashTorchQuit() throws InterruptedException {
         Log.d(TAG, "subTestSaveFlashTorchQuit");
 
+        setToDefault();
+
         if( !mPreview.supportsFlash() ) {
+            Log.d(TAG, "doesn't support flash");
             return;
         }
-
-        setToDefault();
 
         switchToFlashValue("flash_torch");
 
@@ -1794,6 +1795,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
      */
     private int getNFiles(File folder) {
         File [] files = folder.listFiles();
+        Log.d(TAG, "getNFiles: " + folder + " has: " + files);
         return files == null ? 0 : files.length;
     }
 
@@ -2336,6 +2338,68 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             subTestPopupButtonAvailability("TEST_ISO", "800", supported_iso_values);
             subTestPopupButtonAvailability("TEST_ISO", "1600", supported_iso_values);
         }
+    }
+
+    /* Tests enabling and disabling the preview bitmap.
+     */
+    public void testPreviewBitmap() throws InterruptedException {
+        Log.d(TAG, "testPreviewBitmap");
+
+        if( !mActivity.supportsPreviewBitmaps() ) {
+            Log.d(TAG, "preview bitmaps not supported");
+            return;
+        }
+
+        setToDefault();
+        Thread.sleep(1000);
+
+        long [] delays = {20, 50, 100, 1000};
+        int [] n_iters = {50, 30, 30, 3};
+        assertEquals(delays.length, n_iters.length);
+
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+
+        assertFalse(mPreview.isPreviewBitmapEnabled());
+        assertFalse(mPreview.refreshPreviewBitmapTaskIsRunning());
+
+        for(int i=0;i<delays.length;i++) {
+            Log.d(TAG, ">>> i = " + i + " delay: " + delays[i]);
+            for(int j=0;j<n_iters[i];j++) {
+                Log.d(TAG, "    >>> j = " + j + " / " + n_iters[i]);
+                SharedPreferences.Editor editor = settings.edit();
+
+                editor.putString(PreferenceKeys.HistogramPreferenceKey, "preference_histogram_rgb");
+                editor.apply();
+                mActivity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        mActivity.getApplicationInterface().getDrawPreview().updateSettings();
+                    }
+                });
+                this.getInstrumentation().waitForIdleSync();
+                Thread.sleep(delays[i]);
+                if (delays[i] >= 1000) {
+                    assertTrue(mPreview.isPreviewBitmapEnabled());
+                }
+
+                editor.putString(PreferenceKeys.HistogramPreferenceKey, "preference_histogram_off");
+                editor.apply();
+                mActivity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        mActivity.getApplicationInterface().getDrawPreview().updateSettings();
+                    }
+                });
+                this.getInstrumentation().waitForIdleSync();
+                Thread.sleep(delays[i]);
+                if (delays[i] >= 1000) {
+                    assertFalse(mPreview.isPreviewBitmapEnabled());
+                    assertFalse(mPreview.refreshPreviewBitmapTaskIsRunning());
+                }
+            }
+        }
+
+        Thread.sleep(500);
+        assertFalse(mPreview.isPreviewBitmapEnabled());
+        assertFalse(mPreview.refreshPreviewBitmapTaskIsRunning());
     }
 
     public void testTakePhotoExposureCompensation() throws InterruptedException {
@@ -2884,22 +2948,32 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         int n_fast_burst_images = Integer.parseInt(n_fast_burst_images_s);
 
         int exp_n_new_files;
-        if( is_raw ) {
-            if( mActivity.getApplicationInterface().isRawOnly() )
-                exp_n_new_files = 1;
-            else
-                exp_n_new_files = 2;
-        }
-        else if( is_hdr && hdr_save_expo )
+        if( is_hdr && hdr_save_expo ) {
             exp_n_new_files = 4;
-        else if( is_expo )
+            if( is_raw && !mActivity.getApplicationInterface().isRawOnly() ) {
+                exp_n_new_files += 3;
+            }
+        }
+        else if( is_expo ) {
             exp_n_new_files = n_expo_images;
-        else if( is_focus_bracketing )
+            if( is_raw && !mActivity.getApplicationInterface().isRawOnly() ) {
+                exp_n_new_files *= 2;
+            }
+        }
+        else if( is_focus_bracketing ) {
             exp_n_new_files = n_focus_bracketing_images;
+            if( is_raw && !mActivity.getApplicationInterface().isRawOnly() ) {
+                exp_n_new_files *= 2;
+            }
+        }
         else if( is_fast_burst )
             exp_n_new_files = n_fast_burst_images;
-        else
+        else {
             exp_n_new_files = 1;
+            if( is_raw && !mActivity.getApplicationInterface().isRawOnly() ) {
+                exp_n_new_files *= 2;
+            }
+        }
         Log.d(TAG, "exp_n_new_files: " + exp_n_new_files);
         return exp_n_new_files;
     }
@@ -2957,7 +3031,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 }
                 else if( filename.endsWith(".dng") ) {
                     assertTrue(is_raw);
-                    assertTrue(filename_dng == null);
+                    assertTrue(hdr_save_expo || is_expo || is_focus_bracketing || filename_dng == null);
                     filename_dng = filename;
                 }
                 else {
@@ -2965,13 +3039,22 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 }
             }
         }
-        assertTrue( (filename_jpeg == null) == (is_raw && mActivity.getApplicationInterface().isRawOnly()) );
+        assertTrue( (filename_jpeg == null) == (is_raw && mActivity.getApplicationInterface().isRawOnly() && !is_hdr) );
         assertTrue( (filename_dng != null) == is_raw );
         if( is_raw && !mActivity.getApplicationInterface().isRawOnly() ) {
             // check we have same filenames (ignoring extensions)
-            String filename_base_jpeg = filename_jpeg.substring(0, filename_jpeg.length()-4);
+            // if HDR, then we should exclude the "_HDR" vs "_x" of the base filenames
+            String filename_base_jpeg;
+            String filename_base_dng;
+            if( is_hdr ) {
+                filename_base_jpeg = filename_jpeg.substring(0, filename_jpeg.length()-7);
+                filename_base_dng = filename_dng.substring(0, filename_dng.length()-5);
+            }
+            else {
+                filename_base_jpeg = filename_jpeg.substring(0, filename_jpeg.length()-4);
+                filename_base_dng = filename_dng.substring(0, filename_dng.length()-4);
+            }
             Log.d(TAG, "filename_base_jpeg: " + filename_base_jpeg);
-            String filename_base_dng = filename_dng.substring(0, filename_dng.length()-4);
             Log.d(TAG, "filename_base_dng: " + filename_base_dng);
             assertTrue( filename_base_jpeg.equals(filename_base_dng) );
         }
@@ -3178,6 +3261,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             max_time_s = 3; // takes longer to save 20 images!
         }
 
+        if( is_raw ) {
+            max_time_s += 6; // extra time needed for Nexus 6 at least
+        }
+
         boolean pause_preview =  sharedPreferences.getBoolean(PreferenceKeys.PausePreviewPreferenceKey, false);
         if( pause_preview ) {
             max_time_s += 3; // need to allow longer for testTakePhotoRawWaitCaptureResult with Nexus 6 at least
@@ -3199,7 +3286,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 Log.d(TAG, "waiting for thumbnail animation");
                 Thread.sleep(10);
                 int allowed_time_ms = 10000;
-                if( !mPreview.usingCamera2API() && ( is_hdr || is_nr || is_expo ) ) {
+                if( is_hdr || is_nr || is_expo ) {
                     // some devices need longer time (especially Nexus 6)
                     allowed_time_ms = 12000;
                 }
@@ -3412,6 +3499,77 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         else {
             subTestTakeVideoSnapshot();
         }
+    }
+
+    /** Test taking photo with JPEG + DNG (RAW) in Expo photo mode.
+     */
+    public void testTakePhotoRawExpo() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoRawExpo");
+        setToDefault();
+
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_yes");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_expo_bracketing");
+        editor.apply();
+        updateForSettings();
+
+        subTestTakePhoto(false, false, true, true, false, false, true, false);
+        if( mPreview.usingCamera2API() ) {
+            Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+            assertTrue(mPreview.getCameraController().test_capture_results == 1);
+        }
+    }
+
+    /** Test taking photo with JPEG + DNG (RAW) in Expo photo mode, with test_wait_capture_result.
+     */
+    public void testTakePhotoRawExpoWaitCaptureResult() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoRawExpoWaitCaptureResult");
+        setToDefault();
+
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_yes");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_expo_bracketing");
+        editor.apply();
+        updateForSettings();
+
+        mPreview.getCameraController().test_wait_capture_result = true;
+        subTestTakePhoto(false, false, true, true, false, false, true, true);
+        if( mPreview.usingCamera2API() ) {
+            Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+            assertTrue(mPreview.getCameraController().test_capture_results == 1);
+        }
+    }
+
+    /** Test taking photo with DNG (RAW) only in Expo photo mode.
+     */
+    public void testTakePhotoRawOnlyExpo() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoRawOnlyExpo");
+        setToDefault();
+
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_only");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_expo_bracketing");
+        editor.apply();
+        updateForSettings();
+
+        // test modes not supported in RAW only mode
+        assertFalse(mActivity.supportsAutoStabilise());
+        assertFalse(mActivity.supportsDRO());
+
+        subTestTakePhoto(false, false, true, true, false, false, true, false);
     }
 
     public void testTakePhotoAutoStabilise() throws InterruptedException {
@@ -3779,6 +3937,31 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         subTestTakePhoto(false, false, true, true, false, false, false, false);
 
         assertTrue( mPreview.getCameraController().test_af_state_null_focus == 0 );
+    }
+
+    /** Take a photo for Camera2 API when camera is released on UI thread whilst photo is taken on background thread (via
+     *  autofocus callback).
+     */
+    public void testTakePhotoAutoFocusReleaseDuringPhoto() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoAutoFocusReleaseDuringPhoto");
+
+        if( !mPreview.usingCamera2API() ) {
+            Log.d(TAG, "test requires camera2 api");
+            return;
+        }
+
+        setToDefault();
+        switchToFocusValue("focus_mode_auto");
+
+        mPreview.getCameraController().test_release_during_photo = true;
+
+        View takePhotoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.take_photo);
+        assertFalse( mActivity.hasThumbnailAnimation() );
+        Log.d(TAG, "about to click take photo");
+        clickView(takePhotoButton);
+        Log.d(TAG, "done clicking take photo");
+
+        Thread.sleep(5000);
     }
 
     public void testTakePhotoLockedFocus() throws InterruptedException {
@@ -5069,10 +5252,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 assertTrue(n_new_files == 0 || n_new_files == 1);
             }
             else if( subtitles ) {
-                assertEquals(n_new_files, 2);
+                assertEquals(2, n_new_files);
             }
             else {
-                assertEquals(n_new_files, 1);
+                assertEquals(1, n_new_files);
             }
         }
         else {
@@ -5629,8 +5812,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
     /** Set maximum filesize so that we get approx 3s of video time. Check that recording stops and restarts within 10s.
      *  Then check recording stops again within 10s.
-     *  On Android 8+, we use MediaRecorder.setNextOutputFile() (see Preview.onVideoInfo()), so instead we just wait 5s and
-     *  check video is still recording, then expect at least 2 resultant video files.
+     *  On Android 8+, we use MediaRecorder.setNextOutputFile() (see Preview.onVideoInfo()), so instead we just wait 10s and
+     *  check video is still recording, then expect at least 2 resultant video files. If this fails on Android 8+, ensure
+     *  that the video lengths aren't too short (if less than 3s, we sometimes seem to fall back to the pre-Android 8
+     *  behaviour, presumably because setNextOutputFile() can't take effect in time).
      *  This test is fine-tuned to Nexus 6, OnePlus 3T and Nokia 8, as we measure hitting max filesize based on time.
      */
     public void testTakeVideoMaxFileSize1() throws InterruptedException {
@@ -5647,7 +5832,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         if( is_nokia ) {
             // Nokia 8 has much smaller video sizes, at least when recording with phone face down, so we also set 4K
             editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
-            editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "2000000"); // approx 3s on Nokia 8 at 4K
+            //editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "2000000"); // approx 3s on Nokia 8 at 4K
+            editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "10000000"); // approx 3s on Nokia 8 at 4K
         }
         else {
             //editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId()), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
@@ -5664,7 +5850,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                     assertTrue(mPreview.isVideoRecording());
                     Log.d(TAG, "wait");
                     try {
-                        Thread.sleep(5000);
+                        Thread.sleep(10000);
                     }
                     catch(InterruptedException e) {
                         e.printStackTrace();
@@ -5672,7 +5858,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                     }
                     Log.d(TAG, "check still recording");
                     assertTrue(mPreview.isVideoRecording());
-                    return -1; // the number of videos recorded can vary, as the max duration corresponding to max filesize can vary widly
+                    return -1; // the number of videos recorded can vary, as the max duration corresponding to max filesize can vary wildly, so we check the number of files afterwards (below)
                 }
 
                 // pre-Android 8 code:
@@ -7050,6 +7236,69 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertEquals(popup_height, test_popup_height);
     }
 
+    /* Tests with ui_right vs ui_top layout.
+     */
+    public void testRightLayout() {
+        Log.d(TAG, "testRightLayout");
+
+        setToDefault();
+        {
+            SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+            SharedPreferences.Editor editor = settings.edit();
+            editor.putString(PreferenceKeys.UIPlacementPreferenceKey, "ui_right");
+            editor.apply();
+            updateForSettings();
+        }
+
+        View popupButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.popup);
+        assertTrue(!mActivity.popupIsOpen());
+        clickView(popupButton);
+        while( !mActivity.popupIsOpen() ) {
+        }
+
+        Point display_size = new Point();
+        {
+            Display display = mActivity.getWindowManager().getDefaultDisplay();
+            display.getSize(display_size);
+            Log.d(TAG, "display_size: " + display_size.x + " x " + display_size.y);
+        }
+        View settingsButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.settings);
+        View galleryButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.gallery);
+
+        Log.d(TAG, "settings right: " + settingsButton.getRight());
+        Log.d(TAG, "settings top: " + settingsButton.getTop());
+        Log.d(TAG, "gallery right: " + galleryButton.getRight());
+        Log.d(TAG, "gallery top: " + galleryButton.getTop());
+
+        assertTrue(settingsButton.getRight() > (int)(0.8*display_size.x));
+        assertEquals(0, settingsButton.getTop());
+        assertEquals(display_size.x, galleryButton.getRight());
+        assertEquals(0, galleryButton.getTop());
+
+        {
+            SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+            SharedPreferences.Editor editor = settings.edit();
+            editor.putString(PreferenceKeys.UIPlacementPreferenceKey, "ui_top");
+            editor.apply();
+            updateForSettings();
+        }
+
+        Log.d(TAG, "settings right: " + settingsButton.getRight());
+        Log.d(TAG, "settings top: " + settingsButton.getTop());
+        Log.d(TAG, "gallery right: " + galleryButton.getRight());
+        Log.d(TAG, "gallery top: " + galleryButton.getTop());
+
+        assertTrue(settingsButton.getRight() < (int)(0.2*display_size.x));
+        assertEquals(0, settingsButton.getTop());
+        assertEquals(display_size.x, galleryButton.getRight());
+        assertEquals(0, galleryButton.getTop());
+
+        assertTrue(!mActivity.popupIsOpen());
+        clickView(popupButton);
+        while( !mActivity.popupIsOpen() ) {
+        }
+    }
+
     /* Tests layout bug with popup menu.
      * Note, in practice this doesn't seem to reproduce the problem, but keep the test anyway.
      * Currently not autotested as the problem isn't fixed, and this would just be a test that
@@ -7256,6 +7505,222 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             waitUntilCameraOpened();
             subTestVideoPopup(true);
         }
+    }
+
+    /* Tests for USB/bluetooth keyboard controls.
+     */
+    public void testKeyboardControls() throws InterruptedException {
+        Log.d(TAG, "testKeyboardControls");
+
+        setToDefault();
+
+        if( !mPreview.supportsFlash() ) {
+            Log.d(TAG, "doesn't support flash");
+            return;
+        }
+        else if( !mPreview.supportsFocus() ) {
+            Log.d(TAG, "doesn't support focus");
+            return;
+        }
+
+        switchToFlashValue("flash_auto");
+
+        // open popup
+        assertFalse( mActivity.popupIsOpen() );
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_FUNCTION);
+        getInstrumentation().waitForIdleSync();
+        assertTrue( mActivity.popupIsOpen() );
+
+        // arrow down
+        assertFalse(mActivity.getMainUI().testGetRemoteControlMode());
+        assertFalse(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow down again
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_2);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertEquals(1, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow down again
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_2);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertEquals(3, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow up
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertEquals(1, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow up again
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_8);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // select
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_5);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertTrue(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow down
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertTrue(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(1, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow down again
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_2);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertTrue(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(2, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow up
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertTrue(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(1, mActivity.getMainUI().testGetPopupIcon());
+
+        // arrow up again
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_8);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertTrue(mActivity.getMainUI().selectingLines());
+        assertTrue(mActivity.getMainUI().selectingIcons());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+
+        // select
+        assertEquals("flash_auto", mPreview.getCurrentFlashValue());
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_5);
+        getInstrumentation().waitForIdleSync();
+        Thread.sleep(500);
+        assertFalse( mActivity.popupIsOpen() );
+        assertEquals("flash_off", mPreview.getCurrentFlashValue());
+        assertFalse(mActivity.getMainUI().testGetRemoteControlMode());
+        assertFalse(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+
+        Thread.sleep(500);
+
+        // open exposure panel
+        assertFalse( mActivity.getMainUI().isExposureUIOpen() );
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_SLASH);
+        getInstrumentation().waitForIdleSync();
+        assertTrue( mActivity.getMainUI().isExposureUIOpen() );
+
+        assertFalse(mActivity.getMainUI().testGetRemoteControlMode());
+        if( mPreview.supportsISORange() || mPreview.getSupportedISOs() != null ) {
+            // need to skip past the ISO line
+            assertFalse(mActivity.getMainUI().selectingLines());
+            assertFalse(mActivity.getMainUI().selectingIcons());
+            getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_2);
+            getInstrumentation().waitForIdleSync();
+            assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+            assertFalse(mActivity.getMainUI().selectingLines());
+            assertFalse(mActivity.getMainUI().selectingIcons());
+            assertFalse(mActivity.getMainUI().isSelectingExposureUIElement());
+            assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+            assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+            assertEquals(0, mActivity.getMainUI().testGetExposureLine());
+        }
+
+        // arrow down
+        assertFalse(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertFalse(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertFalse(mActivity.getMainUI().isSelectingExposureUIElement());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+        assertEquals(3, mActivity.getMainUI().testGetExposureLine());
+
+        // select
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_5);
+        getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.getMainUI().testGetRemoteControlMode());
+        assertFalse(mActivity.getMainUI().selectingLines());
+        assertFalse(mActivity.getMainUI().selectingIcons());
+        assertTrue(mActivity.getMainUI().isSelectingExposureUIElement());
+        assertEquals(0, mActivity.getMainUI().testGetPopupLine());
+        assertEquals(0, mActivity.getMainUI().testGetPopupIcon());
+        assertEquals(3, mActivity.getMainUI().testGetExposureLine());
+
+        // arrow down
+        for(int i=0;i<6;i++) {
+            assertEquals(-i, mPreview.getCurrentExposure());
+            getInstrumentation().sendKeyDownUpSync((i%2==0) ? KeyEvent.KEYCODE_NUMPAD_2 : KeyEvent.KEYCODE_DPAD_DOWN);
+            getInstrumentation().waitForIdleSync();
+            assertEquals(-(i+1), mPreview.getCurrentExposure());
+        }
+
+        // arrow up
+        for(int i=0;i<6;i++) {
+            assertEquals(-6+i, mPreview.getCurrentExposure());
+            getInstrumentation().sendKeyDownUpSync((i%2==0) ? KeyEvent.KEYCODE_NUMPAD_8 : KeyEvent.KEYCODE_DPAD_UP);
+            getInstrumentation().waitForIdleSync();
+            assertEquals(-6+(i+1), mPreview.getCurrentExposure());
+        }
+
+        // close exposure panel
+        assertTrue( mActivity.getMainUI().isExposureUIOpen() );
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_SLASH);
+        getInstrumentation().waitForIdleSync();
+        assertFalse( mActivity.getMainUI().isExposureUIOpen() );
+
+        // take photo
+        assertTrue(mPreview.count_cameraTakePicture==0);
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_NUMPAD_5);
+        getInstrumentation().waitForIdleSync();
+        waitForTakePhoto();
+        assertTrue(mPreview.count_cameraTakePicture==1);
+        mActivity.waitUntilImageQueueEmpty();
+
+        // open settings
+        assertFalse(mActivity.isCameraInBackground());
+        getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_MENU);
+        this.getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.isCameraInBackground());
+
+        //Thread.sleep(3000);
+        Thread.sleep(500);
     }
 
     /* Tests taking photos repeatedly with auto-repeat method.
@@ -8218,9 +8683,11 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "testSettings");
         setToDefault();
 
+        assertFalse(mActivity.isCameraInBackground());
         View settingsButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.settings);
         clickView(settingsButton);
-
+        this.getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.isCameraInBackground());
     }
 
     /* Tests save and load settings.
@@ -9015,6 +9482,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         }
     }
 
+    /** Tests taking photo in HDR photo mode with saving base expo images.
+     */
     public void testTakePhotoHDRSaveExpo() throws InterruptedException {
         Log.d(TAG, "testTakePhotoHDRSaveExpo");
 
@@ -9033,6 +9502,66 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         assertTrue( mActivity.getApplicationInterface().getPhotoMode() == MyApplicationInterface.PhotoMode.HDR );
         subTestTakePhoto(false, false, true, true, false, false, false, false);
+        if( mPreview.usingCamera2API() ) {
+            Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+            assertTrue(mPreview.getCameraController().test_capture_results == 1);
+        }
+    }
+
+    /** Tests taking photo in HDR photo mode with saving base expo images, with RAW.
+     */
+    public void testTakePhotoHDRSaveExpoRaw() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoHDRSaveExpoRaw");
+
+        setToDefault();
+
+        if( !mActivity.supportsHDR() ) {
+            return;
+        }
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_yes");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_hdr");
+        editor.putBoolean(PreferenceKeys.HDRSaveExpoPreferenceKey, true);
+        editor.apply();
+        updateForSettings();
+
+        assertTrue( mActivity.getApplicationInterface().getPhotoMode() == MyApplicationInterface.PhotoMode.HDR );
+        subTestTakePhoto(false, false, true, true, false, false, true, false);
+        if( mPreview.usingCamera2API() ) {
+            Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+            assertTrue(mPreview.getCameraController().test_capture_results == 1);
+        }
+    }
+
+    /** Tests taking photo in HDR photo mode with saving base expo images, with RAW only.
+     */
+    public void testTakePhotoHDRSaveExpoRawOnly() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoHDRSaveExpoRawOnly");
+
+        setToDefault();
+
+        if( !mActivity.supportsHDR() ) {
+            return;
+        }
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_only");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_hdr");
+        editor.putBoolean(PreferenceKeys.HDRSaveExpoPreferenceKey, true);
+        editor.apply();
+        updateForSettings();
+
+        assertTrue( mActivity.getApplicationInterface().getPhotoMode() == MyApplicationInterface.PhotoMode.HDR );
+        subTestTakePhoto(false, false, true, true, false, false, true, false);
         if( mPreview.usingCamera2API() ) {
             Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
             assertTrue(mPreview.getCameraController().test_capture_results == 1);
@@ -9396,6 +9925,106 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             Log.d(TAG, "new_actual_focus_distance: " + new_actual_focus_distance);
             assertEquals(initial_focus_distance, new_actual_focus_distance, 1.0e-5f);
         }
+    }
+
+    /** Tests taking a photo with RAW and focus bracketing mode.
+     */
+    public void testTakePhotoRawFocusBracketing() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoRawFocusBracketing");
+
+        setToDefault();
+
+        if( !mActivity.supportsFocusBracketing() ) {
+            return;
+        }
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+
+        SeekBar focusSeekBar = mActivity.findViewById(net.sourceforge.opencamera.R.id.focus_seekbar);
+        assertTrue(focusSeekBar.getVisibility() == View.GONE);
+        SeekBar focusTargetSeekBar = mActivity.findViewById(net.sourceforge.opencamera.R.id.focus_bracketing_target_seekbar);
+        assertTrue(focusTargetSeekBar.getVisibility() == View.GONE);
+
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_yes");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_focus_bracketing");
+        editor.apply();
+        updateForSettings();
+
+        setUpFocusBracketing();
+
+        float initial_focus_distance = mPreview.getCameraController().getFocusDistance();
+        Log.d(TAG, "initial_focus_distance: " + initial_focus_distance);
+        CameraController2 camera_controller2 = (CameraController2)mPreview.getCameraController();
+        CaptureRequest.Builder previewBuilder = camera_controller2.testGetPreviewBuilder();
+        // need to use LENS_FOCUS_DISTANCE rather than mPreview.getCameraController().getFocusDistance(), as the latter
+        // will always return the source focus distance, even if the preview was set to something else
+        float actual_initial_focus_distance = previewBuilder.get(CaptureRequest.LENS_FOCUS_DISTANCE);
+        assertEquals(initial_focus_distance, actual_initial_focus_distance, 1.0e-5f);
+
+        subTestTakePhoto(false, false, true, true, false, false, true, false);
+        Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+        assertTrue(mPreview.getCameraController().test_capture_results == 1);
+
+        float new_focus_distance = mPreview.getCameraController().getFocusDistance();
+        Log.d(TAG, "new_focus_distance: " + new_focus_distance);
+        assertEquals(initial_focus_distance, new_focus_distance, 1.0e-5f);
+
+        float new_actual_focus_distance = previewBuilder.get(CaptureRequest.LENS_FOCUS_DISTANCE);
+        Log.d(TAG, "new_actual_focus_distance: " + new_actual_focus_distance);
+        assertEquals(initial_focus_distance, new_actual_focus_distance, 1.0e-5f);
+    }
+
+    /** Tests taking a photo with RAW only and focus bracketing mode.
+     */
+    public void testTakePhotoRawOnlyFocusBracketing() throws InterruptedException {
+        Log.d(TAG, "testTakePhotoRawOnlyFocusBracketing");
+
+        setToDefault();
+
+        if( !mActivity.supportsFocusBracketing() ) {
+            return;
+        }
+        if( !mPreview.supportsRaw() ) {
+            return;
+        }
+
+        SeekBar focusSeekBar = mActivity.findViewById(net.sourceforge.opencamera.R.id.focus_seekbar);
+        assertTrue(focusSeekBar.getVisibility() == View.GONE);
+        SeekBar focusTargetSeekBar = mActivity.findViewById(net.sourceforge.opencamera.R.id.focus_bracketing_target_seekbar);
+        assertTrue(focusTargetSeekBar.getVisibility() == View.GONE);
+
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putString(PreferenceKeys.RawPreferenceKey, "preference_raw_only");
+        editor.putString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_focus_bracketing");
+        editor.apply();
+        updateForSettings();
+
+        setUpFocusBracketing();
+
+        float initial_focus_distance = mPreview.getCameraController().getFocusDistance();
+        Log.d(TAG, "initial_focus_distance: " + initial_focus_distance);
+        CameraController2 camera_controller2 = (CameraController2)mPreview.getCameraController();
+        CaptureRequest.Builder previewBuilder = camera_controller2.testGetPreviewBuilder();
+        // need to use LENS_FOCUS_DISTANCE rather than mPreview.getCameraController().getFocusDistance(), as the latter
+        // will always return the source focus distance, even if the preview was set to something else
+        float actual_initial_focus_distance = previewBuilder.get(CaptureRequest.LENS_FOCUS_DISTANCE);
+        assertEquals(initial_focus_distance, actual_initial_focus_distance, 1.0e-5f);
+
+        subTestTakePhoto(false, false, true, true, false, false, true, false);
+        Log.d(TAG, "test_capture_results: " + mPreview.getCameraController().test_capture_results);
+        assertTrue(mPreview.getCameraController().test_capture_results == 1);
+
+        float new_focus_distance = mPreview.getCameraController().getFocusDistance();
+        Log.d(TAG, "new_focus_distance: " + new_focus_distance);
+        assertEquals(initial_focus_distance, new_focus_distance, 1.0e-5f);
+
+        float new_actual_focus_distance = previewBuilder.get(CaptureRequest.LENS_FOCUS_DISTANCE);
+        Log.d(TAG, "new_actual_focus_distance: " + new_actual_focus_distance);
+        assertEquals(initial_focus_distance, new_actual_focus_distance, 1.0e-5f);
     }
 
     /** Tests NR photo mode.
@@ -9794,7 +10423,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     		float hdr_alpha = ImageSaver.getHDRAlpha(preference_hdr_contrast_enhancement, exposure_time, inputs.size());
             long time_s = System.currentTimeMillis();
             try {
-                mActivity.getApplicationInterface().getHDRProcessor().processHDR(inputs, true, null, true, null, hdr_alpha, 4, true, tonemapping_algorithm);
+                mActivity.getApplicationInterface().getHDRProcessor().processHDR(inputs, true, null, true, null, hdr_alpha, 4, true, tonemapping_algorithm, HDRProcessor.DROTonemappingAlgorithm.DROALGORITHM_GAINGAMMA);
             }
             catch(HDRProcessorException e) {
                 e.printStackTrace();
@@ -9802,11 +10431,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             }
             Log.d(TAG, "HDR time: " + (System.currentTimeMillis() - time_s));
 
-            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/" + output_name);
-            OutputStream outputStream = new FileOutputStream(file);
-            inputs.get(0).compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-            outputStream.close();
-            mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+            saveBitmap(inputs.get(0), output_name);
             hdrHistogramDetails = checkHistogram(inputs.get(0));
         }
         inputs.get(0).recycle();
@@ -9816,7 +10441,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             inputs.add(dro_bitmap_in);
             long time_s = System.currentTimeMillis();
             try {
-                mActivity.getApplicationInterface().getHDRProcessor().processHDR(inputs, true, null, true, null, 0.5f, 4, true, HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD);
+                mActivity.getApplicationInterface().getHDRProcessor().processHDR(inputs, true, null, true, null, 0.5f, 4, true, HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD, HDRProcessor.DROTonemappingAlgorithm.DROALGORITHM_GAINGAMMA);
             }
             catch(HDRProcessorException e) {
                 e.printStackTrace();
@@ -9824,11 +10449,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             }
             Log.d(TAG, "DRO time: " + (System.currentTimeMillis() - time_s));
 
-            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/dro" + output_name);
-            OutputStream outputStream = new FileOutputStream(file);
-            inputs.get(0).compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-            outputStream.close();
-            mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+            saveBitmap(inputs.get(0), "dro" + output_name);
             checkHistogram(inputs.get(0));
             inputs.get(0).recycle();
             inputs.clear();
@@ -10317,7 +10938,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         //checkHistogramDetails(hdrHistogramDetails, 1, 113, 254);
         //checkHistogramDetails(hdrHistogramDetails, 1, 119, 255);
-        checkHistogramDetails(hdrHistogramDetails, 5, 120, 255);
+        //checkHistogramDetails(hdrHistogramDetails, 5, 120, 255);
+        checkHistogramDetails(hdrHistogramDetails, 2, 120, 255);
     }
 
     /** Tests HDR algorithm on test samples "testHDR19".
@@ -11477,7 +12099,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add( getBitmapFromFile(hdr_images_path + "testHDR51/IMG_20180323_104702_1.jpg") );
         inputs.add( getBitmapFromFile(hdr_images_path + "testHDR51/IMG_20180323_104702_2.jpg") );
 
-        HistogramDetails hdrHistogramDetails = subTestHDR(inputs, "testHDR51_output.jpg", false, 1600, 1000000000L/11);
+        HistogramDetails hdrHistogramDetails = subTestHDR(inputs, "testHDR51_output.jpg", true, 1600, 1000000000L/11);
 
         //checkHistogramDetails(hdrHistogramDetails, 0, 75, 255);
     }
@@ -11652,7 +12274,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         subTestHDR(inputs, "testDRODark1_output.jpg", true, -1, -1);
     }
 
-    /** Tests calling the DRO routine with 0.0 factor - and that the resultant image is identical.
+    /** Tests calling the DRO routine with 0.0 factor, and DROALGORITHM_NONE - and that the resultant image is identical.
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public void testDROZero() throws IOException, InterruptedException {
@@ -11673,18 +12295,14 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         List<Bitmap> inputs = new ArrayList<>();
         inputs.add(bitmap);
         try {
-            mActivity.getApplicationInterface().getHDRProcessor().processHDR(inputs, true, null, true, null, 0.0f, 4, true, HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD);
+            mActivity.getApplicationInterface().getHDRProcessor().processHDR(inputs, true, null, true, null, 0.0f, 4, true, HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD, HDRProcessor.DROTonemappingAlgorithm.DROALGORITHM_NONE);
         }
         catch(HDRProcessorException e) {
             e.printStackTrace();
             throw new RuntimeException();
         }
 
-        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/droZerotestHDR3_output.jpg");
-        OutputStream outputStream = new FileOutputStream(file);
-        inputs.get(0).compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-        outputStream.close();
-        mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+        saveBitmap(inputs.get(0), "droZerotestHDR3_output.jpg");
         checkHistogram(bitmap);
 
         // check bitmaps are the same
@@ -11817,11 +12435,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             throw new RuntimeException();
         }
 
-        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/" + output_name);
-        OutputStream outputStream = new FileOutputStream(file);
-        nr_bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-        outputStream.close();
-        mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+        saveBitmap(nr_bitmap, output_name);
         HistogramDetails hdrHistogramDetails = checkHistogram(nr_bitmap);
         nr_bitmap.recycle();
         System.gc();
@@ -14009,11 +14623,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             bitmap.setPixels(buffer, 0, bitmap.getWidth(), 0, y, bitmap.getWidth(), 1);
         }
 
-        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/" + output_name);
-        OutputStream outputStream = new FileOutputStream(file);
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-        outputStream.close();
-        mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+        saveBitmap(bitmap, output_name);
         HistogramDetails hdrHistogramDetails = checkHistogram(bitmap);
         bitmap.recycle();
         System.gc();
@@ -14149,11 +14759,81 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         checkHistogramDetails(hdrHistogramDetails, 0, 212, 255);
     }
 
-    public void subTestPanorama(List<String> inputs, String output_name, String gyro_debug_info_filename, float panorama_pics_per_screen, float gyro_tol_degrees) throws IOException, InterruptedException {
+    private void saveBitmap(Bitmap bitmap, String name) throws IOException {
+        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/" + name);
+        OutputStream outputStream = new FileOutputStream(file);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
+        outputStream.close();
+        mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+    }
+
+    private Bitmap blend_panorama_pyramids(Bitmap lhs, Bitmap rhs) throws IOException {
+        Bitmap merged_bitmap = mActivity.getApplicationInterface().getHDRProcessor().blendPyramids(lhs, rhs);
+
+        /*{
+            // debug
+            saveBitmap(merged_bitmap, "merged_bitmap.jpg");
+        }*/
+        return merged_bitmap;
+    }
+
+    private Bitmap blend_panorama_alpha(Bitmap lhs, Bitmap rhs) {
+        int width = lhs.getWidth();
+        int height = lhs.getHeight();
+        if( width != rhs.getWidth() ) {
+            Log.e(TAG, "bitmaps have different widths");
+            throw new RuntimeException();
+        }
+        else if( height != rhs.getHeight() ) {
+            Log.e(TAG, "bitmaps have different heights");
+            throw new RuntimeException();
+        }
+        Paint p = new Paint();
+        Rect rect = new Rect();
+        Bitmap blended_bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas blended_canvas = new Canvas(blended_bitmap);
+        p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.ADD));
+        for(int x=0;x<width;x++) {
+            rect.set(x, 0, x+1, height);
+
+            // left hand blend
+            // if x=0: frac=1
+            // if x=width-1: frac=0
+            float frac = (width-1.0f-x)/(width-1.0f);
+            p.setAlpha((int)(255.0f*frac));
+            blended_canvas.drawBitmap(lhs, rect, rect, p);
+
+            // right hand blend
+            // if x=0: frac=0
+            // if x=width-1: frac=1
+            frac = ((float)x)/(width-1.0f);
+            p.setAlpha((int)(255.0f*frac));
+            blended_canvas.drawBitmap(rhs, rect, rect, p);
+        }
+        return blended_bitmap;
+    }
+
+    private int nextPowerOf2(int value) {
+        int power = 1;
+        while( value > power )
+            power *= 2;
+        return power;
+    }
+
+    /**
+     * @param panorama_pics_per_screen The value of panorama_pics_per_screen used when taking the input photos.
+     * @param camera_angle_x The value of preview.getViewAngleX(for_preview=false) (in degrees) when taking the input photos (on the device used).
+     * @param camera_angle_y The value of preview.getViewAngleY(for_preview=false) (in degrees) when taking the input photos (on the device used).
+     */
+    private void subTestPanorama(List<String> inputs, String output_name, String gyro_debug_info_filename, float panorama_pics_per_screen, float camera_angle_x, float camera_angle_y, float gyro_tol_degrees) throws IOException, InterruptedException {
         Log.d(TAG, "subTestPanorama");
 
         // we set panorama_pics_per_screen in the test rather than using MyApplicationInterface.panorama_pics_per_screen,
         // in case the latter value is changed
+
+        long time_s = 0;
+        if( MyDebug.LOG )
+            time_s = System.currentTimeMillis();
 
         List<Bitmap> bitmaps = new ArrayList<>();
         for(String input : inputs) {
@@ -14163,10 +14843,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         int bitmap_width = bitmaps.get(0).getWidth();
         int bitmap_height = bitmaps.get(0).getHeight();
-        int slice_width = (int)(bitmap_width / panorama_pics_per_screen);
         Log.d(TAG, "bitmap_width: " + bitmap_width);
         Log.d(TAG, "bitmap_height: " + bitmap_height);
-        Log.d(TAG, "slice_width: " + slice_width);
 
         for(int i=1;i<bitmaps.size();i++) {
             Bitmap bitmap = bitmaps.get(i);
@@ -14200,13 +14878,35 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         }
         //bitmaps.subList(2,bitmaps.size()).clear(); // test
 
-        float camera_angle_deg = mActivity.getPreview().getViewAngleY(false);
-        double camera_angle = Math.toRadians(camera_angle_deg);
-        Log.d(TAG, "camera_angle_deg: " + camera_angle_deg);
+        // downscale
+        final int max_height = 2080;
+        if( bitmap_height >= max_height ) {
+            float scale = ((float)max_height) / ((float)bitmap_height);
+            Log.d(TAG, "scale: " + scale);
+            Matrix scale_matrix = new Matrix();
+            scale_matrix.postScale(scale, scale);
+            for(int j=0;j<bitmaps.size();j++) {
+                Bitmap new_bitmap = Bitmap.createBitmap(bitmaps.get(j), 0, 0, bitmap_width, bitmap_height, scale_matrix, true);
+                bitmaps.get(j).recycle();
+                bitmaps.set(j, new_bitmap);
+            }
+            bitmap_width = bitmaps.get(0).getWidth();
+            bitmap_height = bitmaps.get(0).getHeight();
+            Log.d(TAG, "bitmap_width is now: " + bitmap_width);
+            Log.d(TAG, "bitmap_height is now: " + bitmap_height);
+        }
+        Log.d(TAG, "### time after downsscale: " + (System.currentTimeMillis() - time_s));
+
+        int slice_width = (int)(bitmap_width / panorama_pics_per_screen);
+        Log.d(TAG, "slice_width: " + slice_width);
+
+        double camera_angle = Math.toRadians(camera_angle_y);
+        Log.d(TAG, "camera_angle_y: " + camera_angle_y);
         Log.d(TAG, "camera_angle: " + camera_angle);
         // max offset error of gyro_tol_degrees - convert this to pixels
         //int max_offset_error_x = (int)(gyro_tol_degrees * bitmap_width / mActivity.getPreview().getViewAngleY() + 0.5f);
         //int max_offset_error_y = (int)(gyro_tol_degrees * bitmap_height / mActivity.getPreview().getViewAngleX() + 0.5f);
+        //if we use the above code, remember not to use the camera view angles, but those that the test photos were taken with!
         double h = ((double)bitmap_width) / (2.0 * Math.tan(camera_angle/2.0) );
         /*int max_offset_error_x = (int)(h * Math.tan(Math.toRadians(gyro_tol_degrees)) + 0.5f);
         max_offset_error_x *= 2; // allow a fudge factor
@@ -14215,10 +14915,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "max_offset_error_x: " + max_offset_error_x);
         Log.d(TAG, "max_offset_error_y: " + max_offset_error_y);*/
 
-        int offset_x = (bitmap_width - slice_width)/2;
+        final int offset_x = (bitmap_width - slice_width)/2;
         //final int blend_hwidth = 0;
-        final int blend_hwidth = bitmap_width/20;
+        //final int blend_hwidth = bitmap_width/20;
+        final int blend_hwidth = nextPowerOf2(bitmap_width/20);
         final int align_hwidth = bitmap_width/10;
+        //final int align_hwidth = bitmap_width/5;
         final boolean use_auto_align = true;
         //final boolean use_auto_align = false;
         gyro_debug_info = null; // test
@@ -14235,7 +14937,6 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Rect src_rect = new Rect();
         Rect dst_rect = new Rect();
         Paint p = new Paint();
-        p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.ADD));
         int align_x = 0, align_y = 0;
         int dst_offset_x = 0;
         for(int i=0;i<bitmaps.size();i++) {
@@ -14319,14 +15020,16 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             // important to rotate before doing auto-alignment (since we already have the angle from gyro)
             if( Math.abs(angle_z) > 1.0e-5f ) {
                 Log.d(TAG, "pre-rotate bitmap by: " + angle_z);
+                Log.d(TAG, "### time before rotating " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                 Bitmap rotated_bitmap = Bitmap.createBitmap(bitmap_width, bitmap_height, Bitmap.Config.ARGB_8888);
                 Canvas rotated_canvas = new Canvas(rotated_bitmap);
                 rotated_canvas.save();
-                rotated_canvas.rotate((float)Math.toDegrees(-angle_z), bitmap_width/2, bitmap_height/2);
+                rotated_canvas.rotate((float)Math.toDegrees(-angle_z), bitmap_width/2.0f, bitmap_height/2.0f);
                 rotated_canvas.drawBitmap(bitmaps.get(i), 0, 0, p);
                 rotated_canvas.restore();
                 bitmaps.get(i).recycle();
                 bitmaps.set(i, rotated_bitmap);
+                Log.d(TAG, "### time after rotating " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
             }
 
             if( use_auto_align && i > 0 ) {
@@ -14340,19 +15043,24 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 Log.d(TAG, "    slice_width: " + slice_width);
                 Log.d(TAG, "    align_x+offset_x+slice_width-align_hwidth: " + (align_x+offset_x+slice_width-align_hwidth));
                 Log.d(TAG, "    bitmap(i-1) width: " + bitmaps.get(i-1).getWidth());
-                alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i-1), align_x+offset_x+slice_width-align_hwidth, 0, 2*align_hwidth, bitmap_height) );
-                alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i), align_x+offset_x-align_hwidth, 0, 2*align_hwidth, bitmap_height) );
+                // n.b., we add in reverse order, so we find the transformation to map the next image (i) onto the previous image (i-1)
+                //alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i), align_x+offset_x-align_hwidth, 0, 2*align_hwidth, bitmap_height) );
+                //alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i-1), align_x+offset_x+slice_width-align_hwidth, 0, 2*align_hwidth, bitmap_height) );
                 // less tall:
-                int align_bitmap_height = Math.min(bitmap_height, align_hwidth); // ratio 2:1
+                //int align_bitmap_height = Math.min(bitmap_height, align_hwidth); // ratio 2:1
                 //int align_bitmap_height = Math.min(bitmap_height, 2*align_hwidth); // ratio 1:1
                 //int align_bitmap_height = Math.min(bitmap_height, 4*align_hwidth); // ratio 1:2
                 //int align_bitmap_height = Math.min(bitmap_height, 8*align_hwidth); // ratio 1:4
-                //alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i-1), align_x+offset_x+slice_width-align_hwidth, (bitmap_height-align_bitmap_height)/2, 2*align_hwidth, align_bitmap_height) );
-                //alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i), align_x+offset_x-align_hwidth, (bitmap_height-align_bitmap_height)/2, 2*align_hwidth, align_bitmap_height) );
+                int align_bitmap_height = (3*bitmap_height)/4;
+                Log.d(TAG, "### time before creating alignment bitmaps for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+                alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i), align_x+offset_x-align_hwidth, (bitmap_height-align_bitmap_height)/2, 2*align_hwidth, align_bitmap_height) );
+                alignment_bitmaps.add( Bitmap.createBitmap(bitmaps.get(i-1), align_x+offset_x+slice_width-align_hwidth, (bitmap_height-align_bitmap_height)/2, 2*align_hwidth, align_bitmap_height) );
+                Log.d(TAG, "### time after creating alignment bitmaps for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                 //final boolean use_align_by_feature = false;
                 final boolean use_align_by_feature = true;
                 final int align_downsample = use_align_by_feature ? 4 : 1;
                 if( align_downsample > 1 ) {
+                    Log.d(TAG, "### time before downscaling creating alignment bitmaps for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                     Matrix align_scale_matrix = new Matrix();
                     align_scale_matrix.postScale(1.0f/(float)align_downsample, 1.0f/(float)align_downsample);
                     for(int j=0;j<alignment_bitmaps.size();j++) {
@@ -14360,25 +15068,25 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                         alignment_bitmaps.get(j).recycle();
                         alignment_bitmaps.set(j, new_bitmap);
                     }
+                    Log.d(TAG, "### time after downscaling creating alignment bitmaps for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                 }
 
                 // save bitmaps used for alignments
                 /*for(int j=0;j<alignment_bitmaps.size();j++) {
                     Bitmap alignment_bitmap = alignment_bitmaps.get(j);
-                    File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/alignment_bitmap_" + i + "_" + j +"_" + output_name);
-                    OutputStream outputStream = new FileOutputStream(file);
-                    alignment_bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-                    outputStream.close();
-                    mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+                    saveBitmap(alignment_bitmap, "alignment_bitmap_" + i + "_" + j +"_" + output_name);
                 }*/
 
                 int this_align_x = 0, this_align_y = 0;
+                float y_scale = 1.0f;
+                Log.d(TAG, "### time before auto-alignment for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                 if( use_align_by_feature ) {
                     try {
                         HDRProcessor.AutoAlignmentByFeatureResult res = mActivity.getApplicationInterface().getHDRProcessor().autoAlignmentByFeature(alignment_bitmaps.get(0).getWidth(), alignment_bitmaps.get(0).getHeight(), alignment_bitmaps, i);
                         this_align_x = res.offset_x;
                         this_align_y = res.offset_y;
                         angle_z = res.rotation;
+                        y_scale = res.y_scale;
                     }
                     catch (HDRProcessorException e) {
                         e.printStackTrace();
@@ -14394,6 +15102,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                     this_align_x = offsets_x[1];
                     this_align_y = offsets_y[1];
                 }
+                Log.d(TAG, "### time after auto-alignment for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                 this_align_x *= align_downsample;
                 this_align_y *= align_downsample;
                 for(Bitmap alignment_bitmap : alignment_bitmaps) {
@@ -14406,29 +15115,44 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 // post-rotate image based on auto-alignment
                 if( gyro_debug_info == null && Math.abs(angle_z) > 1.0e-5f ) {
                     Log.d(TAG, "post-rotate bitmap by: " + angle_z);
+                    Log.d(TAG, "### time before pre-rotate for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                     // we have rotation about origin followed by translation
                     // but instead we want to rotate about the bitmap centre and then translate:
                     // R[x] + d = (R[x-c] + c) + (d - c + R[c])
-                    float rotated_centre_x = (float)(bitmap_width/2 * Math.cos(angle_z) - bitmap_height/2 * Math.sin(angle_z));
-                    float rotated_centre_y = (float)(bitmap_width/2 * Math.sin(angle_z) + bitmap_height/2 * Math.cos(angle_z));
+                    //float rotated_centre_x = (float)(bitmap_width/2 * Math.cos(angle_z) - bitmap_height/2 * Math.sin(angle_z));
+                    //float rotated_centre_y = (float)(bitmap_width/2 * Math.sin(angle_z) + bitmap_height/2 * Math.cos(angle_z));
                     //this_align_x += rotated_centre_x - bitmap_width/2;
                     //this_align_y += rotated_centre_y - bitmap_height/2;
-                    Log.d(TAG, "    this_align_x is now: " + this_align_x);
-                    Log.d(TAG, "    this_align_y is now: " + this_align_y);
+                    //Log.d(TAG, "    this_align_x is now: " + this_align_x);
+                    //Log.d(TAG, "    this_align_y is now: " + this_align_y);
 
                     Bitmap rotated_bitmap = Bitmap.createBitmap(bitmap_width, bitmap_height, Bitmap.Config.ARGB_8888);
                     Canvas rotated_canvas = new Canvas(rotated_bitmap);
                     rotated_canvas.save();
-                    //rotated_canvas.rotate((float)Math.toDegrees(-angle_z), bitmap_width/2, bitmap_height/2);
-                    rotated_canvas.rotate((float)Math.toDegrees(-angle_z), align_x+offset_x-align_hwidth, 0);
+
+                    /*
+                    // handle the transformation entirely by transforming the bitmap
+                    // need to invert the transformation
                     rotated_canvas.translate(-this_align_x, -this_align_y);
+                    rotated_canvas.rotate((float)Math.toDegrees(-angle_z), align_x+offset_x-align_hwidth, 0);
                     this_align_x = 0;
                     this_align_y = 0;
+                    */
+
+                    //rotated_canvas.scale(1.0f, y_scale,align_x+offset_x-align_hwidth,0);
+                    rotated_canvas.rotate((float)Math.toDegrees(angle_z), align_x+offset_x-align_hwidth, 0);
+                    rotated_canvas.scale(1.0f, y_scale,align_x+offset_x-align_hwidth,0);
+
                     rotated_canvas.drawBitmap(bitmaps.get(i), 0, 0, p);
                     rotated_canvas.restore();
                     bitmaps.get(i).recycle();
                     bitmaps.set(i, rotated_bitmap);
+                    Log.d(TAG, "### time after pre-rotate for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
                 }
+
+                // alignments map next image to previous, so this means we need to move the "source" window in the opposite direction
+                this_align_x = - this_align_x;
+                this_align_y = - this_align_y;
 
                 if( x_offsets_cumulative )
                     align_x += this_align_x;
@@ -14476,6 +15200,127 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 bitmap = rotated_bitmap;
             }*/
 
+            float alpha = (float)((camera_angle * i)/panorama_pics_per_screen);
+            Log.d(TAG, "    alpha: " + alpha + " ( " + Math.toDegrees(alpha) + " degrees )");
+
+            Log.d(TAG, "### time before projection for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+            Bitmap projected_bitmap = Bitmap.createBitmap(bitmap_width, bitmap_height, Bitmap.Config.ARGB_8888);
+            {
+                // project
+                Canvas projected_canvas = new Canvas(projected_bitmap);
+                int prev_x = 0;
+                int prev_y0 = -1, prev_y1 = -1;
+                for(int x=0;x<bitmap_width;x++) {
+                    float dx = (float)(x - (bitmap_width/2));
+                    // rectangular projection:
+                    //float new_height = bitmap_height * (float)(h / (h * Math.cos(alpha) - dx * Math.sin(alpha)));
+                    // cylindrical projection:
+                    float theta = (float)(dx*camera_angle)/(float)bitmap_width;
+                    float new_height = bitmap_height * (float)Math.cos(theta);
+
+                    int dst_y0 = (int)((bitmap_height - new_height)/2.0f+0.5f);
+                    int dst_y1 = (int)((bitmap_height + new_height)/2.0f+0.5f);
+                    // y_tol: boost performance at the expense of accuracy (but only by up to 1 pixel)
+                    //final int y_tol = 0;
+                    final int y_tol = 1;
+                    if( x == 0 ) {
+                        prev_y0 = dst_y0;
+                        prev_y1 = dst_y1;
+                    }
+                    //else if( dst_y0 != prev_y0 || dst_y1 != prev_y1 ) {
+                    else if( Math.abs(dst_y0 - prev_y0) > y_tol || Math.abs(dst_y1 - prev_y1) > y_tol ) {
+                        src_rect.set(prev_x, 0, x, bitmap_height);
+                        dst_rect.set(prev_x, dst_y0, x, dst_y1);
+                        projected_canvas.drawBitmap(bitmap, src_rect, dst_rect, p);
+                        prev_x = x;
+                        prev_y0 = dst_y0;
+                        prev_y1 = dst_y1;
+                    }
+
+                    if( x == bitmap_width-1 ) {
+                        // draw last
+                        src_rect.set(prev_x, 0, x+1, bitmap_height);
+                        dst_rect.set(prev_x, dst_y0, x+1, dst_y1);
+                        projected_canvas.drawBitmap(bitmap, src_rect, dst_rect, p);
+                    }
+
+                    /*src_rect.set(x, 0, x+1, bitmap_height);
+                    dst_rect.set(x, dst_y0, x+1, dst_y1);
+
+                    projected_canvas.drawBitmap(bitmap, src_rect, dst_rect, p);*/
+                }
+            }
+            Log.d(TAG, "### time after projection for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+
+            if( i > 0 && blend_hwidth > 0 ) {
+                Log.d(TAG, "### time before blending for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+                // first blend right hand side of previous image with left hand side of new image
+                Bitmap lhs = Bitmap.createBitmap(panorama, offset_x + dst_offset_x - blend_hwidth, 0, 2*blend_hwidth, bitmap_height);
+                //Bitmap rhs = Bitmap.createBitmap(projected_bitmap, offset_x - blend_hwidth, 0, 2*blend_hwidth, bitmap_height);
+                Bitmap rhs = Bitmap.createBitmap(2*blend_hwidth, bitmap_height, Bitmap.Config.ARGB_8888);
+                {
+                    Canvas rhs_canvas = new Canvas(rhs);
+                    src_rect.set(offset_x - blend_hwidth, 0, offset_x + blend_hwidth, bitmap_height);
+                    src_rect.offset(align_x, align_y);
+                    dst_rect.set(0, 0, 2*blend_hwidth, bitmap_height);
+                    rhs_canvas.drawBitmap(projected_bitmap, src_rect, dst_rect, p);
+                }
+                //Bitmap blended_bitmap = blend_panorama_alpha(lhs, rhs);
+                Bitmap blended_bitmap = blend_panorama_pyramids(lhs, rhs);
+                /*Bitmap blended_bitmap = Bitmap.createBitmap(2*blend_hwidth, bitmap_height, Bitmap.Config.ARGB_8888);
+                Canvas blended_canvas = new Canvas(blended_bitmap);
+                p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.ADD));
+                for(int x=0;x<2*blend_hwidth;x++) {
+                    src_rect.set(x, 0, x+1, bitmap_height);
+
+                    // left hand blend
+                    // if x=0: frac=1
+                    // if x=2*blend_width-1: frac=0
+                    float frac = (2.0f*blend_hwidth-1.0f-x)/(2.0f*blend_hwidth-1.0f);
+                    p.setAlpha((int)(255.0f*frac));
+                    blended_canvas.drawBitmap(lhs, src_rect, src_rect, p);
+
+                    // right hand blend
+                    // if x=0: frac=0
+                    // if x=2*blend_width-1: frac=1
+                    frac = ((float)x)/(2.0f*blend_hwidth-1.0f);
+                    p.setAlpha((int)(255.0f*frac));
+                    blended_canvas.drawBitmap(rhs, src_rect, src_rect, p);
+                }
+                p.setAlpha(255); // reset
+                p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER)); // reset
+                */
+
+                // now draw the blended region
+                canvas.drawBitmap(blended_bitmap, offset_x + dst_offset_x - blend_hwidth, 0, p);
+
+                lhs.recycle();
+                rhs.recycle();
+                blended_bitmap.recycle();
+                Log.d(TAG, "### time after blending for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+            }
+
+            int start_x = blend_hwidth;
+            int stop_x = slice_width+blend_hwidth;
+            if( i == 0 )
+                start_x = -offset_x;
+            if( i == bitmaps.size()-1 )
+                stop_x = slice_width+offset_x;
+            if( !x_offsets_cumulative ) {
+                stop_x -= align_x;
+            }
+            Log.d(TAG, "    start_x: " + start_x);
+            Log.d(TAG, "    stop_x: " + stop_x);
+
+            // draw rest of this image
+            Log.d(TAG, "### time before drawing non-blended region for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+            src_rect.set(offset_x + start_x, 0, offset_x + stop_x, bitmap_height);
+            src_rect.offset(align_x, align_y);
+            dst_rect.set(offset_x + dst_offset_x + start_x, 0, offset_x + dst_offset_x + stop_x, bitmap_height);
+            canvas.drawBitmap(projected_bitmap, src_rect, dst_rect, p);
+            Log.d(TAG, "### time after drawing non-blended region for " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
+
+            /*
             int start_x = -blend_hwidth;
             int stop_x = slice_width+blend_hwidth;
             if( i == 0 )
@@ -14488,27 +15333,11 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             Log.d(TAG, "    start_x: " + start_x);
             Log.d(TAG, "    stop_x: " + stop_x);
 
-            float alpha = (float)((camera_angle * i)/panorama_pics_per_screen);
-            Log.d(TAG, "    alpha: " + alpha + " ( " + Math.toDegrees(alpha) + " degrees )");
-
+            p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.ADD));
             for(int x=start_x;x<stop_x;x++) {
-                float dx = (float)(x - (slice_width/2));
-                dx += align_x;
-
-                // rectangular projection:
-                //float new_height = bitmap_height * (float)(h / (h * Math.cos(alpha) - dx * Math.sin(alpha)));
-                // cylindrical projection:
-                float theta = (float)(dx*camera_angle)/(float)bitmap_width;
-                float new_height = bitmap_height * (float)Math.cos(theta);
-                // no projection:
-                //float new_height = bitmap_height;
-
-                int dst_y0 = (int)((bitmap_height - new_height)/2.0f+0.5f);
-                int dst_y1 = (int)((bitmap_height + new_height)/2.0f+0.5f);
-
                 src_rect.set(offset_x + x, 0, offset_x + x+1, bitmap_height);
                 src_rect.offset(align_x, align_y);
-                dst_rect.set(offset_x + dst_offset_x + x, dst_y0, offset_x + dst_offset_x + x+1, dst_y1);
+                dst_rect.set(offset_x + dst_offset_x + x, 0, offset_x + dst_offset_x + x+1, bitmap_height);
 
                 int blend_alpha = 255;
                 if( i > 0 && x < blend_hwidth ) {
@@ -14531,15 +15360,20 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                 }
                 p.setAlpha(blend_alpha);
 
-                canvas.drawBitmap(bitmap, src_rect, dst_rect, p);
-                p.setAlpha(255); // reset!
+                //canvas.drawBitmap(bitmap, src_rect, dst_rect, p);
+                canvas.drawBitmap(projected_bitmap, src_rect, dst_rect, p);
             }
+            p.setAlpha(255); // reset
+            p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER)); // reset
+            */
+
             dst_offset_x += slice_width;
             if( !x_offsets_cumulative ) {
                 dst_offset_x -= align_x;
             }
             Log.d(TAG, "    dst_offset_x is now: " + dst_offset_x);
 
+            projected_bitmap.recycle();
             /*if( rotated_bitmap != null ) {
                 rotated_bitmap.recycle();
             }*/
@@ -14586,6 +15420,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             canvas.drawBitmap(bitmap_slice, matrix, null);
             bitmap_slice.recycle();
             */
+            Log.d(TAG, "### time after processing " + i + "th bitmap: " + (System.currentTimeMillis() - time_s));
         }
         for(Bitmap bitmap : bitmaps) {
             bitmap.recycle();
@@ -14593,11 +15428,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         bitmaps.clear();
         Log.d(TAG, "panorama complete!");
 
-        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/" + output_name);
-        OutputStream outputStream = new FileOutputStream(file);
-        panorama.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-        outputStream.close();
-        mActivity.getStorageUtils().broadcastFile(file, true, false, true);
+        Log.d(TAG, "### time taken: " + (System.currentTimeMillis() - time_s));
+
+        saveBitmap(panorama, output_name);
         Thread.sleep(500);
     }
 
@@ -14617,12 +15450,14 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama1/input1.jpg");
         inputs.add(panorama_images_path + "testPanorama1/input2.jpg");
         inputs.add(panorama_images_path + "testPanorama1/input3.jpg");
+        float camera_angle_x = 62.93796f;
+        float camera_angle_y = 47.44656f;
         float panorama_pics_per_screen = 2.0f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (47.44656/49.56283);
         String output_name = "testPanorama1_output.jpg";
 
-        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, 2.0f);
+        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 2.0f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama2".
@@ -14655,10 +15490,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama2/input4.jpg");
         inputs.add(panorama_images_path + "testPanorama2/input5.jpg");
         String output_name = "testPanorama2_output.jpg";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, 2.0f);
+        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 2.0f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama3".
@@ -14686,10 +15523,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama3/IMG_20190214_131317.jpg");
         inputs.add(panorama_images_path + "testPanorama3/IMG_20190214_131320.jpg");
         String output_name = "testPanorama3_output.jpg";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, 1.0f);
+        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 1.0f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama3", with panorama_pics_per_screen set
@@ -14718,10 +15557,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         //inputs.add(panorama_images_path + "testPanorama3/IMG_20190214_131317.jpg");
         inputs.add(panorama_images_path + "testPanorama3/IMG_20190214_131320.jpg");
         String output_name = "testPanorama3_picsperscreen2_output.jpg";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, 1.0f);
+        subTestPanorama(inputs, output_name, null, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 1.0f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama4".
@@ -14747,10 +15588,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama4/IMG_20190222_225317_7.jpg");
         String output_name = "testPanorama4_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama4/IMG_20190222_225317.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 1.0f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 1.0f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama5".
@@ -14776,10 +15619,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama5/IMG_20190223_220524_7.jpg");
         String output_name = "testPanorama5_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama5/IMG_20190223_220524.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 0.5f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama6".
@@ -14805,10 +15650,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama6/IMG_20190225_154232_7.jpg");
         String output_name = "testPanorama6_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama6/IMG_20190225_154232.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 0.5f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama7".
@@ -14835,10 +15682,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama7/IMG_20190225_155510_8.jpg");
         String output_name = "testPanorama7_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama7/IMG_20190225_155510.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 0.5f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama8".
@@ -14860,10 +15709,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama8/IMG_20190227_001431_3.jpg");
         String output_name = "testPanorama8_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama8/IMG_20190227_001431.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
         // these images were taken with incorrect camera view angles, so we compensate in the test:
-        panorama_pics_per_screen *= (50.44399/52.26029);
+        panorama_pics_per_screen *= (50.282097/52.26029);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 0.5f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
     }
 
     /** Tests panorama algorithm on test samples "testPanorama9".
@@ -14888,8 +15739,14 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama9/IMG_20190301_145213_6.jpg");
         String output_name = "testPanorama9_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama9/IMG_20190301_145213.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
+        // these images were taken with incorrect camera view angles, so we compensate in the test:
+        panorama_pics_per_screen *= (50.282097/50.44399);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 0.5f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
+
+        Thread.sleep(1000); // need to wait for debug images to be saved/broadcast?
     }
 
     /** Tests panorama algorithm on test samples "testPanorama10".
@@ -14920,7 +15777,74 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         inputs.add(panorama_images_path + "testPanorama10/IMG_20190301_144948_12.jpg");
         String output_name = "testPanorama10_output.jpg";
         String gyro_name = panorama_images_path + "testPanorama10/IMG_20190301_144948.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
+        // these images were taken with incorrect camera view angles, so we compensate in the test:
+        panorama_pics_per_screen *= (50.282097/50.44399);
 
-        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, 0.5f);
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
+    }
+
+    /** Tests panorama algorithm on test samples "testPanorama11".
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void testPanorama11() throws IOException, InterruptedException {
+        Log.d(TAG, "testPanorama11");
+
+        setToDefault();
+
+        // list assets
+        List<String> inputs = new ArrayList<>();
+
+        float panorama_pics_per_screen = 3.0f;
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_0.jpg");
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_1.jpg");
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_2.jpg");
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_3.jpg");
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_4.jpg");
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_5.jpg");
+        inputs.add(panorama_images_path + "testPanorama11/IMG_20190306_143652_6.jpg");
+        String output_name = "testPanorama11_output.jpg";
+        String gyro_name = panorama_images_path + "testPanorama11/IMG_20190306_143652.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
+        // these images were taken with incorrect camera view angles, so we compensate in the test:
+        panorama_pics_per_screen *= (50.282097/50.44399);
+
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
+    }
+
+    /** Tests panorama algorithm on test samples "testPanorama12".
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void testPanorama12() throws IOException, InterruptedException {
+        Log.d(TAG, "testPanorama12");
+
+        setToDefault();
+
+        // list assets
+        List<String> inputs = new ArrayList<>();
+
+        float panorama_pics_per_screen = 3.0f;
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_0.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_1.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_2.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_3.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_4.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_5.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_6.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_7.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_8.jpg");
+        inputs.add(panorama_images_path + "testPanorama12/IMG_20190308_152008_9.jpg");
+        String output_name = "testPanorama12_output.jpg";
+        String gyro_name = panorama_images_path + "testPanorama12/IMG_20190308_152008.xml";
+        float camera_angle_x = 66.708595f;
+        float camera_angle_y = 50.282097f;
+        // these images were taken with incorrect camera view angles, so we compensate in the test:
+        panorama_pics_per_screen *= (50.282097/50.44399);
+
+        subTestPanorama(inputs, output_name, gyro_name, panorama_pics_per_screen, camera_angle_x, camera_angle_y, 0.5f);
     }
 }

@@ -283,8 +283,8 @@
     <string name="audio_listener_started">Make a loud noise</string>
 
     <string name="auto_stabilise_info">Auto-level will automatically rotate photos so that they appear level.\n\nNote that this means images will come out a slightly lower resolution (due to the rotation and cropping that\'s required).</string>
-    <string name="raw_info">DNG files contain the full uncompressed and unprocessed information from your camera.\n\nNote that some gallery apps don\'t recognise DNG files. DNG images can be used with specialised image editors like Snapseed or Lightroom.\n\nNote that various processing options such as "Stamp photos" and "Auto-level" will only apply to the non-DNG (JPEG/etc) images, and not the DNG images.\n\nDNG files are only saved in Standard or DRO photo modes.</string>
-    <string name="hdr_info">HDR mode is useful for shots with a large variation in brightness. It works by taking multiple shots at different exposures, and combining them to create the final image.\n\nNote that HDR is not suitable for scenes with fast movement, and may result in less accurate colour reproduction.\n\nTaking photos in HDR mode will be slower.</string>
+    <string name="raw_info">DNG files contain the full uncompressed and unprocessed information from your camera.\n\nNote that some gallery apps don\'t recognise DNG files. DNG images can be used with specialised image editors like Snapseed or Lightroom.\n\nNote that various processing options such as "Stamp photos" and "Auto-level" will only apply to the non-DNG (JPEG/etc) images, and not the DNG images.</string>
+    <string name="hdr_info">HDR mode is useful for shots with a large variation in brightness. It works by taking multiple shots at different exposures, and combining them to create the final image.\n\nNote that HDR is not suitable for scenes with fast movement, and may result in less accurate color reproduction.\n\nTaking photos in HDR mode will be slower.</string>
 
     <string name="dont_show_again">Don\'t show again</string>
 
@@ -307,7 +307,8 @@
     <string name="permission_rationale_camera">Camera permission is required to enable the camera</string>
     <string name="permission_rationale_storage">Storage read/write permission is required to save photos</string>
     <string name="permission_rationale_record_audio">Microphone permission is required to record video with audio, as well as use the \"Audio control\" options</string>
-    <string name="permission_rationale_location">Location permission is required for geotagging</string>
+    <string name="permission_rationale_location">Location permission is required for geotagging (storing location data in
+        photos and videos). Location permission is also required for connecting to Bluetooth LE remote control devices.</string>
 
     <string name="preference_category_photo_debugging">Debugging options</string>
     <string name="preference_category_video_debugging">Debugging options</string>
@@ -503,6 +504,7 @@
     <string name="preference_focus_bracketing_n_images_entries_40">40</string>
     <string name="preference_focus_bracketing_n_images_entries_50">50</string>
     <string name="preference_focus_bracketing_n_images_entries_100">100</string>
+    <string name="preference_focus_bracketing_n_images_entries_150">150</string>
     <string name="preference_focus_bracketing_n_images_entries_200">200</string>
 
     <string name="preference_video_capture_rate">Speed</string>
@@ -782,7 +784,7 @@
     <string name="photo_mode_panorama">Pano</string> <!-- keep short, as this shows in the popup menu; probably shouldn't be translated? -->
     <string name="photo_mode_panorama_full">Panorama</string>
 
-    <string name="preference_screen_remote_control">Bluetooth LE remote control...</string>
+    <string name="preference_screen_remote_control">Bluetooth LE remote control…</string>
     <string name="preference_enable_remote">Enable Bluetooth LE remote control</string>
     <string name="preference_enable_remote_summary">Enable Bluetooth LE (BLE) remote control devices</string>
     <string name="preference_remote_type">Remote device type</string>
@@ -810,30 +812,68 @@
     <string name="preference_location_enable">Store location data</string>
     <string name="preference_location_disable">Stop storing location data</string>
 
+    <string name="preference_histogram">Show a histogram</string>
+    <string name="preference_histogram_summary">Whether to display histogram of the colors shown on-screen\n%s</string>
+    <string name="preference_histogram_off">Off</string>
+    <string name="preference_histogram_rgb">RGB Colors</string>
+    <string name="preference_histogram_luminance">Luminance</string>
+    <string name="preference_histogram_value">Value (Maximum)</string>
+    <string name="preference_histogram_intensity">Intensity (Average)</string>
+    <string name="preference_histogram_lightness">Lightness (Average of min-max)</string>
+
+    <string name="preference_zebra_stripes">Show zebra stripes</string>
+    <string name="preference_zebra_stripes_summary">If this option is enabled, zebra stripes will be drawn on-screen showing where the camera preview is over exposed.\n%s</string>
+    <string name="preference_zebra_stripes_off">Off</string>
+    <string name="preference_zebra_stripes_70pc">70%</string> <!-- shouldn't escape %, not needed when shown in ListPreference -->
+    <string name="preference_zebra_stripes_80pc">80%</string> <!-- shouldn't escape %, not needed when shown in ListPreference -->
+    <string name="preference_zebra_stripes_90pc">90%</string> <!-- shouldn't escape %, not needed when shown in ListPreference -->
+    <string name="preference_zebra_stripes_100pc">100%</string> <!-- shouldn't escape %, not needed when shown in ListPreference -->
+
+    <string name="preference_focus_peaking">Focus peaking</string>
+    <string name="preference_focus_peaking_summary">If this option is enabled, highlights will be shown on in-focus edges (contours). This is primarily useful for manual focus, and can be used to help determine which regions of the image are in focus.\n%s</string>
+    <string name="preference_focus_peaking_off">Off</string>
+    <string name="preference_focus_peaking_on">On</string>
+    <string name="preference_focus_peaking_color">Focus peaking color</string>
+    <string name="preference_focus_peaking_color_summary">Which color to use for highlighting the in-focus edges\n%s</string>
+
+    <string name="remaining">Remaining</string> <!-- images remaining for "processing" -->
+
+    <string name="preference_preview">Camera preview…</string>
+
+    <string name="cycle_flash">Cycle flash</string>
+    <string name="preference_show_cycle_flash">Show flash icon</string>
+    <string name="preference_show_cycle_flash_summary">Whether to show an on-screen icon for cycling through the flash options, instead of displaying flash options on the popup menu</string>
+
+    <string name="preference_raw_expo_bracketing">Allow RAW for expo bracketing</string>
+    <string name="preference_raw_expo_bracketing_summary">Whether the RAW option should also apply for expo bracketing photo mode (or for HDR mode when \"Save all images for HDR mode\" is enabled). If this option is disabled, only JPEGs will be saved in those photo modes.</string>
+
+    <string name="preference_raw_focus_bracketing">Allow RAW for focus bracketing</string>
+    <string name="preference_raw_focus_bracketing_summary">Whether the RAW option should also apply for focus bracketing photo mode. If this option is disabled, only JPEGs will be saved in focus bracketing photo modes.</string>
+
+    <string name="cycle_raw">Cycle RAW modes</string>
+    <string name="preference_show_cycle_raw">Show RAW icon</string>
+    <string name="preference_show_cycle_raw_summary">Whether to show an on-screen icon for cycling through the RAW modes</string>
+
+    <string name="bluetooth_current_remote">Current remote:</string>
+    <string name="bluetooth_scan">Scan</string>
+
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text">
         [This dialog is shown when Open Camera is updated. You can disable it under
         Settings/On screen GUI/Show What\'s New dialog.]
-        \n\n<b>v1.45:</b>\n\n
+        \n\n<b>v1.46:</b>\n\n
         <ul>
-            <li>New optional layout for user-interface (Settings/On screen GUI/UI placement/"Icons along top").\n</li>
-            <li>New options to enable on-screen icons for enabling face detection, auto-level, photo stamp, custom text stamp, white balance lock (Settings/On screen GUI/).\n</li>
-            <li>New "Low light" mode for Noise Reduction photo mode. (Camera2 API only.)\n</li>
-            <li>Improvements for Noise Reduction, DRO and HDR photo modes.\n</li>
-            <li>Hold down shutter button in standard or fast burst photo modes to take a continuous burst. (Camera2 API only.)\n</li>
-            <li>Support for WebP and PNG (Settings/Photo settings/"Image format").\n</li>
-            <li>Support for different video file formats (Settings/Video settings/"Video format").\n</li>
-            <li>New options to save and restore all settings (Settings/"Settings manager").\n</li>
-            <li>"Say cheese" voice control now remains on.\n</li>
-            <li>Timelapse capture rates of 120x and 240x.\n</li>
-            <li>Focus bracketing mode now supports up to 200 images.\n</li>
-            <li>More auto-repeat options.\n</li>
-            <li>Larger options for maximum filesize for video (up to 9GB).\n</li>
-            <li>2:1 crop guide.\n</li>
-            <li>New "fine" setting for video flat (log) profile.\n</li>
-            <li>New lower noise sensitivity for "loud noise" audio trigger.\n</li>
-            <li>Vietnamese translation (thanks to Khánh Trần).\n</li>
-            <li>Allow Camera2 mode to be used on more devices.\n</li>
+            <li>New features when Settings/\"Use Camera2 API\" is enabled: histogram, zebra stripes, focus peaking (see
+                Settings/\"Camera preview\"/).\n</li>
+            <li>RAW now supported for expo and focus bracketing on higher end devices (see Settings/Photo settings/ to
+                disable).\n</li>
+            <li>New Settings/Photo settings/\"Use addresses\" to display GPS coordinates as an address.\n</li>
+            <li>More on-screen icons under Settings/On screen GUI/.\n</li>
+            <li>Support for remote control via bluetooth/USB keyboards and Kraken Smart Housing (thanks to Edouard Lafargue).\n</li>
+            <li>Improved DRO algorithm for some scenes.\n</li>
+            <li>Noise Reduction \"NR Mode\" is now saved.\n</li>
+            <li>Some settings now moved from \"On screen GUI\" to \"Camera preview\".\n</li>
+            <li>Corrected display of free space with using external SD cards with Storage Access Framework.\n</li>
             <li>Other improvements and bug fixes.\n</li>
         </ul>
     </string>
