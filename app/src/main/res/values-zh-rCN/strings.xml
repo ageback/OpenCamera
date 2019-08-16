@@ -428,8 +428,8 @@
     <string name="preference_exif_copyright_summary">要保存到图像元数据的版权标签的文本。（留空不保存）</string>
 
     <string name="processing">正在处理…</string>
-    <string name="preference_raw_no">仅 JPEG</string>
-    <string name="preference_raw_yes">JPEG 和 DNG (RAW)</string>
+    <string name="preference_raw_no">否</string>
+    <string name="preference_raw_yes">标准 和 DNG (RAW)</string>
     <string name="preference_stamp_dateformat_none">无</string>
     <string name="preference_stamp_dateformat_default">默认</string>
     <string name="preference_raw_only">"仅 DNG (RAW) "</string>
@@ -752,4 +752,40 @@
         </ul>
     </string>
     <string name="preference_stamp_geo_address_prefer">地址优先于GPS坐标</string>
+    <string name="bluetooth_current_remote">当前远程：</string>
+    <string name="bluetooth_scan">扫描</string>
+    <string name="cycle_flash">循环闪光</string>
+    <string name="cycle_raw">循环 RAW 模式</string>
+    <string name="preference_focus_bracketing_n_images_entries_150">150</string>
+    <string name="preference_focus_peaking">焦点峰值</string>
+    <string name="preference_focus_peaking_color">焦点峰值颜色</string>
+    <string name="preference_focus_peaking_color_summary">用于突出显示对焦边缘 %s 的颜色</string>
+    <string name="preference_focus_peaking_off">关闭</string>
+    <string name="preference_focus_peaking_on">开启</string>
+    <string name="preference_focus_peaking_summary">如果启用此选项，则高光将显示在对焦边缘（轮廓）上。 这主要用于手动对焦，可用于帮助确定图像的哪些区域处于焦点。%s</string>
+    <string name="preference_histogram">显示直方图</string>
+    <string name="preference_histogram_intensity">强度（平均值）</string>
+    <string name="preference_histogram_lightness">亮度（最小 - 最大的平均值）</string>
+    <string name="preference_histogram_luminance">亮度</string>
+    <string name="preference_histogram_off">关闭</string>
+    <string name="preference_histogram_rgb">RGB 颜色</string>
+    <string name="preference_histogram_summary">是否显示屏幕 %s 上显示的颜色的直方图</string>
+    <string name="preference_histogram_value">值（最大）</string>
+    <string name="preference_preview">相机预览…</string>
+    <string name="preference_raw_expo_bracketing">允许RAW进行展示包围</string>
+    <string name="preference_raw_expo_bracketing_summary">RAW选项是否也应用于曝光包围照片模式（或启用HDR模式的所有图像保存时用于HDR模式）。 如果禁用此选项，则只有JPEG将保存在这些照片模式中。</string>
+    <string name="preference_raw_focus_bracketing">允许RAW进行对焦包围</string>
+    <string name="preference_raw_focus_bracketing_summary">RAW选项是否也适用于对焦包围照片模式。 如果禁用此选项，则只有JPEG将保存在对焦包围照片模式中。</string>
+    <string name="preference_show_cycle_flash">显示闪光图标</string>
+    <string name="preference_show_cycle_flash_summary">是否显示用于循环显示闪光灯选项的屏幕图标，而不是在弹出菜单上显示闪光灯选项</string>
+    <string name="preference_show_cycle_raw">显示RAW图标</string>
+    <string name="preference_show_cycle_raw_summary">是否显示用于在RAW模式中循环的屏幕图标</string>
+    <string name="preference_zebra_stripes">显示斑马条纹</string>
+    <string name="preference_zebra_stripes_100pc">100%</string>
+    <string name="preference_zebra_stripes_70pc">70%</string>
+    <string name="preference_zebra_stripes_80pc">80%</string>
+    <string name="preference_zebra_stripes_90pc">90%</string>
+    <string name="preference_zebra_stripes_off">关闭</string>
+    <string name="preference_zebra_stripes_summary">如果启用此选项，将在屏幕上绘制斑马条纹，显示相机预览过度曝光的位置。%s</string>
+    <string name="remaining">剩余</string>
 </resources>
