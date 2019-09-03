@@ -48,12 +48,46 @@
 <p>&lt; <small><a href="index.html">Main Page.</a></small></p>
 
 <pre>
-Version 1.47 (Work in progress)
+Version 1.48 (Work in progress)
 
+FIXED   Some devices (e.g., Samsung) played shutter sound etc when Camera2 API enabled even when
+        phone was on silent/vibrate.
+FIXED   When using "Icons along top" UI placement on devices with notches/cutouts, on-screen text
+        could be covered up by icons in widescreen aspect ratios.
+UPDATED Performance improvement for panorama.
+
+Version 1.47.1 (2019/08/17)
+
+FIXED   Crash in 1.47 when saving photo with SAF and geotagging, when using Camera2 API.
+FIXED   Crash in 1.47 for panorama photo mode if a new photo is taken when a previous panorama is
+        still being processed.
+FIXED   Crash for panorama if no matches found when aligning images.
+
+Version 1.47 (2019/08/14)
+
+FIXED   Disallow switching between auto and manual mode while recording video (this previously
+        crashed).
 FIXED   Crashes related to histogram, zebra stripes, focus peaking - don't crash if we have
         problems.
 FIXED   Don't close Open Camera if bluetooth service (for remote control) fails to initialise.
 FIXED   Crash related to focus assist if camera closed.
+FIXED   Crashes related to multiple instances of Open Camera and Renderscript.releaseAllContexts().
+FIXED   Some devices (e.g., LG G6) defaulted to front camera, hopefully fixed to default to back
+        camera on all devices that have a back camera.
+ADDED   New panorama photo mode (requires Android 5+, note not all devices are supported).
+ADDED   New option Settings/Photo settings/Text style/"Text with shaded background" for photo stamp
+        option, to draw with a rectangular shaded background (i.e., bringing back the old behaviour
+        that was replaced by the newer outline shadow text).
+UPDATED Notifications now displayed on Android 8+ when Open Camera is in background when images are
+        still being processed/saved.
+UPDATED Improved exposure panel UI, and made on-screen text (zoom, video timer etc) more compact.
+UPDATED Camera ID is now displayed when switching cameras, on devices with more than two cameras.
+UPDATED Set navigation bar colour to black (needed for some devices, e.g., Samsung).
+UPDATED Improved performance on Android 7+ when saving photos when using Storage Access Framework
+        (no longer need to save to a temporary file to handle Exif tags).
+UPDATED When saving "base images" for Noise Reduction mode, keep JPEG quality at 100% even if using
+        post processing options.
+UPDATED Updated Renderscript to 64-bit code.
 
 Version 1.46 (2019/05/18)
 
@@ -65,7 +99,6 @@ FIXED   Improvement to on-screen placement of pitch and compass lines.
 FIXED   Toast for enabling/disabling face detection (via on-screen icon) was hidden by subsequent
         info toast from restarting the camera.
 FIXED   Fixed some crashes for old camera API.
-FIXED   Crashes related to multiple instances of Open Camera and Renderscript.releaseAllContexts().
 FIXED   Problem with Camera2 API where with manual exposure time, preview would display a maximum
         exposure time of 1/12s rather than what the manual exposure time had been set to.
 FIXED   When using "red eye" flash, on-screen flash icon (with Camera2 API) was being shown all the

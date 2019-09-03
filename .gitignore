@@ -1,6 +1,9 @@
 _archive/
 _devdocs/
 _docs/*.jpg
+_docs/ads.txt
+_docs/app-ads.txt
+_docs/gplay.html
 _other/
 _saved/
 

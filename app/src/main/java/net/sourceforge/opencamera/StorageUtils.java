@@ -35,7 +35,6 @@ import android.provider.MediaStore.Images.ImageColumns;
 import android.provider.MediaStore.Video.VideoColumns;
 import android.support.annotation.RequiresApi;
 import android.support.v4.content.ContextCompat;
-import android.system.ErrnoException;
 import android.system.Os;
 import android.system.StructStatVfs;
 import android.util.Log;
@@ -360,13 +359,16 @@ public class StorageUtils {
         return file;
     }
 
-    // only valid if isUsingSAF()
-    // This function should only be used as a last resort - we shouldn't generally assume that a Uri represents an actual File, and instead.
-    // However this is needed for a workaround to the fact that deleting a document file doesn't remove it from MediaStore.
-    // See:
-    // http://stackoverflow.com/questions/21605493/storage-access-framework-does-not-update-mediascanner-mtp
-    // http://stackoverflow.com/questions/20067508/get-real-path-from-uri-android-kitkat-new-storage-access-framework/
-    // only valid if isUsingSAF()
+    /** Only valid if isUsingSAF()
+     *  This function should only be used as a last resort - we shouldn't generally assume that a Uri represents an actual File, or that
+     *  the File can be obtained anyway.
+     *  However this is needed for a workaround to the fact that deleting a document file doesn't remove it from MediaStore.
+     *  See:
+            http://stackoverflow.com/questions/21605493/storage-access-framework-does-not-update-mediascanner-mtp
+            http://stackoverflow.com/questions/20067508/get-real-path-from-uri-android-kitkat-new-storage-access-framework/
+        Also note that this will always return null with Android Q's scoped storage: https://developer.android.com/preview/privacy/scoped-storage
+        "The DATA column is redacted for each file in the media store."
+     */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public File getFileFromDocumentUriSAF(Uri uri, boolean is_folder) {
         if( MyDebug.LOG ) {
@@ -973,9 +975,18 @@ public class StorageUtils {
                 throw new IllegalArgumentException(); // so that we fall onto the backup
             }
             StatFs statFs = new StatFs(folder.getAbsolutePath());
-            // cast to long to avoid overflow!
-            long blocks = statFs.getAvailableBlocks();
-            long size = statFs.getBlockSize();
+            long blocks, size;
+            if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2 ) {
+                blocks = statFs.getAvailableBlocksLong();
+                size = statFs.getBlockSizeLong();
+            }
+            else {
+                // cast to long to avoid overflow!
+                //noinspection deprecation
+                blocks = statFs.getAvailableBlocks();
+                //noinspection deprecation
+                size = statFs.getBlockSize();
+            }
             return (blocks*size) / 1048576;
         }
         catch(IllegalArgumentException e) {
@@ -988,9 +999,18 @@ public class StorageUtils {
                     if( !folder_name.startsWith("/") ) {
                         File folder = getBaseFolder();
                         StatFs statFs = new StatFs(folder.getAbsolutePath());
-                        // cast to long to avoid overflow!
-                        long blocks = statFs.getAvailableBlocks();
-                        long size = statFs.getBlockSize();
+                        long blocks, size;
+                        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2 ) {
+                            blocks = statFs.getAvailableBlocksLong();
+                            size = statFs.getBlockSizeLong();
+                        }
+                        else {
+                            // cast to long to avoid overflow!
+                            //noinspection deprecation
+                            blocks = statFs.getAvailableBlocks();
+                            //noinspection deprecation
+                            size = statFs.getBlockSize();
+                        }
                         return (blocks*size) / 1048576;
                     }
                 }

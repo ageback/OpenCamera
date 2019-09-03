@@ -12,8 +12,10 @@ public class PhotoTests {
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLocationOn"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLocationDirectionOn"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLocationOff"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testLocationOnSAF"));
         if( !MainActivityTest.test_camera2 ) {
             suite.addTest(TestSuite.createTest(MainActivityTest.class, "testDirectionOn"));
+            suite.addTest(TestSuite.createTest(MainActivityTest.class, "testDirectionOnSAF"));
         }
         // then do memory intensive tests:
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoAutoLevel"));
@@ -71,16 +73,24 @@ public class PhotoTests {
         }
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testKeyboardControls"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPhotoStamp"));
+        if( !MainActivityTest.test_camera2 ) {
+            suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPhotoStampSAF"));
+        }
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoDRO"));
         if( !MainActivityTest.test_camera2 ) {
             suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoDROPhotoStamp"));
         }
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoHDR"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testPhotoBackgroundHDR"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoHDRSaveExpo"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoHDRFrontCamera"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoHDRAutoStabilise"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoHDRPhotoStamp"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoExpo"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoPanorama"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoPanoramaMax"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoPanoramaCancel"));
+        suite.addTest(TestSuite.createTest(MainActivityTest.class, "testTakePhotoPanoramaCancelBySettings"));
         suite.addTest(TestSuite.createTest(MainActivityTest.class, "testCreateSaveFolder1"));
         if( !MainActivityTest.test_camera2 ) {
             suite.addTest(TestSuite.createTest(MainActivityTest.class, "testCreateSaveFolder2"));

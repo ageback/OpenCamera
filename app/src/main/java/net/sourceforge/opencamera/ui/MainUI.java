@@ -1,5 +1,6 @@
 package net.sourceforge.opencamera.ui;
 
+import net.sourceforge.opencamera.MyApplicationInterface;
 import net.sourceforge.opencamera.cameracontroller.CameraController;
 import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyDebug;
@@ -62,7 +63,7 @@ public class MainUI {
         UIPLACEMENT_TOP
     }
     private UIPlacement ui_placement = UIPlacement.UIPLACEMENT_RIGHT;
-    private int top_margin = 0;
+    private View top_icon = null;
     private boolean view_rotate_animation;
 
     private boolean immersive_mode;
@@ -251,7 +252,7 @@ public class MainUI {
         if( !popup_container_only )
         {
             // reset:
-            top_margin = 0;
+            top_icon = null;
 
             // we use a dummy button, so that the GUI buttons keep their positioning even if the Settings button is hidden (visibility set to View.GONE)
             View view = main_activity.findViewById(R.id.gui_anchor);
@@ -378,7 +379,7 @@ public class MainUI {
                         if( this_view.getVisibility() == View.VISIBLE ) {
                             if( MyDebug.LOG ) {
                                 Log.d(TAG, "set view layout for: " + this_view.getContentDescription());
-                                if( this_view==first_visible_view) {
+                                if( this_view==first_visible_view ) {
                                     Log.d(TAG,"    first visible view");
                                 }
                             }
@@ -394,7 +395,7 @@ public class MainUI {
                             this_view.setLayoutParams(layoutParams);
                         }
                     }
-                    top_margin = button_size;
+                    top_icon = first_visible_view;
                 }
             }
             else {
@@ -425,6 +426,13 @@ public class MainUI {
             setViewRotation(view, ui_rotation);
 
             view = main_activity.findViewById(R.id.pause_video);
+            layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
+            layoutParams.addRule(align_parent_left, 0);
+            layoutParams.addRule(align_parent_right, RelativeLayout.TRUE);
+            view.setLayoutParams(layoutParams);
+            setViewRotation(view, ui_rotation);
+
+            view = main_activity.findViewById(R.id.cancel_panorama);
             layoutParams = (RelativeLayout.LayoutParams)view.getLayoutParams();
             layoutParams.addRule(align_parent_left, 0);
             layoutParams.addRule(align_parent_right, RelativeLayout.TRUE);
@@ -529,6 +537,12 @@ public class MainUI {
             view.setTranslationY(0.0f);
             if( ui_rotation == 90 || ui_rotation == 270 ) {
                 view.setTranslationX(2*height_pixels);
+            }
+            else if( ui_rotation == 0 ) {
+                view.setTranslationY(1*height_pixels);
+            }
+            else {
+                view.setTranslationY(-1*height_pixels);
             }
 
             view = main_activity.findViewById(R.id.exposure_seekbar);
@@ -708,6 +722,14 @@ public class MainUI {
                 resource = main_activity.getPreview().isVideoRecording() ? R.drawable.take_video_recording : R.drawable.take_video_selector;
                 content_description = main_activity.getPreview().isVideoRecording() ? R.string.stop_video : R.string.start_video;
                 switch_video_content_description = R.string.switch_to_photo;
+            }
+            else if( main_activity.getApplicationInterface().getPhotoMode() == MyApplicationInterface.PhotoMode.Panorama &&
+                    main_activity.getApplicationInterface().getGyroSensor().isRecording() ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "set icon to recording panorama");
+                resource = R.drawable.baseline_check_white_48;
+                content_description = R.string.finish_panorama;
+                switch_video_content_description = R.string.switch_to_video;
             }
             else {
                 if( MyDebug.LOG )
@@ -955,6 +977,10 @@ public class MainUI {
                         View takePhotoVideoButton = main_activity.findViewById(R.id.take_photo_when_video_recording);
                         takePhotoVideoButton.setVisibility(visibility);
                     }
+                    if( main_activity.getApplicationInterface().getGyroSensor().isRecording() ) {
+                        View cancelPanoramaButton = main_activity.findViewById(R.id.cancel_panorama);
+                        cancelPanoramaButton.setVisibility(visibility);
+                    }
                 }
                 if( !immersive_mode ) {
                     // make sure the GUI is set up as expected
@@ -980,7 +1006,7 @@ public class MainUI {
         showGUI();
     }
 
-    private void showGUI() {
+    public void showGUI() {
         if( MyDebug.LOG ) {
             Log.d(TAG, "showGUI");
             Log.d(TAG, "show_gui_photo: " + show_gui_photo);
@@ -994,8 +1020,9 @@ public class MainUI {
         }
         main_activity.runOnUiThread(new Runnable() {
             public void run() {
-                final int visibility = (show_gui_photo && show_gui_video) ? View.VISIBLE : View.GONE; // for UI that is hidden while taking photo or video
-                final int visibility_video = show_gui_photo ? View.VISIBLE : View.GONE; // for UI that is only hidden while taking photo
+                final boolean is_panorama_recording = main_activity.getApplicationInterface().getGyroSensor().isRecording();
+                final int visibility = is_panorama_recording ? View.GONE : (show_gui_photo && show_gui_video) ? View.VISIBLE : View.GONE; // for UI that is hidden while taking photo or video
+                final int visibility_video = is_panorama_recording ? View.GONE : show_gui_photo ? View.VISIBLE : View.GONE; // for UI that is only hidden while taking photo
                 View switchCameraButton = main_activity.findViewById(R.id.switch_camera);
                 View switchVideoButton = main_activity.findViewById(R.id.switch_video);
                 View exposureButton = main_activity.findViewById(R.id.exposure);
@@ -1570,7 +1597,7 @@ public class MainUI {
     private int iso_button_manual_index = -1;
     private final static String manual_iso_value = "m";
 
-    private void setupExposureUI() {
+    public void setupExposureUI() {
         if( MyDebug.LOG )
             Log.d(TAG, "setupExposureUI");
         test_ui_buttons.clear();
@@ -1581,7 +1608,10 @@ public class MainUI {
         ViewGroup iso_buttons_container = main_activity.findViewById(R.id.iso_buttons);
         iso_buttons_container.removeAllViews();
         List<String> supported_isos;
-        if( preview.supportsISORange() ) {
+        if( preview.isVideoRecording() ) {
+            supported_isos = null;
+        }
+        else if( preview.supportsISORange() ) {
             if( MyDebug.LOG )
                 Log.d(TAG, "supports ISO range");
             int min_iso = preview.getMinimumISO();
@@ -2746,8 +2776,8 @@ public class MainUI {
         return entry;
     }
 
-    int getTopMargin() {
-        return this.top_margin;
+    View getTopIcon() {
+        return this.top_icon;
     }
 
     // for testing

@@ -81,8 +81,9 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     private int n_capture_images = 0; // how many calls to onPictureTaken() since the last call to onCaptureStarted()
     private int n_capture_images_raw = 0; // how many calls to onRawPictureTaken() since the last call to onCaptureStarted()
     private int n_panorama_pics = 0;
-    private final static int max_panorama_pics_c = 10;
+    public final static int max_panorama_pics_c = 10; // if we increase this, review against memory requirements under MainActivity.supportsPanorama()
     private boolean panorama_pic_accepted; // whether the last panorama picture was accepted, or else needs to be retaken
+    private boolean panorama_dir_left_to_right = true; // direction of panorama (set after we've captured two images)
 
     private File last_video_file = null;
     private Uri last_video_file_saf = null;
@@ -132,6 +133,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 
     // camera properties which are saved in bundle, but not stored in preferences (so will be remembered if the app goes into background, but not after restart)
     private final static int cameraId_default = 0;
+    private boolean has_set_cameraId;
     private int cameraId = cameraId_default;
     private final static String nr_mode_default = "preference_nr_mode_normal";
     private String nr_mode = nr_mode_default;
@@ -163,6 +165,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             // load the things we saved in onSaveInstanceState().
             if( MyDebug.LOG )
                 Log.d(TAG, "read from savedInstanceState");
+            has_set_cameraId = true;
             cameraId = savedInstanceState.getInt("cameraId", cameraId_default);
             if( MyDebug.LOG )
                 Log.d(TAG, "found cameraId: " + cameraId);
@@ -396,47 +399,53 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         return exposure;
     }
 
-    @Override
-    public Pair<Integer, Integer> getCameraResolutionPref() {
-        if( getPhotoMode() == PhotoMode.Panorama ) {
-            List<CameraController.Size> sizes = main_activity.getPreview().getSupportedPictureSizes(false);
-            final int max_width_c = 2080;
-            boolean found = false;
-            CameraController.Size best_size = null;
-            // find largest width <= max_width_c with aspect ratio 4:3
-            for(CameraController.Size size : sizes) {
-                if( size.width <= max_width_c ) {
-                    double aspect_ratio = ((double)size.width) / (double)size.height;
-                    if( Math.abs(aspect_ratio - 4.0/3.0) < 1.0e-5 ) {
-                        if( !found || size.width > best_size.width ) {
-                            found = true;
-                            best_size = size;
-                        }
-                    }
-                }
-            }
-            if( found ) {
-                return new Pair<>(best_size.width, best_size.height);
-            }
-            // else find largest width <= max_width_c
-            for(CameraController.Size size : sizes) {
-                if( size.width <= max_width_c ) {
+    public static CameraController.Size choosePanoramaResolution(List<CameraController.Size> sizes) {
+        // if we allow panorama with higher resolutions, review against memory requirements under MainActivity.supportsPanorama()
+        // also may need to update the downscaling in the testing code
+        final int max_width_c = 2080;
+        boolean found = false;
+        CameraController.Size best_size = null;
+        // find largest width <= max_width_c with aspect ratio 4:3
+        for(CameraController.Size size : sizes) {
+            if( size.width <= max_width_c ) {
+                double aspect_ratio = ((double)size.width) / (double)size.height;
+                if( Math.abs(aspect_ratio - 4.0/3.0) < 1.0e-5 ) {
                     if( !found || size.width > best_size.width ) {
                         found = true;
                         best_size = size;
                     }
                 }
             }
-            if( found ) {
-                return new Pair<>(best_size.width, best_size.height);
-            }
-            // else find smallest width
-            for(CameraController.Size size : sizes) {
-                if( !found || size.width < best_size.width ) {
+        }
+        if( found ) {
+            return best_size;
+        }
+        // else find largest width <= max_width_c
+        for(CameraController.Size size : sizes) {
+            if( size.width <= max_width_c ) {
+                if( !found || size.width > best_size.width ) {
                     found = true;
                     best_size = size;
                 }
             }
+        }
+        if( found ) {
+            return best_size;
+        }
+        // else find smallest width
+        for(CameraController.Size size : sizes) {
+            if( !found || size.width < best_size.width ) {
+                found = true;
+                best_size = size;
+            }
+        }
+        return best_size;
+    }
+
+    @Override
+    public Pair<Integer, Integer> getCameraResolutionPref() {
+        if( getPhotoMode() == PhotoMode.Panorama ) {
+            CameraController.Size best_size = choosePanoramaResolution(main_activity.getPreview().getSupportedPictureSizes(false));
             return new Pair<>(best_size.width, best_size.height);
         }
         String resolution_value = sharedPreferences.getString(PreferenceKeys.getResolutionPreferenceKey(cameraId), "");
@@ -891,6 +900,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             // pause preview in this mode.
             return false;
         }
+        else if( getPhotoMode() == PhotoMode.Panorama ) {
+            // don't pause preview when taking photos for panorama mode
+            return false;
+        }
         return sharedPreferences.getBoolean(PreferenceKeys.PausePreviewPreferenceKey, false);
     }
 
@@ -917,6 +930,8 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 
     @Override
     public long getTimerPref() {
+        if( getPhotoMode() == MyApplicationInterface.PhotoMode.Panorama )
+            return 0; // don't support timer with panorama
         String timer_value = sharedPreferences.getString(PreferenceKeys.getTimerPreferenceKey(), "0");
         long timer_delay;
         try {
@@ -933,6 +948,8 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 
     @Override
     public String getRepeatPref() {
+        if( getPhotoMode() == MyApplicationInterface.PhotoMode.Panorama )
+            return "1"; // don't support repeat with panorama
         return sharedPreferences.getString(PreferenceKeys.getRepeatModePreferenceKey(), "1");
     }
 
@@ -1391,6 +1408,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             return sharedPreferences.getBoolean(PreferenceKeys.AllowRawForFocusBracketingPreferenceKey, true) &&
                     main_activity.supportsBurstRaw();
         }
+        // not supported for panorama mode
         return false;
     }
 
@@ -1461,6 +1479,15 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     }
 
     @Override
+    public boolean allowZoom() {
+        if( getPhotoMode() == PhotoMode.Panorama ) {
+            // don't allow zooming in panorama mode, the algorithm isn't set up to support this!
+            return false;
+        }
+        return true;
+    }
+
+    @Override
     public boolean isTestAlwaysFocus() {
         if( MyDebug.LOG ) {
             Log.d(TAG, "isTestAlwaysFocus: " + main_activity.is_test);
@@ -1491,17 +1518,50 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         gyroSensor.startRecording();
         n_panorama_pics = 0;
         panorama_pic_accepted = false;
+        panorama_dir_left_to_right = true;
+
+        main_activity.getMainUI().setTakePhotoIcon();
+        View cancelPanoramaButton = main_activity.findViewById(R.id.cancel_panorama);
+        cancelPanoramaButton.setVisibility(View.VISIBLE);
+        main_activity.getMainUI().clearSeekBar(); // close seekbars if open (popup is already closed when taking a photo)
+        // taking the photo will end up calling MainUI.showGUI(), which will hide the other on-screen icons
     }
 
-    void stopPanorama() {
+    /** Ends panorama and submits the panoramic images to be processed.
+     */
+    void finishPanorama() {
         if( MyDebug.LOG )
-            Log.d(TAG, "stopPanorama");
-        gyroSensor.stopRecording();
-        clearPanoramaPoint();
+            Log.d(TAG, "finishPanorama");
+
+        imageSaver.getImageBatchRequest().panorama_dir_left_to_right = this.panorama_dir_left_to_right;
+
+        stopPanorama(false);
 
         boolean image_capture_intent = isImageCaptureIntent();
         boolean do_in_background = saveInBackground(image_capture_intent);
-        imageSaver.finishImageAverage(do_in_background);
+        imageSaver.finishImageBatch(do_in_background);
+    }
+
+    /** Stop the panorama recording. Does nothing if panorama isn't currently recording.
+     * @param is_cancelled Whether the panorama has been cancelled.
+     */
+    void stopPanorama(boolean is_cancelled) {
+        if( MyDebug.LOG )
+            Log.d(TAG, "stopPanorama");
+        if( !gyroSensor.isRecording() ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "...nothing to stop");
+            return;
+        }
+        gyroSensor.stopRecording();
+        clearPanoramaPoint();
+        if( is_cancelled ) {
+            imageSaver.flushImageBatch();
+        }
+        main_activity.getMainUI().setTakePhotoIcon();
+        View cancelPanoramaButton = main_activity.findViewById(R.id.cancel_panorama);
+        cancelPanoramaButton.setVisibility(View.GONE);
+        main_activity.getMainUI().showGUI(); // refresh UI icons now that we've stopped panorama
     }
 
     private void setNextPanoramaPoint(boolean repeat) {
@@ -1515,24 +1575,43 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         if( n_panorama_pics == max_panorama_pics_c ) {
             if( MyDebug.LOG )
                 Log.d(TAG, "reached max panorama limit");
-            stopPanorama();
+            finishPanorama();
             return;
         }
         float angle = (float) Math.toRadians(camera_angle_y) * n_panorama_pics;
-        setNextPanoramaPoint((float) Math.sin(angle / panorama_pics_per_screen), 0.0f, (float) -Math.cos(angle / panorama_pics_per_screen));
+        if( n_panorama_pics > 1 && !panorama_dir_left_to_right ) {
+            angle = - angle; // for right-to-left
+        }
+        float x = (float) Math.sin(angle / panorama_pics_per_screen);
+        float z = (float) -Math.cos(angle / panorama_pics_per_screen);
+        setNextPanoramaPoint(x, 0.0f, z);
+
+        if( n_panorama_pics == 1 ) {
+            // also set target for right-to-left
+            angle = - angle;
+            x = (float) Math.sin(angle / panorama_pics_per_screen);
+            z = (float) -Math.cos(angle / panorama_pics_per_screen);
+            gyroSensor.addTarget(x, 0.0f, z);
+            drawPreview.addGyroDirectionMarker(x, 0.0f, z);
+        }
     }
 
     private void setNextPanoramaPoint(float x, float y, float z) {
         if( MyDebug.LOG )
             Log.d(TAG, "setNextPanoramaPoint : " + x + " , " + y + " , " + z);
 
-        //final float target_angle = 1.0f * 0.01745329252f;
-        final float target_angle = 0.5f * 0.01745329252f;
-        gyroSensor.setTarget(x, y, z, target_angle, new GyroSensor.TargetCallback() {
+        final float target_angle = 1.0f * 0.01745329252f;
+        //final float target_angle = 0.5f * 0.01745329252f;
+        final float upright_angle_tol = 2.0f * 0.017452406437f;
+        //final float upright_angle_tol = 1.0f * 0.017452406437f;
+        final float too_far_angle = 45.0f * 0.01745329252f;
+        gyroSensor.setTarget(x, y, z, target_angle, upright_angle_tol, too_far_angle, new GyroSensor.TargetCallback() {
             @Override
-            public void onAchieved() {
-                if( MyDebug.LOG )
-                    Log.d(TAG, "TargetCallback.onAchieved");
+            public void onAchieved(int indx) {
+                if( MyDebug.LOG ) {
+                    Log.d(TAG, "TargetCallback.onAchieved: " + indx);
+                    Log.d(TAG, "    n_panorama_pics: " + n_panorama_pics);
+                }
                 // Disable the target callback so we avoid risk of multiple callbacks - but note we don't call
                 // clearPanoramaPoint(), as we don't want to call drawPreview.clearGyroDirectionMarker()
                 // at this stage (looks better to keep showing the target market on-screen whilst photo
@@ -1541,8 +1620,25 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 // the target is still achieved or not (for panorama_pic_accepted).
                 //gyroSensor.clearTarget();
                 gyroSensor.disableTargetCallback();
+                if( n_panorama_pics == 1 ) {
+                    panorama_dir_left_to_right = indx == 0;
+                    if( MyDebug.LOG )
+                        Log.d(TAG, "set panorama_dir_left_to_right to " + panorama_dir_left_to_right);
+                }
                 main_activity.takePicturePressed(false, false);
             }
+
+            @Override
+            public void onTooFar() {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "TargetCallback.onTooFar");
+
+                if( !main_activity.is_test ) {
+                    main_activity.getPreview().showToast(null, R.string.panorama_cancelled);
+                    MyApplicationInterface.this.stopPanorama(true);
+                }
+            }
+
         });
         drawPreview.setGyroDirectionMarker(x, y, z);
     }
@@ -1552,6 +1648,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             Log.d(TAG, "clearPanoramaPoint");
         gyroSensor.clearTarget();
         drawPreview.clearGyroDirectionMarker();
+    }
+
+    static float getPanoramaPicsPerScreen() {
+        return panorama_pics_per_screen;
     }
 
     @Override
@@ -1592,6 +1692,13 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 View takePhotoVideoButton = main_activity.findViewById(R.id.take_photo_when_video_recording);
                 takePhotoVideoButton.setVisibility(View.VISIBLE);
             }
+        }
+        if( main_activity.getMainUI().isExposureUIOpen() ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "need to update exposure UI for start video recording");
+            // need to update the exposure UI when starting/stopping video recording, to remove/add
+            // ability to switch between auto and manual
+            main_activity.getMainUI().setupExposureUI();
         }
         final int video_method = this.createOutputVideoMethod();
         boolean dategeo_subtitles = getVideoSubtitlePref().equals("preference_video_subtitle_yes");
@@ -1829,6 +1936,13 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         takePhotoVideoButton.setVisibility(View.GONE);
         main_activity.getMainUI().setPauseVideoContentDescription(); // just to be safe
         main_activity.getMainUI().destroyPopup(); // as the available popup options change while recording video
+        if( main_activity.getMainUI().isExposureUIOpen() ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "need to update exposure UI for stop video recording");
+            // need to update the exposure UI when starting/stopping video recording, to remove/add
+            // ability to switch between auto and manual
+            main_activity.getMainUI().setupExposureUI();
+        }
         if( subtitleVideoTimerTask != null ) {
             subtitleVideoTimerTask.cancel();
             subtitleVideoTimerTask = null;
@@ -2105,7 +2219,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         if( photo_mode == PhotoMode.NoiseReduction ) {
             boolean image_capture_intent = isImageCaptureIntent();
             boolean do_in_background = saveInBackground(image_capture_intent);
-            imageSaver.finishImageAverage(do_in_background);
+            imageSaver.finishImageBatch(do_in_background);
         }
         else if( photo_mode == MyApplicationInterface.PhotoMode.Panorama && gyroSensor.isRecording() ) {
             if( panorama_pic_accepted ) {
@@ -2141,6 +2255,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     public void cameraClosed() {
         if( MyDebug.LOG )
             Log.d(TAG, "cameraClosed");
+        this.stopPanorama(true);
         main_activity.getMainUI().clearSeekBar();
         main_activity.getMainUI().destroyPopup(); // need to close popup - and when camera reopened, it may have different settings
         drawPreview.clearContinuousFocusMove();
@@ -2182,8 +2297,32 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         main_activity.getMainUI().setSeekbarZoom(new_zoom);
     }
 
+    /** Switch to the first available camera that is front or back facing as desired.
+     * @param front_facing Whether to switch to a front or back facing camera.
+     */
+    void switchToCamera(boolean front_facing) {
+        if( MyDebug.LOG )
+            Log.d(TAG, "switchToCamera: " + front_facing);
+        int n_cameras = main_activity.getPreview().getCameraControllerManager().getNumberOfCameras();
+        for(int i=0;i<n_cameras;i++) {
+            if( main_activity.getPreview().getCameraControllerManager().isFrontFacing(i) == front_facing ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "found desired camera: " + i);
+                this.setCameraIdPref(i);
+                break;
+            }
+        }
+    }
+
+    /* Note that the cameraId is still valid if this returns false, it just means that a cameraId hasn't be explicitly set yet.
+     */
+    boolean hasSetCameraId() {
+        return has_set_cameraId;
+    }
+
     @Override
     public void setCameraIdPref(int cameraId) {
+        this.has_set_cameraId = true;
         this.cameraId = cameraId;
     }
 
@@ -2393,19 +2532,25 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         ALIGNMENT_BOTTOM
     }
 
+    public enum Shadow {
+        SHADOW_NONE,
+        SHADOW_OUTLINE,
+        SHADOW_BACKGROUND
+    }
+
     public int drawTextWithBackground(Canvas canvas, Paint paint, String text, int foreground, int background, int location_x, int location_y) {
         return drawTextWithBackground(canvas, paint, text, foreground, background, location_x, location_y, Alignment.ALIGNMENT_BOTTOM);
     }
 
     public int drawTextWithBackground(Canvas canvas, Paint paint, String text, int foreground, int background, int location_x, int location_y, Alignment alignment_y) {
-        return drawTextWithBackground(canvas, paint, text, foreground, background, location_x, location_y, alignment_y, null, true);
+        return drawTextWithBackground(canvas, paint, text, foreground, background, location_x, location_y, alignment_y, null, Shadow.SHADOW_OUTLINE);
     }
 
-    public int drawTextWithBackground(Canvas canvas, Paint paint, String text, int foreground, int background, int location_x, int location_y, Alignment alignment_y, String ybounds_text, boolean shadow) {
+    public int drawTextWithBackground(Canvas canvas, Paint paint, String text, int foreground, int background, int location_x, int location_y, Alignment alignment_y, String ybounds_text, Shadow shadow) {
         return drawTextWithBackground(canvas, paint, text, foreground, background, location_x, location_y, alignment_y, null, shadow, null);
     }
 
-    public int drawTextWithBackground(Canvas canvas, Paint paint, String text, int foreground, int background, int location_x, int location_y, Alignment alignment_y, String ybounds_text, boolean shadow, Rect bounds) {
+    public int drawTextWithBackground(Canvas canvas, Paint paint, String text, int foreground, int background, int location_x, int location_y, Alignment alignment_y, String ybounds_text, Shadow shadow, Rect bounds) {
         final float scale = getContext().getResources().getDisplayMetrics().density;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(background);
@@ -2457,9 +2602,15 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             text_bounds.top += location_y - padding;
             text_bounds.bottom += location_y + padding;
         }
+        if( shadow == Shadow.SHADOW_BACKGROUND ) {
+            paint.setColor(background);
+            paint.setAlpha(64);
+            canvas.drawRect(text_bounds, paint);
+            paint.setAlpha(255);
+        }
         paint.setColor(foreground);
         canvas.drawText(text, location_x, location_y, paint);
-        if( shadow ) {
+        if( shadow == Shadow.SHADOW_OUTLINE ) {
             paint.setColor(background);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1);
@@ -2495,12 +2646,11 @@ public class MyApplicationInterface extends BasicApplicationInterface {
      */
     private boolean forceSuffix(PhotoMode photo_mode) {
         // focus bracketing and fast burst shots come is as separate requests, so we need to make sure we get the filename suffixes right
-        boolean force_suffix = photo_mode == PhotoMode.FocusBracketing || photo_mode == PhotoMode.FastBurst ||
+        return photo_mode == PhotoMode.FocusBracketing || photo_mode == PhotoMode.FastBurst ||
                 (
                         main_activity.getPreview().getCameraController() != null &&
                                 main_activity.getPreview().getCameraController().isCapturingBurst()
                 );
-        return force_suffix;
     }
 
     /** Saves the supplied image(s)
@@ -2554,6 +2704,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         String preference_stamp_gpsformat = this.getStampGPSFormatPref();
         String preference_stamp_geo_address = this.getStampGeoAddressPref();
         String preference_units_distance = this.getUnitsDistancePref();
+        boolean panorama_crop = sharedPreferences.getString(PreferenceKeys.PanoramaCropPreferenceKey, "preference_panorama_crop_on").equals("preference_panorama_crop_on");
         boolean store_location = getGeotaggingPref() && getLocation() != null;
         Location location = store_location ? getLocation() : null;
         boolean store_geo_direction = main_activity.getPreview().hasGeoDirection() && getGeodirectionPref();
@@ -2609,7 +2760,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             photo_mode = PhotoMode.Standard;
         }
 
-        if( photo_mode == PhotoMode.Panorama && gyroSensor.isRecording() && gyroSensor.hasTarget() && !gyroSensor.isTargetAchieved() ) {
+        if( !main_activity.is_test && photo_mode == PhotoMode.Panorama && gyroSensor.isRecording() && gyroSensor.hasTarget() && !gyroSensor.isTargetAchieved() ) {
             if( MyDebug.LOG )
                 Log.d(TAG, "ignore panorama image as target no longer achieved!");
             // n.b., gyroSensor.hasTarget() will be false if this is the first picture in the panorama series
@@ -2626,17 +2777,30 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 first_image = n_capture_images == 1;
             if( first_image ) {
                 ImageSaver.Request.SaveBase save_base = ImageSaver.Request.SaveBase.SAVEBASE_NONE;
-                String save_base_preference = sharedPreferences.getString(PreferenceKeys.NRSaveExpoPreferenceKey, "preference_nr_save_no");
-                switch( save_base_preference ) {
-                    case "preference_nr_save_single":
-                        save_base = ImageSaver.Request.SaveBase.SAVEBASE_FIRST;
-                        break;
-                    case "preference_nr_save_all":
-                        save_base = ImageSaver.Request.SaveBase.SAVEBASE_ALL;
-                        break;
+                if( photo_mode == PhotoMode.NoiseReduction ) {
+                    String save_base_preference = sharedPreferences.getString(PreferenceKeys.NRSaveExpoPreferenceKey, "preference_nr_save_no");
+                    switch( save_base_preference ) {
+                        case "preference_nr_save_single":
+                            save_base = ImageSaver.Request.SaveBase.SAVEBASE_FIRST;
+                            break;
+                        case "preference_nr_save_all":
+                            save_base = ImageSaver.Request.SaveBase.SAVEBASE_ALL;
+                            break;
+                    }
+                }
+                else if( photo_mode == PhotoMode.Panorama ) {
+                    String save_base_preference = sharedPreferences.getString(PreferenceKeys.PanoramaSaveExpoPreferenceKey, "preference_panorama_save_no");
+                    switch( save_base_preference ) {
+                        case "preference_panorama_save_all":
+                            save_base = ImageSaver.Request.SaveBase.SAVEBASE_ALL;
+                            break;
+                        case "preference_panorama_save_all_plus_debug":
+                            save_base = ImageSaver.Request.SaveBase.SAVEBASE_ALL_PLUS_DEBUG;
+                            break;
+                    }
                 }
 
-                imageSaver.startImageAverage(true,
+                imageSaver.startImageBatch(true,
                         photo_mode == PhotoMode.NoiseReduction ? ImageSaver.Request.ProcessType.AVERAGE : ImageSaver.Request.ProcessType.PANORAMA,
                         save_base,
                         image_capture_intent, image_capture_intent_uri,
@@ -2650,9 +2814,15 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                         exposure_time,
                         zoom_factor,
                         preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
+                        panorama_crop,
                         store_location, location, store_geo_direction, geo_direction,
                         custom_tag_artist, custom_tag_copyright,
                         sample_factor);
+
+                if( photo_mode == PhotoMode.Panorama ) {
+                    imageSaver.getImageBatchRequest().camera_view_angle_x = main_activity.getPreview().getViewAngleX(false);
+                    imageSaver.getImageBatchRequest().camera_view_angle_y = main_activity.getPreview().getViewAngleY(false);
+                }
             }
 
             float [] gyro_rotation_matrix = null;
@@ -2661,7 +2831,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 this.gyroSensor.getRotationMatrix(gyro_rotation_matrix);
             }
 
-            imageSaver.addImageAverage(images.get(0), gyro_rotation_matrix);
+            imageSaver.addImageBatch(images.get(0), gyro_rotation_matrix);
             success = true;
         }
         else {
@@ -2686,6 +2856,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                     exposure_time,
                     zoom_factor,
                     preference_stamp, preference_textstamp, font_size, color, pref_style, preference_stamp_dateformat, preference_stamp_timeformat, preference_stamp_gpsformat, preference_stamp_geo_address, preference_units_distance,
+                    false, // panorama doesn't use this codepath
                     store_location, location, store_geo_direction, geo_direction,
                     custom_tag_artist, custom_tag_copyright,
                     sample_factor);
@@ -2971,6 +3142,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
 
     public HDRProcessor getHDRProcessor() {
         return imageSaver.getHDRProcessor();
+    }
+
+    public PanoramaProcessor getPanoramaProcessor() {
+        return imageSaver.getPanoramaProcessor();
     }
 
     public boolean test_set_available_memory = false;

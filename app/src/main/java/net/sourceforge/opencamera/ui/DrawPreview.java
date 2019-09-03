@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Locale;
 
 import net.sourceforge.opencamera.GyroSensor;
@@ -147,6 +149,7 @@ public class DrawPreview {
     private Bitmap auto_stabilise_bitmap;
     private Bitmap dro_bitmap;
     private Bitmap hdr_bitmap;
+    private Bitmap panorama_bitmap;
     private Bitmap expo_bitmap;
     private Bitmap focus_bracket_bitmap;
     private Bitmap burst_bitmap;
@@ -190,10 +193,15 @@ public class DrawPreview {
     private long continuous_focus_moving_ms;
 
     private boolean enable_gyro_target_spot;
-    private final float [] gyro_direction = new float[3];
+    private final List<float []> gyro_directions = new ArrayList<>();
     private final float [] transformed_gyro_direction = new float[3];
     private final float [] gyro_direction_up = new float[3];
     private final float [] transformed_gyro_direction_up = new float[3];
+
+    // call updateCachedViewAngles() before reading these values
+    private float view_angle_x_preview;
+    private float view_angle_y_preview;
+    private long last_view_angles_time;
 
     // OSD extra lines
     private String OSDLine1;
@@ -222,6 +230,7 @@ public class DrawPreview {
         auto_stabilise_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.auto_stabilise_icon);
         dro_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.dro_icon);
         hdr_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_hdr_on_white_48dp);
+        panorama_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.baseline_panorama_horizontal_white_48);
         expo_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.expo_icon);
         focus_bracket_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.focus_bracket_icon);
         burst_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_burst_mode_white_48dp);
@@ -270,6 +279,10 @@ public class DrawPreview {
         if( hdr_bitmap != null ) {
             hdr_bitmap.recycle();
             hdr_bitmap = null;
+        }
+        if( panorama_bitmap != null ) {
+            panorama_bitmap.recycle();
+            panorama_bitmap = null;
         }
         if( expo_bitmap != null ) {
             expo_bitmap.recycle();
@@ -431,12 +444,16 @@ public class DrawPreview {
 
     public void setGyroDirectionMarker(float x, float y, float z) {
         enable_gyro_target_spot = true;
-        gyro_direction[0] = x;
-        gyro_direction[1] = y;
-        gyro_direction[2] = z;
+        this.gyro_directions.clear();
+        addGyroDirectionMarker(x, y, z);
         gyro_direction_up[0] = 0.f;
         gyro_direction_up[1] = 1.f;
         gyro_direction_up[2] = 0.f;
+    }
+
+    public void addGyroDirectionMarker(float x, float y, float z) {
+        float [] vector = new float[]{x, y, z};
+        this.gyro_directions.add(vector);
     }
 
     public void clearGyroDirectionMarker() {
@@ -578,7 +595,23 @@ public class DrawPreview {
         String focus_peaking_color = sharedPreferences.getString(PreferenceKeys.FocusPeakingColorPreferenceKey, "#ffffff");
         focus_peaking_color_pref = Color.parseColor(focus_peaking_color);
 
+        last_view_angles_time = 0; // force view angles to be recomputed
+
         has_settings = true;
+    }
+
+    private void updateCachedViewAngles(long time_ms) {
+        if( last_view_angles_time == 0 || time_ms > last_view_angles_time + 10000 ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "update cached view angles");
+            // don't call this too often, for UI performance
+            // note that updateSettings will force the time to reset anyway, but we check every so often
+            // again just in case...
+            Preview preview = main_activity.getPreview();
+            view_angle_x_preview = preview.getViewAngleX(true);
+            view_angle_y_preview = preview.getViewAngleY(true);
+            last_view_angles_time = time_ms;
+        }
     }
 
     /** Loads the bitmap from the uri. File is optional, and is used on pre-Android 7 devices to
@@ -975,7 +1008,7 @@ public class DrawPreview {
                 String bounds_time_string = "00:00:00";
                 p.getTextBounds(bounds_time_string, 0, bounds_time_string.length(), text_bounds_time);
             }
-            int height = applicationInterface.drawTextWithBackground(canvas, p, current_time_string, Color.WHITE, Color.BLACK, location_x, location_y, MyApplicationInterface.Alignment.ALIGNMENT_TOP, null, true, text_bounds_time);
+            int height = applicationInterface.drawTextWithBackground(canvas, p, current_time_string, Color.WHITE, Color.BLACK, location_x, location_y, MyApplicationInterface.Alignment.ALIGNMENT_TOP, null, MyApplicationInterface.Shadow.SHADOW_OUTLINE, text_bounds_time);
             height += gap_y;
             if( ui_rotation == 90 ) {
                 location_y -= height;
@@ -1010,7 +1043,7 @@ public class DrawPreview {
                     text_bounds_free_memory = new Rect();
                     p.getTextBounds(free_memory_gb_string, 0, free_memory_gb_string.length(), text_bounds_free_memory);
                 }
-                int height = applicationInterface.drawTextWithBackground(canvas, p, free_memory_gb_string, Color.WHITE, Color.BLACK, location_x, location_y, MyApplicationInterface.Alignment.ALIGNMENT_TOP, null, true, text_bounds_free_memory);
+                int height = applicationInterface.drawTextWithBackground(canvas, p, free_memory_gb_string, Color.WHITE, Color.BLACK, location_x, location_y, MyApplicationInterface.Alignment.ALIGNMENT_TOP, null, MyApplicationInterface.Shadow.SHADOW_OUTLINE, text_bounds_free_memory);
                 height += gap_y;
                 if( ui_rotation == 90 ) {
                     location_y -= height;
@@ -1027,12 +1060,12 @@ public class DrawPreview {
         if (OSDLine1 != null && OSDLine1.length() > 0) {
             applicationInterface.drawTextWithBackground(canvas, p, OSDLine1,
                     Color.WHITE, Color.BLACK,  location_x, bottom_y - y_offset,
-                    MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, true);
+                    MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, MyApplicationInterface.Shadow.SHADOW_OUTLINE);
         }
         if (OSDLine2 != null && OSDLine2.length() > 0) {
             applicationInterface.drawTextWithBackground(canvas, p, OSDLine2,
                     Color.WHITE, Color.BLACK, location_x, bottom_y,
-                    MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, true);
+                    MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, MyApplicationInterface.Shadow.SHADOW_OUTLINE);
         }
         p.setTextSize(16 * scale + 0.5f); // Restore text size
 
@@ -1086,7 +1119,7 @@ public class DrawPreview {
                     ae_started_scanning_ms = -1;
                 }
                 // can't cache the bounds rect, as the width may change significantly as the ISO or exposure values change
-                int height = applicationInterface.drawTextWithBackground(canvas, p, iso_exposure_string, text_color, Color.BLACK, location_x, location_y, MyApplicationInterface.Alignment.ALIGNMENT_TOP, ybounds_text, true);
+                int height = applicationInterface.drawTextWithBackground(canvas, p, iso_exposure_string, text_color, Color.BLACK, location_x, location_y, MyApplicationInterface.Alignment.ALIGNMENT_TOP, ybounds_text, MyApplicationInterface.Shadow.SHADOW_OUTLINE);
                 height += gap_y;
                 // only move location_y if we actually print something (because on old camera API, even if the ISO option has
                 // been enabled, we'll never be able to display the on-screen ISO)
@@ -1198,6 +1231,7 @@ public class DrawPreview {
             if( (
                     photoMode == MyApplicationInterface.PhotoMode.DRO ||
                             photoMode == MyApplicationInterface.PhotoMode.HDR ||
+                            photoMode == MyApplicationInterface.PhotoMode.Panorama ||
                             photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ||
                             photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ||
                             photoMode == MyApplicationInterface.PhotoMode.FastBurst ||
@@ -1212,11 +1246,12 @@ public class DrawPreview {
                 p.setAlpha(255);
                 Bitmap bitmap = photoMode == MyApplicationInterface.PhotoMode.DRO ? dro_bitmap :
                         photoMode == MyApplicationInterface.PhotoMode.HDR ? hdr_bitmap :
-                                photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ? expo_bitmap :
-                                        photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ? focus_bracket_bitmap :
-                                                photoMode == MyApplicationInterface.PhotoMode.FastBurst ? burst_bitmap :
-                                                        photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ? nr_bitmap :
-                                                                null;
+                                photoMode == MyApplicationInterface.PhotoMode.Panorama ? panorama_bitmap :
+                                    photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ? expo_bitmap :
+                                            photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ? focus_bracket_bitmap :
+                                                    photoMode == MyApplicationInterface.PhotoMode.FastBurst ? burst_bitmap :
+                                                            photoMode == MyApplicationInterface.PhotoMode.NoiseReduction ? nr_bitmap :
+                                                                    null;
                 if( bitmap != null ) {
                     if( photoMode == MyApplicationInterface.PhotoMode.NoiseReduction && applicationInterface.getNRModePref() == ApplicationInterface.NRModePref.NRMODE_LOW_LIGHT ) {
                         p.setColorFilter(new PorterDuffColorFilter(Color.rgb(255, 235, 59), PorterDuff.Mode.SRC_IN)); // Yellow 500
@@ -1500,19 +1535,20 @@ public class DrawPreview {
         if( camera_controller != null && !preview.isPreviewPaused() ) {
 			/*canvas.drawText("PREVIEW", canvas.getWidth() / 2,
 					canvas.getHeight() / 2, p);*/
-            int text_y = (int) (20 * scale + 0.5f); // convert dps to pixels
+            int gap_y = (int) (20 * scale + 0.5f); // convert dps to pixels
+            int text_y = (int) (16 * scale + 0.5f); // convert dps to pixels
             // fine tuning to adjust placement of text with respect to the GUI, depending on orientation
             if( ui_placement == MainUI.UIPlacement.UIPLACEMENT_TOP && ( ui_rotation == 0 || ui_rotation == 180 ) ) {
-                text_base_y = canvas.getHeight() - (int)(0.5*text_y);
+                text_base_y = canvas.getHeight() - (int)(0.5*gap_y);
             }
             else if( ui_rotation == ( ui_placement == MainUI.UIPlacement.UIPLACEMENT_RIGHT ? 0 : 180 ) ) {
-                text_base_y = canvas.getHeight() - (int)(0.5*text_y);
+                text_base_y = canvas.getHeight() - (int)(0.5*gap_y);
             }
             else if( ui_rotation == ( ui_placement == MainUI.UIPlacement.UIPLACEMENT_RIGHT ? 180 : 0 ) ) {
-                text_base_y = canvas.getHeight() - (int)(2.5*text_y); // leave room for GUI icons
+                text_base_y = canvas.getHeight() - (int)(2.5*gap_y); // leave room for GUI icons
             }
             else if( ui_rotation == 90 || ui_rotation == 270 ) {
-                //text_base_y = canvas.getHeight() + (int)(0.5*text_y);
+                //text_base_y = canvas.getHeight() + (int)(0.5*gap_y);
 				/*ImageButton view = (ImageButton)main_activity.findViewById(R.id.take_photo);
 				// align with "top" of the take_photo button, but remember to take the rotation into account!
 				view.getLocationOnScreen(gui_location);
@@ -1534,7 +1570,7 @@ public class DrawPreview {
                 int max_x = canvas.getWidth();
                 if( ui_rotation == 90 ) {
                     // so we don't interfere with the top bar info (datetime, free memory, ISO)
-                    max_x -= (int)(2.5*text_y);
+                    max_x -= (int)(2.5*gap_y);
                 }
 				/*if( MyDebug.LOG ) {
 					Log.d(TAG, "root view right: " + preview.getView().getRootView().getRight());
@@ -1546,7 +1582,7 @@ public class DrawPreview {
                     // in case goes off the size of the canvas, for "black bar" cases (when preview aspect ratio != screen aspect ratio)
                     diff_x = max_x - canvas.getWidth()/2;
                 }
-                text_base_y = canvas.getHeight()/2 + diff_x - (int)(0.5*text_y);
+                text_base_y = canvas.getHeight()/2 + diff_x - (int)(0.5*gap_y);
             }
 
             boolean draw_angle = has_level_angle && show_angle_pref;
@@ -1595,7 +1631,7 @@ public class DrawPreview {
                     String bounds_angle_string = "-45.0" + (char)0x00B0;
                     p.getTextBounds(bounds_angle_string, 0, bounds_angle_string.length(), text_bounds_angle_double);
                 }
-                applicationInterface.drawTextWithBackground(canvas, p, angle_string, color, Color.BLACK, canvas.getWidth() / 2 + pixels_offset_x, text_base_y, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, true, Math.abs(cached_angle) < 10.0 ? text_bounds_angle_single : text_bounds_angle_double);
+                applicationInterface.drawTextWithBackground(canvas, p, angle_string, color, Color.BLACK, canvas.getWidth() / 2 + pixels_offset_x, text_base_y, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, null, MyApplicationInterface.Shadow.SHADOW_OUTLINE, Math.abs(cached_angle) < 10.0 ? text_bounds_angle_single : text_bounds_angle_double);
                 p.setUnderlineText(false);
             }
             if( draw_geo_direction ) {
@@ -1617,7 +1653,7 @@ public class DrawPreview {
                     geo_angle += 360.0f;
                 }
                 String string = "" + Math.round(geo_angle) + (char)0x00B0;
-                applicationInterface.drawTextWithBackground(canvas, p, string, color, Color.BLACK, canvas.getWidth() / 2 + pixels_offset_x, text_base_y, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, ybounds_text, true);
+                applicationInterface.drawTextWithBackground(canvas, p, string, color, Color.BLACK, canvas.getWidth() / 2 + pixels_offset_x, text_base_y, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, ybounds_text, MyApplicationInterface.Shadow.SHADOW_OUTLINE);
             }
             if( preview.isOnTimer() ) {
                 long remaining_time = (preview.getTimerEndTime() - time_ms + 999)/1000;
@@ -1644,7 +1680,7 @@ public class DrawPreview {
 					Log.d(TAG, "video_time: " + video_time + " " + time_s);*/
                 p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
                 p.setTextAlign(Paint.Align.CENTER);
-                int pixels_offset_y = 3*text_y; // avoid overwriting the zoom, and also allow a bit extra space
+                int pixels_offset_y = 2*text_y; // avoid overwriting the zoom
                 int color = Color.rgb(244, 67, 54); // Red 500
                 if( main_activity.isScreenLocked() ) {
                     // writing in reverse order, bottom to top
@@ -1718,10 +1754,10 @@ public class DrawPreview {
                     int n_burst_total = camera_controller.getBurstTotal();
                     p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
                     p.setTextAlign(Paint.Align.CENTER);
-                    int pixels_offset_y = 3*text_y; // avoid overwriting the zoom, and also allow a bit extra space
+                    int pixels_offset_y = 2*text_y; // avoid overwriting the zoom
                     if( ui_rotation == 0 && applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.FocusBracketing ) {
                         // avoid clashing with the target focus bracketing seekbar in landscape orientation
-                        pixels_offset_y = 5*text_y;
+                        pixels_offset_y = 5*gap_y;
                     }
                     String text = getContext().getResources().getString(R.string.capturing) + " " + n_burst_taken;
                     if( n_burst_total > 0 ) {
@@ -1736,7 +1772,7 @@ public class DrawPreview {
                         if( ((int)(time_ms / 500)) % 2 == 0 ) {
                             p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
                             p.setTextAlign(Paint.Align.CENTER);
-                            int pixels_offset_y = 3*text_y; // avoid overwriting the zoom, and also allow a bit extra space
+                            int pixels_offset_y = 2*text_y; // avoid overwriting the zoom
                             int color = Color.rgb(244, 67, 54); // Red 500
                             applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.capturing), color, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
                         }
@@ -1747,7 +1783,7 @@ public class DrawPreview {
                 if( ((int)(time_ms / 500)) % 2 == 0 ) {
                     p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
                     p.setTextAlign(Paint.Align.CENTER);
-                    int pixels_offset_y = 3 * text_y; // avoid overwriting the zoom, and also allow a bit extra space
+                    int pixels_offset_y = 2 * text_y; // avoid overwriting the zoom
                     int n_images_to_save = applicationInterface.getImageSaver().getNRealImagesToSave();
                     String string = getContext().getResources().getString(R.string.processing) + " (" + n_images_to_save + " " + getContext().getResources().getString(R.string.remaining) + ")";
                     applicationInterface.drawTextWithBackground(canvas, p, string, Color.LTGRAY, Color.BLACK, canvas.getWidth() / 2, text_base_y - pixels_offset_y);
@@ -1761,7 +1797,7 @@ public class DrawPreview {
                     // Convert the dps to pixels, based on density scale
                     p.setTextSize(14 * scale + 0.5f); // convert dps to pixels
                     p.setTextAlign(Paint.Align.CENTER);
-                    applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.zoom) + ": " + zoom_ratio +"x", Color.WHITE, Color.BLACK, canvas.getWidth() / 2, text_base_y - text_y, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, ybounds_text, true);
+                    applicationInterface.drawTextWithBackground(canvas, p, getContext().getResources().getString(R.string.zoom) + ": " + zoom_ratio +"x", Color.WHITE, Color.BLACK, canvas.getWidth() / 2, text_base_y - text_y, MyApplicationInterface.Alignment.ALIGNMENT_BOTTOM, ybounds_text, MyApplicationInterface.Shadow.SHADOW_OUTLINE);
                 }
             }
 
@@ -1792,11 +1828,14 @@ public class DrawPreview {
 
         int top_x = (int) (5 * scale + 0.5f); // convert dps to pixels
         int top_y = (int) (5 * scale + 0.5f); // convert dps to pixels
-        int top_margin = main_activity.getMainUI().getTopMargin();
-        if( top_margin > 0 ) {
+        View top_icon = main_activity.getMainUI().getTopIcon();
+        if( top_icon != null ) {
+            top_icon.getLocationOnScreen(gui_location);
+            int top_margin = gui_location[0] + top_icon.getWidth();
+            preview.getView().getLocationOnScreen(gui_location);
             int preview_left = gui_location[0];
-			/*if( MyDebug.LOG )
-				Log.d(TAG, "preview_left: " + preview_left);*/
+            /*if( MyDebug.LOG )
+            	Log.d(TAG, "preview_left: " + preview_left);*/
             int shift = top_margin - preview_left;
             if( shift > 0 ) {
                 if( ui_rotation == 90 || ui_rotation == 270 ) {
@@ -1861,11 +1900,18 @@ public class DrawPreview {
         canvas.restore();
     }
 
-    private void drawAngleLines(Canvas canvas) {
+    private void drawAngleLines(Canvas canvas, long time_ms) {
         Preview preview = main_activity.getPreview();
         CameraController camera_controller = preview.getCameraController();
         boolean has_level_angle = preview.hasLevelAngle();
-        if( camera_controller != null && !preview.isPreviewPaused() && has_level_angle && ( show_angle_line_pref || show_pitch_lines_pref || show_geo_direction_lines_pref ) ) {
+        boolean actual_show_angle_line_pref;
+        if( photoMode == MyApplicationInterface.PhotoMode.Panorama ) {
+            // in panorama mode, we should the level iff we aren't taking the panorama photos
+            actual_show_angle_line_pref = !main_activity.getApplicationInterface().getGyroSensor().isRecording();
+        }
+        else
+            actual_show_angle_line_pref = show_angle_line_pref;
+        if( camera_controller != null && !preview.isPreviewPaused() && has_level_angle && ( actual_show_angle_line_pref || show_pitch_lines_pref || show_geo_direction_lines_pref ) ) {
             int ui_rotation = preview.getUIRotation();
             double level_angle = preview.getLevelAngle();
             boolean has_pitch_angle = preview.hasPitchAngle();
@@ -1910,7 +1956,7 @@ public class DrawPreview {
             final int line_alpha = 160;
             float hthickness = (0.5f * scale + 0.5f); // convert dps to pixels
             p.setStyle(Paint.Style.FILL);
-            if( show_angle_line_pref && preview.hasLevelAngleStable() ) {
+            if( actual_show_angle_line_pref && preview.hasLevelAngleStable() ) {
                 // only show the angle line if level angle "stable" (i.e., not pointing near vertically up or down)
                 // draw outline
                 p.setColor(Color.BLACK);
@@ -1950,8 +1996,9 @@ public class DrawPreview {
                     canvas.drawRoundRect(draw_rect, hthickness, hthickness, p);
                 }
             }
-            float camera_angle_x = preview.getViewAngleX(true);
-            float camera_angle_y = preview.getViewAngleY(true);
+            updateCachedViewAngles(time_ms); // ensure view_angle_x_preview, view_angle_y_preview are computed and up to date
+            float camera_angle_x = this.view_angle_x_preview;
+            float camera_angle_y = this.view_angle_y_preview;
             float angle_scale_x = (float)( canvas.getWidth() / (2.0 * Math.tan( Math.toRadians((camera_angle_x/2.0)) )) );
             float angle_scale_y = (float)( canvas.getHeight() / (2.0 * Math.tan( Math.toRadians((camera_angle_y/2.0)) )) );
 			/*if( MyDebug.LOG ) {
@@ -2278,12 +2325,6 @@ public class DrawPreview {
             }
         }
 
-        preview.getView().getLocationOnScreen(gui_location);
-		/*if( MyDebug.LOG ) {
-			Log.d(TAG, "gui_location[0]: " + gui_location[0]);
-			Log.d(TAG, "gui_location[1]: " + gui_location[1]);
-		}*/
-
         if( camera_controller != null && taking_picture && !front_screen_flash && take_photo_border_pref ) {
             p.setColor(Color.WHITE);
             p.setStyle(Paint.Style.STROKE);
@@ -2352,7 +2393,7 @@ public class DrawPreview {
 
         drawUI(canvas, time_ms);
 
-        drawAngleLines(canvas);
+        drawAngleLines(canvas, time_ms);
 
         doFocusAnimation(canvas, time_ms);
 
@@ -2373,27 +2414,29 @@ public class DrawPreview {
         if( enable_gyro_target_spot && camera_controller != null ) {
             GyroSensor gyroSensor = main_activity.getApplicationInterface().getGyroSensor();
             if( gyroSensor.isRecording() ) {
-                gyroSensor.getRelativeInverseVector(transformed_gyro_direction, gyro_direction);
-                gyroSensor.getRelativeInverseVector(transformed_gyro_direction_up, gyro_direction_up);
-                // note that although X of gyro_direction represents left to right on the device, because we're in landscape mode,
-                // this is y coordinates on the screen
-                float angle_x = - (float)Math.asin(transformed_gyro_direction[1]);
-                float angle_y = - (float)Math.asin(transformed_gyro_direction[0]);
-                if( Math.abs(angle_x) < 0.5f*Math.PI && Math.abs(angle_y) < 0.5f*Math.PI ) {
-                    float camera_angle_x = preview.getViewAngleX(true);
-                    float camera_angle_y = preview.getViewAngleY(true);
-                    float angle_scale_x = (float) (canvas.getWidth() / (2.0 * Math.tan(Math.toRadians((camera_angle_x / 2.0)))));
-                    float angle_scale_y = (float) (canvas.getHeight() / (2.0 * Math.tan(Math.toRadians((camera_angle_y / 2.0)))));
-                    angle_scale_x *= preview.getZoomRatio();
-                    angle_scale_y *= preview.getZoomRatio();
-                    float distance_x = angle_scale_x * (float) Math.tan(angle_x); // angle_scale is already in pixels rather than dps
-                    float distance_y = angle_scale_y * (float) Math.tan(angle_y); // angle_scale is already in pixels rather than dps
-                    p.setColor(Color.WHITE);
-                    drawGyroSpot(canvas, 0.0f, 0.0f, -1.0f, 0.0f, 48); // draw spot for the centre of the screen, to help the user orient the device
-                    p.setColor(Color.BLUE);
-                    float dir_x = -transformed_gyro_direction_up[1];
-                    float dir_y = -transformed_gyro_direction_up[0];
-                    drawGyroSpot(canvas, distance_x, distance_y, dir_x, dir_y, 45);
+                for(float [] gyro_direction : gyro_directions) {
+                    gyroSensor.getRelativeInverseVector(transformed_gyro_direction, gyro_direction);
+                    gyroSensor.getRelativeInverseVector(transformed_gyro_direction_up, gyro_direction_up);
+                    // note that although X of gyro_direction represents left to right on the device, because we're in landscape mode,
+                    // this is y coordinates on the screen
+                    float angle_x = - (float)Math.asin(transformed_gyro_direction[1]);
+                    float angle_y = - (float)Math.asin(transformed_gyro_direction[0]);
+                    if( Math.abs(angle_x) < 0.5f*Math.PI && Math.abs(angle_y) < 0.5f*Math.PI ) {
+                        updateCachedViewAngles(time_ms); // ensure view_angle_x_preview, view_angle_y_preview are computed and up to date
+                        float camera_angle_x = this.view_angle_x_preview;
+                        float camera_angle_y = this.view_angle_y_preview;
+                        float angle_scale_x = (float) (canvas.getWidth() / (2.0 * Math.tan(Math.toRadians((camera_angle_x / 2.0)))));
+                        float angle_scale_y = (float) (canvas.getHeight() / (2.0 * Math.tan(Math.toRadians((camera_angle_y / 2.0)))));
+                        angle_scale_x *= preview.getZoomRatio();
+                        angle_scale_y *= preview.getZoomRatio();
+                        float distance_x = angle_scale_x * (float) Math.tan(angle_x); // angle_scale is already in pixels rather than dps
+                        float distance_y = angle_scale_y * (float) Math.tan(angle_y); // angle_scale is already in pixels rather than dps
+                        p.setColor(Color.WHITE);
+                        drawGyroSpot(canvas, 0.0f, 0.0f, -1.0f, 0.0f, 48, true); // draw spot for the centre of the screen, to help the user orient the device
+                        p.setColor(Color.BLUE);
+                        float dir_x = -transformed_gyro_direction_up[1];
+                        float dir_y = -transformed_gyro_direction_up[0];
+                        drawGyroSpot(canvas, distance_x, distance_y, dir_x, dir_y, 45, false);
 					/*{
 						// for debug only, draw the gyro spot that isn't calibrated with the accelerometer
 						gyroSensor.getRelativeInverseVectorGyroOnly(transformed_gyro_direction, gyro_direction);
@@ -2407,24 +2450,25 @@ public class DrawPreview {
 						dir_y = -transformed_gyro_direction_up[0];
 						drawGyroSpot(canvas, distance_x, distance_y, dir_x, dir_y, 45);
 					}*/
-                }
+                    }
 
-                // show indicator for not being "upright", but only if tilt angle is within 20 degrees
-                if( gyroSensor.isUpright() != 0 && Math.abs(angle_x) <= 20.0f*0.0174532925199f ) {
-                    //applicationInterface.drawTextWithBackground(canvas, p, "not upright", Color.WHITE, Color.BLACK, canvas.getWidth()/2, canvas.getHeight()/2, MyApplicationInterface.Alignment.ALIGNMENT_CENTRE, null, true);
-                    canvas.save();
-                    canvas.rotate(ui_rotation, canvas.getWidth()/2.0f, canvas.getHeight()/2.0f);
-                    final int icon_size = (int) (64 * scale + 0.5f); // convert dps to pixels
-                    final int cy_offset = (int) (80 * scale + 0.5f); // convert dps to pixels
-                    int cx = canvas.getWidth()/2, cy = canvas.getHeight()/2 - cy_offset;
-                    icon_dest.set(cx - icon_size/2, cy - icon_size/2, cx + icon_size/2, cy + icon_size/2);
+                    // show indicator for not being "upright", but only if tilt angle is within 20 degrees
+                    if( gyroSensor.isUpright() != 0 && Math.abs(angle_x) <= 20.0f*0.0174532925199f ) {
+                        //applicationInterface.drawTextWithBackground(canvas, p, "not upright", Color.WHITE, Color.BLACK, canvas.getWidth()/2, canvas.getHeight()/2, MyApplicationInterface.Alignment.ALIGNMENT_CENTRE, null, true);
+                        canvas.save();
+                        canvas.rotate(ui_rotation, canvas.getWidth()/2.0f, canvas.getHeight()/2.0f);
+                        final int icon_size = (int) (64 * scale + 0.5f); // convert dps to pixels
+                        final int cy_offset = (int) (80 * scale + 0.5f); // convert dps to pixels
+                        int cx = canvas.getWidth()/2, cy = canvas.getHeight()/2 - cy_offset;
+                        icon_dest.set(cx - icon_size/2, cy - icon_size/2, cx + icon_size/2, cy + icon_size/2);
 					/*p.setStyle(Paint.Style.FILL);
 					p.setColor(Color.BLACK);
 					p.setAlpha(64);
 					canvas.drawRect(icon_dest, p);
 					p.setAlpha(255);*/
-                    canvas.drawBitmap(gyroSensor.isUpright() > 0 ? rotate_left_bitmap : rotate_right_bitmap, null, icon_dest, p);
-                    canvas.restore();
+                        canvas.drawBitmap(gyroSensor.isUpright() > 0 ? rotate_left_bitmap : rotate_right_bitmap, null, icon_dest, p);
+                        canvas.restore();
+                    }
                 }
             }
         }
@@ -2464,19 +2508,27 @@ public class DrawPreview {
         }
     }
 
-    private void drawGyroSpot(Canvas canvas, float distance_x, float distance_y, float dir_x, float dir_y, int radius_dp) {
-        p.setAlpha(64);
+    private void drawGyroSpot(Canvas canvas, float distance_x, float distance_y, float dir_x, float dir_y, int radius_dp, boolean outline) {
+        if( outline ) {
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(stroke_width);
+            p.setAlpha(255);
+        }
+        else {
+            p.setAlpha(127);
+        }
         float radius = (radius_dp * scale + 0.5f); // convert dps to pixels
         float cx = canvas.getWidth()/2.0f + distance_x;
         float cy = canvas.getHeight()/2.0f + distance_y;
         canvas.drawCircle(cx, cy, radius, p);
         p.setAlpha(255);
+        p.setStyle(Paint.Style.FILL); // reset
 
         // draw crosshairs
         //p.setColor(Color.WHITE);
-        p.setStrokeWidth(stroke_width);
+        /*p.setStrokeWidth(stroke_width);
         canvas.drawLine(cx - radius*dir_x, cy - radius*dir_y, cx + radius*dir_x, cy + radius*dir_y, p);
-        canvas.drawLine(cx - radius*dir_y, cy + radius*dir_x, cx + radius*dir_y, cy - radius*dir_x, p);
+        canvas.drawLine(cx - radius*dir_y, cy + radius*dir_x, cx + radius*dir_y, cy - radius*dir_x, p);*/
     }
 
     /**

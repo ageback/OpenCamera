@@ -226,6 +226,9 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     private boolean has_pitch_angle;
     private double pitch_angle;
 
+    // if applicationInterface.allowZoom() returns false, then has_zoom will be false, but camera_controller_supports_zoom
+    // supports whether the camera controller supported zoom
+    private boolean camera_controller_supports_zoom;
     private boolean has_zoom;
     private int max_zoom_factor;
     private final GestureDetector gestureDetector;
@@ -1319,6 +1322,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
         successfully_focused = false;
         preview_targetRatio = 0.0;
         scene_modes = null;
+        camera_controller_supports_zoom = false;
         has_zoom = false;
         max_zoom_factor = 0;
         minimum_focus_distance = 0.0f;
@@ -1858,6 +1862,13 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
                 Log.d(TAG, "setupCamera: total time after zoomTo: " + (System.currentTimeMillis() - debug_time));
             }
         }
+        else if( camera_controller_supports_zoom && !has_zoom ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "camera supports zoom but application disabled zoom, so reset zoom to default");
+            // if the application switches zoom off via ApplicationInterface.allowZoom(), we need to support
+            // resetting the zoom (in case the application called setupCamera() rather than reopening the camera).
+            camera_controller.setZoom(0);
+        }
 
 	    /*if( take_photo ) {
 			if( this.is_video ) {
@@ -1984,10 +1995,15 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( MyDebug.LOG )
                 Log.d(TAG, "grab info from parameters");
             CameraController.CameraFeatures camera_features = camera_controller.getCameraFeatures();
-            this.has_zoom = camera_features.is_zoom_supported;
+            this.camera_controller_supports_zoom = camera_features.is_zoom_supported;
+            this.has_zoom = camera_features.is_zoom_supported && applicationInterface.allowZoom();
             if( this.has_zoom ) {
                 this.max_zoom_factor = camera_features.max_zoom;
                 this.zoom_ratios = camera_features.zoom_ratios;
+            }
+            else {
+                this.max_zoom_factor = 0;
+                this.zoom_ratios = null;
             }
             this.minimum_focus_distance = camera_features.minimum_focus_distance;
             this.supports_face_detection = camera_features.supports_face_detection;
@@ -3835,7 +3851,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( camera_controller.setExposureCompensation(new_exposure) ) {
                 // now save
                 applicationInterface.setExposureCompensationPref(new_exposure);
-                showToast(getExposureCompensationString(new_exposure), 96, true);
+                showToast(getExposureCompensationString(new_exposure), 0, true);
             }
         }
     }
@@ -3850,7 +3866,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( camera_controller.setWhiteBalanceTemperature(new_temperature) ) {
                 // now save
                 applicationInterface.setWhiteBalanceTemperaturePref(new_temperature);
-                showToast(getResources().getString(R.string.white_balance) + " " + new_temperature, 96, true);
+                showToast(getResources().getString(R.string.white_balance) + " " + new_temperature, 0, true);
             }
         }
     }
@@ -3886,7 +3902,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( camera_controller.setISO(new_iso) ) {
                 // now save
                 applicationInterface.setISOPref("" + new_iso);
-                showToast(getISOString(new_iso), 96, true);
+                showToast(getISOString(new_iso), 0, true);
             }
         }
     }
@@ -3902,7 +3918,7 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
             if( camera_controller.setExposureTime(new_exposure_time) ) {
                 // now save
                 applicationInterface.setExposureTimePref(new_exposure_time);
-                showToast(getExposureTimeString(new_exposure_time), 96, true);
+                showToast(getExposureTimeString(new_exposure_time), 0, true);
             }
         }
     }
@@ -6658,8 +6674,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     /** Returns the horizontal angle of view in degrees (when unzoomed).
      */
     public float getViewAngleX(boolean for_preview) {
-		/*if( MyDebug.LOG )
-			Log.d(TAG, "getViewAngleX: " + for_preview);*/
+		if( MyDebug.LOG )
+			Log.d(TAG, "getViewAngleX: " + for_preview);
         CameraController.Size size = for_preview ? this.getCurrentPreviewSize() : this.getCurrentPictureSize();
         if( size == null ) {
             Log.e(TAG, "can't find view angle x size");
@@ -6692,8 +6708,8 @@ public class Preview implements SurfaceHolder.Callback, TextureView.SurfaceTextu
     /** Returns the vertical angle of view in degrees (when unzoomed).
      */
     public float getViewAngleY(boolean for_preview) {
-		/*if( MyDebug.LOG )
-			Log.d(TAG, "getViewAngleY: " + for_preview);*/
+		if( MyDebug.LOG )
+			Log.d(TAG, "getViewAngleY: " + for_preview);
         CameraController.Size size = for_preview ? this.getCurrentPreviewSize() : this.getCurrentPictureSize();
         if( size == null ) {
             Log.e(TAG, "can't find view angle y size");

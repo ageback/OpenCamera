@@ -230,12 +230,14 @@
         <item>24</item>
     </string-array>
     <string-array name="preference_stamp_style_entries">
-        <item>Shadowed text</item>
-        <item>Plain text</item>
+        <item>@string/preference_stamp_style_plain</item>
+        <item>@string/preference_stamp_style_shadowed</item>
+        <item>@string/preference_stamp_style_background</item>
     </string-array>
     <string-array name="preference_stamp_style_values">
-        <item>preference_stamp_style_shadowed</item>
         <item>preference_stamp_style_plain</item>
+        <item>preference_stamp_style_shadowed</item>
+        <item>preference_stamp_style_background</item>
     </string-array>
     <string-array name="preference_video_restart_entries">
         <item>Don\'t restart</item>
@@ -906,5 +908,23 @@
     <string-array name="preference_focus_peaking_values">
         <item>preference_focus_peaking_off</item>
         <item>preference_focus_peaking_on</item>
+    </string-array>
+    <string-array name="preference_panorama_crop_entries">
+        <item>@string/off</item>
+        <item>@string/on</item>
+    </string-array>
+    <string-array name="preference_panorama_crop_values">
+        <item>preference_panorama_crop_off</item>
+        <item>preference_panorama_crop_on</item>
+    </string-array>
+    <string-array name="preference_panorama_save_entries">
+        <item>@string/preference_panorama_save_no</item>
+        <item>@string/preference_panorama_save_all</item>
+        <item>@string/preference_panorama_save_all_plus_debug</item>
+    </string-array>
+    <string-array name="preference_panorama_save_values">
+        <item>preference_panorama_save_no</item>
+        <item>preference_panorama_save_all</item>
+        <item>preference_panorama_save_all_plus_debug</item>
     </string-array>
 </resources>

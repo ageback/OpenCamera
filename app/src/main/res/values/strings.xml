@@ -195,7 +195,7 @@
     <string name="preference_stamp_font_color">Font color</string>
     <string name="preference_stamp_font_color_summary">Font color to use when stamping text onto photos</string>
     <string name="preference_stamp_style">Text style</string>
-    <string name="preference_stamp_style_summary">Style to use when stamping text onto photos</string>
+    <string name="preference_stamp_style_summary">Style to use when stamping text onto photos\n%s</string>
     <string name="preference_background_photo_saving">Use background thread</string>
     <string name="preference_background_photo_saving_summary">Whether to save photos on a background thread (for faster operation)</string>
     <string name="video_quality">Video resolution</string>
@@ -598,7 +598,7 @@
     <string name="focus_bracketing_add_infinity">Add infinite distance</string>
 
     <string name="magnetic_accuracy_title">Compass direction</string>
-    <string name="magnetic_accuracy_info">Your device\'s compass needs calibrating to improve its accuracy. This can be done by moving your phone in a figure of 8 motion.\n\nCurrent accuracy:</string>
+    <string name="magnetic_accuracy_info">Your device\'s compass needs calibrating to improve its accuracy. This can be done by moving your device in a figure of 8 motion.\n\nCurrent accuracy:</string>
 
     <string name="accuracy_unreliable">Unreliable</string>
     <string name="accuracy_low">Low</string>
@@ -857,24 +857,45 @@
     <string name="bluetooth_current_remote">Current remote:</string>
     <string name="bluetooth_scan">Scan</string>
 
+    <string name="preference_stamp_style_shadowed">Shadowed text</string>
+    <string name="preference_stamp_style_plain">Plain text</string>
+    <string name="preference_stamp_style_background">Text with shaded background</string>
+
+    <string name="image_saving_notification">Saving images…</string>
+
+    <string name="finish_panorama">Finish panorama</string>
+    <string name="cancel_panorama">Cancel panorama</string>
+    <string name="panorama_cancelled">Panorama cancelled</string>
+    <string name="failed_to_process_panorama">Failed to create Panorama image</string>
+
+    <string name="preference_panorama_crop">Panorama auto-crop</string>
+    <string name="preference_panorama_crop_summary">For panorama mode, whether to remove the wavy boundaries\n%s</string>
+
+    <string name="panorama_info">To take a panorama image, hold your device in portrait orientation, and click to take a photo to start the panorama. Then rotate your device either left or right to move the centred white circle over the blue dot. After each new image is captured, keep rotating your device to cover each new blue dot that appears in turn.\n\nClick the tick icon to save the panorama, or the cross icon to cancel.\n\nNote that panorama photos can take time to process and save.</string>
+
+    <string name="preference_panorama_save">Panorama original images</string>
+    <string name="preference_panorama_save_summary">Whether to save original images in panorama mode. Note this will make saving panorama photos slower. Also allows the option to save an XML file which can be useful reporting problems with panorama.\n%s</string>
+
+    <string name="preference_panorama_save_no">Don\'t save original images</string>
+    <string name="preference_panorama_save_all">Save original images</string>
+    <string name="preference_panorama_save_all_plus_debug">Save original images plus debug XML</string>
+
+    <string name="camera_id">ID</string> <!-- ID as in camera ID -->
+
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text">
-        [This dialog is shown when Open Camera is updated. You can disable it under
-        Settings/On screen GUI/Show What\'s New dialog.]
-        \n\n<b>v1.46:</b>\n\n
+        <small>[This dialog is shown when Open Camera is updated. You can disable it under
+            Settings/On screen GUI/Show What\'s New dialog.]</small>
+        \n\n<b>v1.47:</b>\n
         <ul>
-            <li>New features when Settings/\"Use Camera2 API\" is enabled: histogram, zebra stripes, focus peaking (see
-                Settings/\"Camera preview\"/).\n</li>
-            <li>RAW now supported for expo and focus bracketing on higher end devices (see Settings/Photo settings/ to
-                disable).\n</li>
-            <li>New Settings/Photo settings/\"Use addresses\" to display GPS coordinates as an address.\n</li>
-            <li>More on-screen icons under Settings/On screen GUI/.\n</li>
-            <li>Support for remote control via bluetooth/USB keyboards and Kraken Smart Housing (thanks to Edouard Lafargue).\n</li>
-            <li>Improved DRO algorithm for some scenes.\n</li>
-            <li>Noise Reduction \"NR Mode\" is now saved.\n</li>
-            <li>Some settings now moved from \"On screen GUI\" to \"Camera preview\".\n</li>
-            <li>Corrected display of free space with using external SD cards with Storage Access Framework.\n</li>
+            <li>New panorama photo mode (requires Android 5+, note not all devices are supported).\n</li>
+            <li>New option Settings/Photo settings/Text style/\"Text with shaded background\" for photo stamp.\n</li>
+            <li>Notifications now displayed on Android 8+ when Open Camera is in background when images are
+                still being processed/saved.\n</li>
+            <li>Camera ID is now displayed when switching cameras, on devices with more than two cameras.\n</li>
+            <li>Improved performance on Android 7+ when saving photos when using Storage Access Framework.\n</li>
             <li>Other improvements and bug fixes.\n</li>
+
         </ul>
     </string>
 </resources>

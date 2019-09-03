@@ -21,6 +21,9 @@ import java.util.Locale;
 import java.util.Map;
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
@@ -158,6 +161,10 @@ public class MainActivity extends Activity {
     public volatile String test_last_saved_image;
     public static boolean test_force_supports_camera2; // okay to be static, as this is set for an entire test suite
     public volatile String test_save_settings_file;
+
+    private boolean has_notification;
+    private final String CHANNEL_ID = "open_camera_channel";
+    private final int image_saving_notification_id = 1;
 
     private static final float WATER_DENSITY_FRESHWATER = 1.0f;
     private static final float WATER_DENSITY_SALTWATER = 1.03f;
@@ -305,6 +312,8 @@ public class MainActivity extends Activity {
         pauseVideoButton.setVisibility(View.GONE);
         View takePhotoVideoButton = findViewById(R.id.take_photo_when_video_recording);
         takePhotoVideoButton.setVisibility(View.GONE);
+        View cancelPanoramaButton = findViewById(R.id.cancel_panorama);
+        cancelPanoramaButton.setVisibility(View.GONE);
 
         // We initialise optional controls to invisible/gone, so they don't show while the camera is opening - the actual visibility is
         // set in cameraSetup().
@@ -464,7 +473,7 @@ public class MainActivity extends Activity {
                     // E.g., we have a "What's New" for 1.44 (64), but then push out a quick fix for 1.44.1 (65). We don't want to
                     // show the dialog again to people who already received 1.44 (64), but we still want to show the dialog to people
                     // upgrading from earlier versions.
-                    int whats_new_version = 70; // 1.46
+                    int whats_new_version = 71; // 1.47
                     whats_new_version = Math.min(whats_new_version, version_code); // whats_new_version should always be <= version_code, but just in case!
                     if( MyDebug.LOG ) {
                         Log.d(TAG, "whats_new_version: " + whats_new_version);
@@ -485,7 +494,7 @@ public class MainActivity extends Activity {
                             public void onClick(DialogInterface dialog, int which) {
                                 if( MyDebug.LOG )
                                     Log.d(TAG, "donate");
-                                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.getDonateLink()));
+                                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.DonateLink));
                                 startActivity(browserIntent);
                             }
                         });
@@ -532,6 +541,19 @@ public class MainActivity extends Activity {
                 });
             }
         }).start();
+
+        // create notification channel - only needed on Android 8+
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+            CharSequence name = "Open Camera Image Saving";
+            String description = "Notification channel for processing and saving images in the background";
+            int importance = NotificationManager.IMPORTANCE_LOW;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
 
         if( MyDebug.LOG )
             Log.d(TAG, "onCreate: total time for Activity startup: " + (System.currentTimeMillis() - debug_time));
@@ -621,7 +643,7 @@ public class MainActivity extends Activity {
             if( MyDebug.LOG )
                 Log.d(TAG, "launching from quick settings tile or application shortcut for Open Camera: selfie mode");
             done_facing = true;
-            switchToCamera(true);
+            applicationInterface.switchToCamera(true);
         }
         else if( ACTION_SHORTCUT_GALLERY.equals(action) ) {
             if( MyDebug.LOG )
@@ -643,7 +665,7 @@ public class MainActivity extends Activity {
                 if( camera_facing == 0 || camera_facing == 1 ) {
                     if( MyDebug.LOG )
                         Log.d(TAG, "found android.intent.extras.CAMERA_FACING: " + camera_facing);
-                    switchToCamera(camera_facing==1);
+                    applicationInterface.switchToCamera(camera_facing==1);
                     done_facing = true;
                 }
             }
@@ -651,7 +673,7 @@ public class MainActivity extends Activity {
                 if( extras.getInt("android.intent.extras.LENS_FACING_FRONT", -1) == 1 ) {
                     if( MyDebug.LOG )
                         Log.d(TAG, "found android.intent.extras.LENS_FACING_FRONT");
-                    switchToCamera(true);
+                    applicationInterface.switchToCamera(true);
                     done_facing = true;
                 }
             }
@@ -659,7 +681,7 @@ public class MainActivity extends Activity {
                 if( extras.getInt("android.intent.extras.LENS_FACING_BACK", -1) == 1 ) {
                     if( MyDebug.LOG )
                         Log.d(TAG, "found android.intent.extras.LENS_FACING_BACK");
-                    switchToCamera(false);
+                    applicationInterface.switchToCamera(false);
                     done_facing = true;
                 }
             }
@@ -667,27 +689,20 @@ public class MainActivity extends Activity {
                 if( extras.getBoolean("android.intent.extra.USE_FRONT_CAMERA", false) ) {
                     if( MyDebug.LOG )
                         Log.d(TAG, "found android.intent.extra.USE_FRONT_CAMERA");
-                    switchToCamera(true);
+                    applicationInterface.switchToCamera(true);
                     done_facing = true;
                 }
             }
         }
-    }
 
-    /** Switch to the first available camera that is front or back facing as desired.
-     * @param front_facing Whether to switch to a front or back facing camera.
-     */
-    private void switchToCamera(boolean front_facing) {
-        if( MyDebug.LOG )
-            Log.d(TAG, "switchToCamera: " + front_facing);
-        int n_cameras = preview.getCameraControllerManager().getNumberOfCameras();
-        for(int i=0;i<n_cameras;i++) {
-            if( preview.getCameraControllerManager().isFrontFacing(i) == front_facing ) {
-                if( MyDebug.LOG )
-                    Log.d(TAG, "found desired camera: " + i);
-                applicationInterface.setCameraIdPref(i);
-                break;
-            }
+        // N.B., in practice the hasSetCameraId() check is pointless as we don't save the camera ID in shared preferences, so it will always
+        // be false when application is started from onCreate(), unless resuming from saved instance (in which case we shouldn't be here anyway)
+        if( !done_facing && !applicationInterface.hasSetCameraId() ) {
+            if( MyDebug.LOG )
+                Log.d(TAG, "initialise to back camera");
+            // most devices have first camera as back camera anyway so this wouldn't be needed, but some (e.g., LG G6) have first camera
+            // as front camera, so we should explicitly switch to back camera
+            applicationInterface.switchToCamera(false);
         }
     }
 
@@ -762,6 +777,10 @@ public class MainActivity extends Activity {
         if( MyDebug.LOG )
             Log.d(TAG, "activity_count: " + activity_count);
 
+        // should do asap before waiting for images to be saved - as risk the application will be killed whilst waiting for that to happen,
+        // and we want to avoid notifications hanging around
+        cancelImageSavingNotification();
+
         // reduce risk of losing any images
         // we don't do this in onPause or onStop, due to risk of ANRs
         // note that even if we did call this earlier in onPause or onStop, we'd still want to wait again here: as it can happen
@@ -784,11 +803,6 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "release renderscript contexts");
             RenderScript.releaseAllContexts();
         }
-        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
-            // see note in HDRProcessor.onDestroy() - but from Android M, renderscript contexts are released with releaseAllContexts()
-            // doc for releaseAllContexts() says "If no contexts have been created this function does nothing"
-            RenderScript.releaseAllContexts();
-        }
         // Need to recycle to avoid out of memory when running tests - probably good practice to do anyway
         for(Map.Entry<Integer, Bitmap> entry : preloaded_bitmap_resources.entrySet()) {
             if( MyDebug.LOG )
@@ -804,6 +818,7 @@ public class MainActivity extends Activity {
             textToSpeech.shutdown();
             textToSpeech = null;
         }
+
         super.onDestroy();
         if( MyDebug.LOG )
             Log.d(TAG, "onDestroy done");
@@ -947,6 +962,8 @@ public class MainActivity extends Activity {
         }
         super.onResume();
 
+        cancelImageSavingNotification();
+
         // Set black window background; also needed if we hide the virtual buttons in immersive mode
         // Note that we do it here rather than customising the theme's android:windowBackground, so this doesn't affect other views - in particular, the MyPreferenceFragment settings
         getWindow().getDecorView().getRootView().setBackgroundColor(Color.BLACK);
@@ -1016,12 +1033,17 @@ public class MainActivity extends Activity {
         freeAudioListener(false);
         speechControl.stopSpeechRecognizer();
         applicationInterface.getLocationSupplier().freeLocationListeners();
-        applicationInterface.getGyroSensor().stopRecording();
+        applicationInterface.stopPanorama(true); // in practice not needed as we should stop panorama when camera is closed, but good to do it explicitly here, before disabling the gyro sensors
         applicationInterface.getGyroSensor().disableSensors();
         soundPoolManager.releaseSound();
         applicationInterface.clearLastImages(); // this should happen when pausing the preview, but call explicitly just to be safe
         applicationInterface.getDrawPreview().clearGhostImage();
         preview.onPause();
+
+        if( applicationInterface.getImageSaver().getNImagesToSave() > 0) {
+            createImageSavingNotification();
+        }
+
         if( MyDebug.LOG ) {
             Log.d(TAG, "onPause: total time to pause: " + (System.currentTimeMillis() - debug_time));
         }
@@ -1100,6 +1122,12 @@ public class MainActivity extends Activity {
             preview.pauseVideo();
             mainUI.setPauseVideoContentDescription();
         }
+    }
+
+    public void clickedCancelPanorama(View view) {
+        if( MyDebug.LOG )
+            Log.d(TAG, "clickedCancelPanorama");
+        applicationInterface.stopPanorama(true);
     }
 
     public void clickedCycleRaw(View view) {
@@ -1352,6 +1380,15 @@ public class MainActivity extends Activity {
         this.closePopup();
         if( this.preview.canSwitchCamera() ) {
             int cameraId = getNextCameraId();
+            if( preview.getCameraControllerManager().getNumberOfCameras() > 2 ) {
+                // telling the user which camera is pointless for only two cameras, but on devices that now
+                // expose many cameras it can be confusing, so show a toast to at least display the id
+                String toast_string = getResources().getString(
+                        preview.getCameraControllerManager().isFrontFacing(cameraId) ? R.string.front_camera : R.string.back_camera ) +
+                        " : " + getResources().getString(R.string.camera_id) + " " + cameraId;
+                preview.showToast(null, toast_string);
+            }
+
             View switchCameraButton = findViewById(R.id.switch_camera);
             switchCameraButton.setEnabled(false); // prevent slowdown if user repeatedly clicks
             applicationInterface.reset();
@@ -1371,6 +1408,13 @@ public class MainActivity extends Activity {
             Log.d(TAG, "clickedSwitchVideo");
         this.closePopup();
         mainUI.destroyPopup(); // important as we don't want to use a cached popup, as we can show different options depending on whether we're in photo or video mode
+
+        // In practice stopping the gyro sensor shouldn't be needed as (a) we don't show the switch
+        // photo/video icon when recording, (b) at the time of writing switching to video mode
+        // reopens the camera, which will stop panorama recording anyway, but we do this just to be
+        // safe.
+        applicationInterface.stopPanorama(true);
+
         View switchVideoButton = findViewById(R.id.switch_video);
         switchVideoButton.setEnabled(false); // prevent slowdown if user repeatedly clicks
         applicationInterface.reset();
@@ -1382,10 +1426,7 @@ public class MainActivity extends Activity {
 
         // ensure icons invisible if they're affected by being in video mode or not
         // (if enabling them, we'll make the icon visible later on)
-        if( !mainUI.showCycleRawIcon() ) {
-            View button = findViewById(R.id.cycle_raw);
-            button.setVisibility(View.GONE);
-        }
+        checkDisableGUIIcons();
 
         if( !block_startup_toast ) {
             this.showPhotoVideoToast(true);
@@ -1573,6 +1614,7 @@ public class MainActivity extends Activity {
         preview.cancelTimer(); // best to cancel any timer, in case we take a photo while settings window is open, or when changing settings
         preview.cancelRepeat(); // similarly cancel the auto-repeat mode!
         preview.stopVideo(false); // important to stop video, as we'll be changing camera parameters when the settings window closes
+        applicationInterface.stopPanorama(true); // important to stop panorama recording, as we might end up as we'll be changing camera parameters when the settings window closes
         stopAudioListeners();
 
         Bundle bundle = new Bundle();
@@ -1589,6 +1631,7 @@ public class MainActivity extends Activity {
         bundle.putBoolean("supports_burst_raw", this.supportsBurstRaw());
         bundle.putBoolean("supports_hdr", this.supportsHDR());
         bundle.putBoolean("supports_nr", this.supportsNoiseReduction());
+        bundle.putBoolean("supports_panorama", this.supportsPanorama());
         bundle.putBoolean("supports_expo_bracketing", this.supportsExpoBracketing());
         bundle.putBoolean("supports_preview_bitmaps", this.supportsPreviewBitmaps());
         bundle.putInt("max_expo_bracketing_n_images", this.maxExpoBracketingNImages());
@@ -1897,42 +1940,8 @@ public class MainActivity extends Activity {
 
         // ensure icons invisible if disabling them from showing from the Settings
         // (if enabling them, we'll make the icon visible later on)
-        if( !mainUI.showExposureLockIcon() ) {
-            View button = findViewById(R.id.exposure_lock);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showWhiteBalanceLockIcon() ) {
-            View button = findViewById(R.id.white_balance_lock);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showCycleRawIcon() ) {
-            View button = findViewById(R.id.cycle_raw);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showStoreLocationIcon() ) {
-            View button = findViewById(R.id.store_location);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showTextStampIcon() ) {
-            View button = findViewById(R.id.text_stamp);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showStampIcon() ) {
-            View button = findViewById(R.id.stamp);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showAutoLevelIcon() ) {
-            View button = findViewById(R.id.auto_level);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showCycleFlashIcon() ) {
-            View button = findViewById(R.id.cycle_flash);
-            button.setVisibility(View.GONE);
-        }
-        if( !mainUI.showFaceDetectionIcon() ) {
-            View button = findViewById(R.id.face_detection);
-            button.setVisibility(View.GONE);
-        }
+        checkDisableGUIIcons();
+
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         if( sharedPreferences.getString(PreferenceKeys.AudioControlPreferenceKey, "none").equals("none") ) {
             View speechRecognizerButton = findViewById(R.id.audio_control);
@@ -1983,6 +1992,47 @@ public class MainActivity extends Activity {
 
         if( MyDebug.LOG ) {
             Log.d(TAG, "updateForSettings: done: " + (System.currentTimeMillis() - debug_time));
+        }
+    }
+
+    private void checkDisableGUIIcons() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "checkDisableGUIIcons");
+        if( !mainUI.showExposureLockIcon() ) {
+            View button = findViewById(R.id.exposure_lock);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showWhiteBalanceLockIcon() ) {
+            View button = findViewById(R.id.white_balance_lock);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showCycleRawIcon() ) {
+            View button = findViewById(R.id.cycle_raw);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showStoreLocationIcon() ) {
+            View button = findViewById(R.id.store_location);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showTextStampIcon() ) {
+            View button = findViewById(R.id.text_stamp);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showStampIcon() ) {
+            View button = findViewById(R.id.stamp);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showAutoLevelIcon() ) {
+            View button = findViewById(R.id.auto_level);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showCycleFlashIcon() ) {
+            View button = findViewById(R.id.cycle_flash);
+            button.setVisibility(View.GONE);
+        }
+        if( !mainUI.showFaceDetectionIcon() ) {
+            View button = findViewById(R.id.face_detection);
+            button.setVisibility(View.GONE);
         }
     }
 
@@ -2114,7 +2164,13 @@ public class MainActivity extends Activity {
         // n.b., preview.setImmersiveMode() is called from onSystemUiVisibilityChange()
         if( on ) {
             if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && usingKitKatImmersiveMode() ) {
-                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN);
+                if( applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.Panorama ) {
+                    // don't allow the kitkat-style immersive mode for panorama mode (problem that in "full" immersive mode, the gyro spot can't be seen - we could fix this, but simplest to just disallow)
+                    getWindow().getDecorView().setSystemUiVisibility(0);
+                }
+                else {
+                    getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN);
+                }
             }
             else {
                 SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
@@ -2560,6 +2616,47 @@ public class MainActivity extends Activity {
         if( MyDebug.LOG )
             Log.d(TAG, "imageQueueChanged");
         applicationInterface.getDrawPreview().setImageQueueFull( !applicationInterface.canTakeNewPhoto() );
+
+        if( applicationInterface.getImageSaver().getNImagesToSave() == 0) {
+            cancelImageSavingNotification();
+        }
+        else if( has_notification) {
+            // call again to update the text of remaining images
+            createImageSavingNotification();
+        }
+    }
+
+    /** Creates a notification to indicate still saving images (or updates an existing one).
+     */
+    private void createImageSavingNotification() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "createImageSavingNotification");
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+            int n_images_to_save = applicationInterface.getImageSaver().getNRealImagesToSave();
+            Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.take_photo)
+                    .setContentTitle(getString(R.string.app_name))
+                    .setContentText(getString(R.string.image_saving_notification) + " " + n_images_to_save + " " + getString(R.string.remaining))
+                    //.setStyle(new Notification.BigTextStyle()
+                    //        .bigText("Much longer text that cannot fit one line..."))
+                    //.setPriority(Notification.PRIORITY_DEFAULT)
+                    ;
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.notify(image_saving_notification_id, builder.build());
+            has_notification = true;
+        }
+    }
+
+    /** Cancels the notification for saving images.
+     */
+    private void cancelImageSavingNotification() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "cancelImageSavingNotification");
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.cancel(image_saving_notification_id);
+            has_notification = false;
+        }
     }
 
     public void clickedGallery(View view) {
@@ -3148,13 +3245,24 @@ public class MainActivity extends Activity {
             Log.d(TAG, "takePicture");
 
         if( applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.Panorama ) {
-            if (applicationInterface.getGyroSensor().isRecording()) {
-                if (MyDebug.LOG)
+            if( preview.isTakingPhoto() ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "ignore whilst taking panorama photo");
+            }
+            else if( applicationInterface.getGyroSensor().isRecording() ) {
+                if( MyDebug.LOG )
                     Log.d(TAG, "panorama complete");
-                applicationInterface.stopPanorama();
+                applicationInterface.finishPanorama();
                 return;
-            } else {
-                if (MyDebug.LOG)
+            }
+            else if( !applicationInterface.canTakeNewPhoto() ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "can't start new panoroma, still saving in background");
+                // we need to test here, otherwise the Preview won't take a new photo - but we'll think we've
+                // started the panorama!
+            }
+            else {
+                if( MyDebug.LOG )
                     Log.d(TAG, "start panorama");
                 applicationInterface.startPanorama();
             }
@@ -3368,7 +3476,7 @@ public class MainActivity extends Activity {
             }
             else {
                 zoomControls.setVisibility(View.GONE);
-                zoomSeekBar.setVisibility(View.GONE);
+                zoomSeekBar.setVisibility(View.INVISIBLE); // should be INVISIBLE not GONE, as the focus_seekbar is aligned to be left to this
             }
             if( MyDebug.LOG )
                 Log.d(TAG, "cameraSetup: time after setting up zoom: " + (System.currentTimeMillis() - debug_time));
@@ -3635,6 +3743,8 @@ public class MainActivity extends Activity {
     public boolean supportsAutoStabilise() {
         if( applicationInterface.isRawOnly() )
             return false; // if not saving JPEGs, no point having auto-stabilise mode, as it won't affect the RAW images
+        if( applicationInterface.getPhotoMode() == MyApplicationInterface.PhotoMode.Panorama )
+            return false; // not supported in panorama mode
         return this.supports_auto_stabilise;
     }
 
@@ -3664,9 +3774,14 @@ public class MainActivity extends Activity {
     }
 
     public boolean supportsPanorama() {
-        // require 512MB just to be safe, due to the large number of images that may be created
-        //return( large_heap_memory >= 512 );
-        return false; // currently blocked for release
+        // don't support panorama mode if called from image capture intent
+        // in theory this works, but problem that currently we'd end up doing the processing on the UI thread, so risk ANR
+        if( applicationInterface.isImageCaptureIntent() )
+            return false;
+        // require 256MB just to be safe, due to the large number of images that may be created
+        // also require at least Android 5, for Renderscript
+        return( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && large_heap_memory >= 256 && applicationInterface.getGyroSensor().hasSensors() );
+        //return false; // currently blocked for release
     }
 
     public boolean supportsFastBurst() {
@@ -3712,9 +3827,7 @@ public class MainActivity extends Activity {
         this.supports_force_video_4k = false;
     }
 
-    public static String getDonateLink() {
-        return "https://play.google.com/store/apps/details?id=harman.mark.donation";
-    }
+    public static final String DonateLink = "https://play.google.com/store/apps/details?id=harman.mark.donation";
 
     /*public static String getDonateMarketLink() {
     	return "market://details?id=harman.mark.donation";
@@ -3873,25 +3986,18 @@ public class MainActivity extends Activity {
             }
         }
         else {
-            toast_string = getResources().getString(R.string.photo);
-            CameraController.Size current_size = preview.getCurrentPictureSize();
-            toast_string += " " + current_size.width + "x" + current_size.height;
-            if( preview.supportsFocus() && preview.getSupportedFocusValues().size() > 1 && photo_mode != MyApplicationInterface.PhotoMode.FocusBracketing ) {
-                String focus_value = preview.getCurrentFocusValue();
-                if( focus_value != null && !focus_value.equals("focus_mode_auto") && !focus_value.equals("focus_mode_continuous_picture") ) {
-                    String focus_entry = preview.findFocusEntryForValue(focus_value);
-                    if( focus_entry != null ) {
-                        toast_string += "\n" + focus_entry;
-                    }
-                }
+            if( photo_mode == MyApplicationInterface.PhotoMode.Panorama ) {
+                // don't show resolution in panorama mode
+                toast_string = "";
             }
-            if( applicationInterface.getAutoStabilisePref() ) {
-                // important as users are sometimes confused at the behaviour if they don't realise the option is on
-                toast_string += "\n" + getResources().getString(R.string.preference_auto_stabilise);
-                simple = false;
+            else {
+                toast_string = getResources().getString(R.string.photo);
+                CameraController.Size current_size = preview.getCurrentPictureSize();
+                toast_string += " " + current_size.width + "x" + current_size.height;
             }
+
             String photo_mode_string = null;
-            switch (photo_mode) {
+            switch( photo_mode ) {
                 case DRO:
                     photo_mode_string = getResources().getString(R.string.photo_mode_dro);
                     break;
@@ -3921,7 +4027,23 @@ public class MainActivity extends Activity {
                     break;
             }
             if( photo_mode_string != null ) {
-                toast_string += "\n" + getResources().getString(R.string.photo_mode) + ": " + photo_mode_string;
+                toast_string += (toast_string.length()==0 ? "" : "\n") + getResources().getString(R.string.photo_mode) + ": " + photo_mode_string;
+                simple = false;
+            }
+
+            if( preview.supportsFocus() && preview.getSupportedFocusValues().size() > 1 && photo_mode != MyApplicationInterface.PhotoMode.FocusBracketing ) {
+                String focus_value = preview.getCurrentFocusValue();
+                if( focus_value != null && !focus_value.equals("focus_mode_auto") && !focus_value.equals("focus_mode_continuous_picture") ) {
+                    String focus_entry = preview.findFocusEntryForValue(focus_value);
+                    if( focus_entry != null ) {
+                        toast_string += "\n" + focus_entry;
+                    }
+                }
+            }
+
+            if( applicationInterface.getAutoStabilisePref() ) {
+                // important as users are sometimes confused at the behaviour if they don't realise the option is on
+                toast_string += (toast_string.length()==0 ? "" : "\n") + getResources().getString(R.string.preference_auto_stabilise);
                 simple = false;
             }
         }
@@ -3984,7 +4106,7 @@ public class MainActivity extends Activity {
             }
         }
         String timer = sharedPreferences.getString(PreferenceKeys.getTimerPreferenceKey(), "0");
-        if( !timer.equals("0") ) {
+        if( !timer.equals("0") && photo_mode != MyApplicationInterface.PhotoMode.Panorama ) {
             String [] entries_array = getResources().getStringArray(R.array.preference_timer_entries);
             String [] values_array = getResources().getStringArray(R.array.preference_timer_values);
             int index = Arrays.asList(values_array).indexOf(timer);
@@ -4186,5 +4308,9 @@ public class MainActivity extends Activity {
 
     public boolean hasThumbnailAnimation() {
         return this.applicationInterface.hasThumbnailAnimation();
+    }
+
+    public boolean testHasNotification() {
+        return has_notification;
     }
 }
