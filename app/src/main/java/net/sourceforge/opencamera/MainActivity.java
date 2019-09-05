@@ -853,6 +853,13 @@ public class MainActivity extends Activity {
         startActivity(browserIntent);
     }
 
+    void launchOnlinePrivacyPolicy() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "launchOnlinePrivacyPolicy");
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/index.html#privacy"));
+        startActivity(browserIntent);
+    }
+
     /* Audio trigger - either loud sound, or speech recognition.
      * This performs some additional checks before taking a photo.
      */
@@ -3933,7 +3940,8 @@ public class MainActivity extends Activity {
 
             double capture_rate = profile.videoCaptureRate;
             String capture_rate_string = (capture_rate < 9.5f) ? new DecimalFormat("#0.###").format(capture_rate) : "" + (int)(profile.videoCaptureRate+0.5);
-            toast_string = getResources().getString(R.string.video) + ": " + profile.videoFrameWidth + "x" + profile.videoFrameHeight + ", " + capture_rate_string + getResources().getString(R.string.fps) + (video_high_speed ? " [" + getResources().getString(R.string.high_speed) + "]" : "") + ", " + bitrate_string + " (" + extension_string + ")";
+            toast_string = getResources().getString(R.string.video) + ": " + profile.videoFrameWidth + "x" + profile.videoFrameHeight + "\n" +
+                    capture_rate_string + getResources().getString(R.string.fps) + (video_high_speed ? " [" + getResources().getString(R.string.high_speed) + "]" : "") + ", " + bitrate_string + " (" + extension_string + ")";
 
             String fps_value = applicationInterface.getVideoFPSPref();
             if( !fps_value.equals("default") || video_high_speed ) {

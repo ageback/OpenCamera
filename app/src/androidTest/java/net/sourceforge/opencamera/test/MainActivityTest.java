@@ -22,6 +22,7 @@ import net.sourceforge.opencamera.ImageSaver;
 import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyApplicationInterface;
 import net.sourceforge.opencamera.PreferenceKeys;
+import net.sourceforge.opencamera.preview.ApplicationInterface;
 import net.sourceforge.opencamera.preview.VideoProfile;
 import net.sourceforge.opencamera.SaveLocationHistory;
 import net.sourceforge.opencamera.cameracontroller.CameraController;
@@ -52,6 +53,7 @@ import android.os.Build;
 import android.os.Environment;
 //import android.os.Environment;
 import android.preference.PreferenceManager;
+import android.provider.MediaStore;
 import android.renderscript.Allocation;
 import android.support.annotation.RequiresApi;
 import android.test.ActivityInstrumentationTestCase2;
@@ -73,6 +75,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
     public MainActivityTest() {
         super("net.sourceforge.opencamera", MainActivity.class);
+    }
+
+    private Intent createDefaultIntent() {
+        Intent intent = new Intent();
+        intent.putExtra("test_project", true);
+        return intent;
     }
 
     @Override
@@ -97,8 +105,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         editor.apply();
         Log.d(TAG, "setUp: 2");
 
-        Intent intent = new Intent();
-        intent.putExtra("test_project", true);
+        Intent intent = createDefaultIntent();
         setActivityIntent(intent);
         Log.d(TAG, "setUp: about to get activity");
         mActivity = getActivity();
@@ -237,6 +244,22 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         this.getInstrumentation().waitForIdleSync();
     }
 
+    private void switchToCamera(int cameraId) {
+        int origCameraId = mPreview.getCameraId();
+        Log.d(TAG, "switchToCamera: "+ cameraId);
+        Log.d(TAG, "origCameraId: "+ origCameraId);
+        int newCameraId = origCameraId;
+        while( newCameraId != cameraId ) {
+            View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
+            clickView(switchCameraButton);
+            this.getInstrumentation().waitForIdleSync();
+            waitUntilCameraOpened();
+            newCameraId = mPreview.getCameraId();
+            Log.d(TAG, "changed cameraId to: "+ newCameraId);
+            assertTrue(newCameraId != origCameraId);
+        }
+    }
+
     private void switchToFlashValue(String required_flash_value) {
         if( mPreview.supportsFlash() ) {
             String flash_value = mPreview.getCurrentFlashValue();
@@ -353,16 +376,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(!mPreview.isVideo());
 
         if( mPreview.getCameraControllerManager().getNumberOfCameras() > 1 ) {
-            int cameraId = mPreview.getCameraId();
-            Log.d(TAG, "start cameraId: "+ cameraId);
-            while( cameraId != 0 ) {
-                View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
-                clickView(switchCameraButton);
-                waitUntilCameraOpened();
-                // camera becomes invalid when switching cameras
-                cameraId = mPreview.getCameraId();
-                Log.d(TAG, "changed cameraId to: "+ cameraId);
-            }
+            switchToCamera(0);
         }
 
         switchToFlashValue("flash_off");
@@ -515,6 +529,23 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue( switchVideoButton.getContentDescription().equals( mActivity.getResources().getString(net.sourceforge.opencamera.R.string.switch_to_photo) ) );
     }
 
+    /* Returns a focus mode that is supported by the device, but not the default focus mode.
+     */
+    private String getNonDefaultFocus() {
+        String non_default_focus;
+        if( mPreview.getSupportedFocusValues().contains("focus_mode_macro") ) {
+            non_default_focus = "focus_mode_macro";
+        }
+        else if( mPreview.getSupportedFocusValues().contains("focus_mode_infinity") ) {
+            non_default_focus = "focus_mode_infinity";
+        }
+        else {
+            non_default_focus = null;
+            fail("can't choose a non-default focus for this device");
+        }
+        return non_default_focus;
+    }
+
     /* Ensures that we save the focus mode for photos when restarting.
      * Note that saving the focus mode for video mode is tested in testFocusSwitchVideoResetContinuous.
      */
@@ -525,15 +556,21 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         }
 
         setToDefault();
-        switchToFocusValue("focus_mode_macro");
+
+        String non_default_focus = getNonDefaultFocus();
+
+        String focus_value = mPreview.getCameraController().getFocusValue();
+        assertFalse(focus_value.equals(non_default_focus));
+
+        switchToFocusValue(non_default_focus);
 
         restart();
-        String focus_value = mPreview.getCameraController().getFocusValue();
-        assertTrue(focus_value.equals("focus_mode_macro"));
+        focus_value = mPreview.getCameraController().getFocusValue();
+        assertTrue(focus_value.equals(non_default_focus));
 
         pauseAndResume();
         focus_value = mPreview.getCameraController().getFocusValue();
-        assertTrue(focus_value.equals("focus_mode_macro"));
+        assertTrue(focus_value.equals(non_default_focus));
     }
 
     /* Ensures that we save the flash mode torch when quitting and restarting.
@@ -1015,7 +1052,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mPreview.getCameraController().getFocusAreas() == null);
         assertTrue(mPreview.getCameraController().getMeteringAreas() == null);
 
-        Thread.sleep(1000); // wait until autofocus startup
+        Thread.sleep(2000); // wait until autofocus startup
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus + " compare to saved_count: " + saved_count);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
         assertTrue(!mPreview.hasFocusArea());
@@ -1024,8 +1061,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         // touch to auto-focus with focus area
         saved_count = mPreview.count_cameraAutoFocus;
+        Log.d(TAG, "about to touch preview to auto-focus");
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
-        Log.d(TAG, "2 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
+        Log.d(TAG, "done touch preview to auto-focus");
+        Log.d(TAG, "2 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus + " compare to saved_count: " + saved_count);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
         assertTrue(mPreview.hasFocusArea());
         assertTrue(mPreview.getCameraController().getFocusAreas() != null);
@@ -1044,14 +1083,16 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mPreview.getCameraController().getMeteringAreas() != null);
         assertTrue(mPreview.getCameraController().getMeteringAreas().size() == 1);
 
-        saved_count = mPreview.count_cameraAutoFocus;
-        // test switching mode sets off an autofocus, and resets the focus area
-        switchToFocusValue("focus_mode_macro");
-        Log.d(TAG, "4 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
-        assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
-        assertTrue(!mPreview.hasFocusArea());
-        assertTrue(mPreview.getCameraController().getFocusAreas() == null);
-        assertTrue(mPreview.getCameraController().getMeteringAreas() == null);
+        if( mPreview.getSupportedFocusValues().contains("focus_mode_macro") ) {
+            saved_count = mPreview.count_cameraAutoFocus;
+            // test switching mode sets off an autofocus, and resets the focus area
+            switchToFocusValue("focus_mode_macro");
+            Log.d(TAG, "4 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
+            assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
+            assertTrue(!mPreview.hasFocusArea());
+            assertTrue(mPreview.getCameraController().getFocusAreas() == null);
+            assertTrue(mPreview.getCameraController().getMeteringAreas() == null);
+        }
 
         saved_count = mPreview.count_cameraAutoFocus;
         // switching to focus locked shouldn't set off an autofocus
@@ -1061,6 +1102,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         saved_count = mPreview.count_cameraAutoFocus;
         // touch to focus should autofocus
+        Thread.sleep(2000);
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         Log.d(TAG, "6 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
@@ -1073,6 +1115,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mPreview.count_cameraAutoFocus == saved_count);
 
         // but touch to focus should
+        Thread.sleep(2000);
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         Log.d(TAG, "8 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
@@ -1112,6 +1155,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             // test that touch to auto-focus region only works in focus auto, macro or continuous mode, and that we set off an autofocus for focus auto and macro
             // test that touch to set metering area works in any focus mode
             saved_count = mPreview.count_cameraAutoFocus;
+            Thread.sleep(2000);
             TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
             Log.d(TAG, "count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
             if( focus_value.equals("focus_mode_auto") || focus_value.equals("focus_mode_macro") || focus_value.equals("focus_mode_continuous_picture") || focus_value.equals("focus_mode_continuous_video") ) {
@@ -1306,7 +1350,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
         */
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         assertTrue(!mPreview.hasFocusArea());
         assertTrue(mPreview.getCameraController().getFocusAreas() == null);
         assertTrue(mPreview.getCameraController().getMeteringAreas() == null);
@@ -1323,14 +1367,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mPreview.getCameraController().getMeteringAreas() == null);
 
         if( mPreview.getCameraControllerManager().getNumberOfCameras() > 1 ) {
+            int cameraId = mPreview.getCameraId();
             View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
             clickView(switchCameraButton);
             waitUntilCameraOpened();
             // check face detection already started
             assertFalse( mPreview.getCameraController().startFaceDetection() );
 
-            clickView(switchCameraButton);
-            waitUntilCameraOpened();
+            // return to back camera
+            switchToCamera(cameraId);
         }
 
         // test show face detection icon
@@ -1669,10 +1714,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             }
 
             // now switch back
-            clickView(switchCameraButton);
-            waitUntilCameraOpened();
-            new_cameraId = mPreview.getCameraId();
-            assertTrue(cameraId == new_cameraId);
+            switchToCamera(cameraId);
         }
 
         if( mPreview.supportsFocus() ) {
@@ -1687,7 +1729,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             Log.d(TAG, "video focus_value: "+ focus_value);
             assertTrue(focus_value.equals("focus_mode_continuous_video"));
 
-            switchToFocusValue("focus_mode_macro");
+            String non_default_focus = getNonDefaultFocus();
+            switchToFocusValue(non_default_focus);
 
             clickView(switchVideoButton);
             waitUntilCameraOpened();
@@ -1700,8 +1743,12 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             waitUntilCameraOpened();
             assertTrue(mPreview.isVideo());
             focus_value = mPreview.getCameraController().getFocusValue();
+            if( non_default_focus.equals("focus_mode_infinity") && focus_value.equals("focus_mode_manual2") ) {
+                // for Camera2, focus_mode_infinity is represented as focus_mode_manual2
+                focus_value = "focus_mode_infinity";
+            }
             Log.d(TAG, "video focus_value: "+ focus_value);
-            assertTrue(focus_value.equals("focus_mode_macro"));
+            assertEquals(non_default_focus, focus_value);
         }
     }
 
@@ -1724,7 +1771,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         // check continuous focus is working
         int saved_count_cameraContinuousFocusMoving = mPreview.count_cameraContinuousFocusMoving;
-        Thread.sleep(1000);
+        Thread.sleep(2000); // n.b., Galaxy S10e seems to need longer delay than other devices for continuous focus to occur
         int new_count_cameraContinuousFocusMoving = mPreview.count_cameraContinuousFocusMoving;
         Log.d(TAG, "count_cameraContinuousFocusMoving compare saved: "+ saved_count_cameraContinuousFocusMoving + " to new: " + new_count_cameraContinuousFocusMoving);
         assertTrue( mPreview.getCameraController().test_af_state_null_focus == 0 );
@@ -1888,6 +1935,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         Log.d(TAG, "about to click preview for autofocus");
         int saved_count = mPreview.count_cameraAutoFocus;
+        Thread.sleep(1000); // needed for Galaxy S10e for the touch to register
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count+1);
@@ -1954,6 +2002,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         Log.d(TAG, "about to click preview for autofocus");
         int saved_count = mPreview.count_cameraAutoFocus;
+        Thread.sleep(1000); // needed for Galaxy S10e for the touch to register
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         this.getInstrumentation().waitForIdleSync();
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
@@ -2028,6 +2077,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         for(int i=0;i<8;i++) {
             Log.d(TAG, "about to click preview for autofocus: " + i);
             int saved_count = mPreview.count_cameraAutoFocus;
+            Thread.sleep(1000); // needed for Galaxy S10e for the touch to register
             TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
             this.getInstrumentation().waitForIdleSync();
             Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
@@ -2047,9 +2097,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         }
 
         int saved_count = mPreview.count_cameraAutoFocus;
-        Thread.sleep(5000);
-        assertTrue(mPreview.getCurrentFocusValue().equals(focus_value_ui));
-        assertTrue(mPreview.getCameraController().getFocusValue().equals(focus_value));
+        Thread.sleep(6000);
+        assertEquals(focus_value_ui, mPreview.getCurrentFocusValue());
+        assertEquals(focus_value, mPreview.getCameraController().getFocusValue());
         Log.d(TAG, "2 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
         assertTrue(mPreview.count_cameraAutoFocus == saved_count);
     }
@@ -2077,6 +2127,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         Log.d(TAG, "about to click preview for autofocus");
         int saved_count = mPreview.count_cameraAutoFocus;
+        Thread.sleep(2000); // needed for Galaxy S10e for the touch to register
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         this.getInstrumentation().waitForIdleSync();
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
@@ -2182,7 +2233,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     /* Start in photo mode with auto focus:
      * - go to video mode
      * - then switch to front camera
-     * - then stop video
+     * - then switch back to photo mode
      * - then go to back camera
      * Check focus mode has returned to auto.
      * This test is important when front camera doesn't support focus modes, but back camera does - we won't be able to reset to auto focus for the front camera, but need to do so when returning to back camera
@@ -2199,6 +2250,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         if( !mPreview.supportsFocus() ) {
             return;
         }
+
+        int cameraId = mPreview.getCameraId();
 
         switchToFocusValue("focus_mode_auto");
 
@@ -2223,19 +2276,18 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "front focus_value: "+ focus_value);
         // don't care when focus mode is for front camera (focus may not be supported for front camera)
 
-        clickView(switchCameraButton);
-        waitUntilCameraOpened();
-        // camera becomes invalid when switching cameras
+        switchToCamera(cameraId);
+
         focus_value = mPreview.getCameraController().getFocusValue();
         Log.d(TAG, "end focus_value: "+ focus_value);
         assertTrue(focus_value.equals("focus_mode_auto"));
     }
 
-    /* Start in photo mode with focus macro:
+    /* Start in photo mode with non-default focus mode:
      * - switch to front camera
      * - switch to back camera
-     * Check focus mode is still macro.
-     * This test is important when front camera doesn't support focus modes, but back camera does - need to remain in macro mode for the back camera.
+     * Check focus mode is still what we set.
+     * This test is important when front camera doesn't support focus modes, but back camera does - need to remain in same focus mode for the back camera.
      */
     public void testFocusRemainMacroSwitchCamera() {
         Log.d(TAG, "testFocusRemainMacroSwitchCamera");
@@ -2250,23 +2302,24 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             return;
         }
 
-        switchToFocusValue("focus_mode_macro");
+        String non_default_focus_mode = getNonDefaultFocus();
+        switchToFocusValue(non_default_focus_mode);
 
         View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
-        // n.b., call twice, to switch to front then to back
+        // n.b., switch to front then to back
+        int cameraId = mPreview.getCameraId();
         clickView(switchCameraButton);
         waitUntilCameraOpened();
-        clickView(switchCameraButton);
-        waitUntilCameraOpened();
+        switchToCamera(cameraId);
 
         String focus_value = mPreview.getCameraController().getFocusValue();
         Log.d(TAG, "focus_value: "+ focus_value);
-        assertTrue(focus_value.equals("focus_mode_macro"));
+        assertTrue(focus_value.equals(non_default_focus_mode));
     }
 
     /* Start in photo mode with focus auto:
      * - switch to video mode
-     * - switch to focus macro
+     * - switch to non-default focus mode
      * - switch to picture mode
      * Check focus mode is now auto.
      * As of 1.26, we now remember the focus mode for photos.
@@ -2289,7 +2342,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "focus_value after switching to video mode: "+ focus_value);
         assertTrue(focus_value.equals("focus_mode_continuous_video"));
 
-        switchToFocusValue("focus_mode_macro");
+        String non_default_focus_mode = getNonDefaultFocus();
+        switchToFocusValue(non_default_focus_mode);
 
         clickView(switchVideoButton);
         waitUntilCameraOpened();
@@ -2300,10 +2354,10 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     }
 
     /* Start in photo mode with focus auto:
-     * - switch to focus macro
+     * - switch to non-default focus mode
      * - switch to video mode
      * - switch to picture mode
-     * Check focus mode is still macro.
+     * Check focus mode is still what we set.
      * As of 1.26, we now remember the focus mode for photos.
      */
     public void testFocusSaveMacroSwitchPhoto() {
@@ -2315,7 +2369,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             return;
         }
 
-        switchToFocusValue("focus_mode_macro");
+        String non_default_focus_mode = getNonDefaultFocus();
+        switchToFocusValue(non_default_focus_mode);
 
         View switchVideoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_video);
         clickView(switchVideoButton);
@@ -2329,7 +2384,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         focus_value = mPreview.getCameraController().getFocusValue();
         Log.d(TAG, "focus_value after switching to picture mode: " + focus_value);
-        assertTrue(focus_value.equals("focus_mode_macro"));
+        assertTrue(focus_value.equals(non_default_focus_mode));
     }
 
     /* Start in photo mode with auto focus:
@@ -2393,11 +2448,17 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         }
         else if( mPreview.supportsISORange() ) {
             subTestPopupButtonAvailability("TEST_ISO", "auto", true);
-            subTestPopupButtonAvailability("TEST_ISO", "100", true);
-            subTestPopupButtonAvailability("TEST_ISO", "200", true);
-            subTestPopupButtonAvailability("TEST_ISO", "400", true);
-            subTestPopupButtonAvailability("TEST_ISO", "800", true);
-            subTestPopupButtonAvailability("TEST_ISO", "1600", true);
+            int [] test_isos = {0, 50, 100, 200, 400, 800, 1600, 3200, 6400, 10000};
+            int min_iso = mPreview.getMinimumISO();
+            int max_iso = mPreview.getMaximumISO();
+            for(int i=0;i<test_isos.length;i++) {
+                int test_iso = test_isos[i];
+                subTestPopupButtonAvailability("TEST_ISO", "" + test_iso, test_iso >= min_iso && test_iso <= max_iso);
+            }
+            subTestPopupButtonAvailability("TEST_ISO", "" + (min_iso-1), false);
+            subTestPopupButtonAvailability("TEST_ISO", "" + min_iso, true);
+            subTestPopupButtonAvailability("TEST_ISO", "" + max_iso, true);
+            subTestPopupButtonAvailability("TEST_ISO", "" + (max_iso+1), false);
         }
         else {
             List<String> supported_iso_values = mPreview.getSupportedISOs();
@@ -2721,13 +2782,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         if( mPreview.getCameraControllerManager().getNumberOfCameras() > 1 ) {
             Log.d(TAG, "switch camera");
+            int old_max = mPreview.getMaximumISO();
             View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
             clickView(switchCameraButton);
             waitUntilCameraOpened();
 
             assertTrue(exposureButton.getVisibility() == View.VISIBLE);
             assertTrue(exposureContainer.getVisibility() == View.GONE);
-            assertTrue( mPreview.getCameraController().getISO() == mPreview.getMaximumISO() );
+            // we use same ISO for all cameras, but if new camera has lower max, it should automatically reduce
+            assertEquals(Math.min(old_max, mPreview.getMaximumISO()), mPreview.getCameraController().getISO());
             if( mPreview.supportsExposureTime() ) {
                 Log.d(TAG, "exposure time: " + mPreview.getCameraController().getExposureTime());
                 Log.d(TAG, "min exposure time: " + mPreview.getMinimumExposureTime());
@@ -2744,7 +2807,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             assertTrue(exposureContainer.getVisibility() == View.VISIBLE);
             assertTrue(isoSeekBar.getVisibility() == View.VISIBLE);
             assertTrue(exposureTimeSeekBar.getVisibility() == (mPreview.supportsExposureTime() ? View.VISIBLE : View.GONE));
-            assertTrue( mPreview.getCameraController().getISO() == mPreview.getMaximumISO() );
+            assertEquals(Math.min(old_max, mPreview.getMaximumISO()), mPreview.getCameraController().getISO());
             if( mPreview.supportsExposureTime() )
                 assertTrue( mPreview.getCameraController().getExposureTime() == saved_exposure_time );
         }
@@ -2947,7 +3010,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     private void subTestTouchToFocus(final boolean wait_after_focus, final boolean single_tap_photo, final boolean double_tap_photo, final boolean manual_can_auto_focus, final boolean can_focus_area, final String focus_value, final String focus_value_ui) throws InterruptedException {
         // touch to auto-focus with focus area (will also exit immersive mode)
         // autofocus shouldn't be immediately, but after a delay
-        Thread.sleep(1000);
+        // and Galaxy S10e needs a longer delay for some reason, for the subsequent touch of the preview view to register
+        Thread.sleep(2000);
         int saved_count = mPreview.count_cameraAutoFocus;
         Log.d(TAG, "saved count_cameraAutoFocus: " + saved_count);
         Log.d(TAG, "about to click preview for autofocus");
@@ -3096,6 +3160,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     }
 
     private void checkFilenames(final boolean is_raw, final File [] files, final File [] files2) {
+        Log.d(TAG, "checkFilenames");
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mActivity);
         boolean hdr_save_expo =  sharedPreferences.getBoolean(PreferenceKeys.HDRSaveExpoPreferenceKey, false);
         boolean is_hdr = mActivity.supportsHDR() && sharedPreferences.getString(PreferenceKeys.PhotoModePreferenceKey, "preference_photo_mode_std").equals("preference_photo_mode_hdr");
@@ -3106,9 +3171,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         // check files have names as expected
         String filename_jpeg = null;
         String filename_dng = null;
-        int n_files = files.length;
+        int n_files = files == null ? 0 : files.length;
         for(File file : files2) {
-            Log.d(TAG, "file: " + file);
+            Log.d(TAG, "check file: " + file);
             boolean is_new = true;
             for(int j=0;j<n_files && is_new;j++) {
                 if( file.equals( files[j] ) ) {
@@ -3161,10 +3226,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         if( is_raw && !mActivity.getApplicationInterface().isRawOnly() ) {
             // check we have same filenames (ignoring extensions)
             // if HDR, then we should exclude the "_HDR" vs "_x" of the base filenames
+            // if expo, then exclude the "_x" as values may be different due to different order of JPEG vs DNG files in the files2 array (at least on Galaxy S10e)
             String filename_base_jpeg;
             String filename_base_dng;
             if( is_hdr ) {
                 filename_base_jpeg = filename_jpeg.substring(0, filename_jpeg.length()-7);
+                filename_base_dng = filename_dng.substring(0, filename_dng.length()-5);
+            }
+            else if( is_expo ) {
+                filename_base_jpeg = filename_jpeg.substring(0, filename_jpeg.length()-5);
                 filename_base_dng = filename_dng.substring(0, filename_dng.length()-5);
             }
             else {
@@ -3173,7 +3243,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             }
             Log.d(TAG, "filename_base_jpeg: " + filename_base_jpeg);
             Log.d(TAG, "filename_base_dng: " + filename_base_dng);
-            assertTrue( filename_base_jpeg.equals(filename_base_dng) );
+            assertEquals(filename_base_jpeg, filename_base_dng);
         }
     }
 
@@ -4497,6 +4567,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(trashButton.getVisibility() == View.VISIBLE);
         assertTrue(shareButton.getVisibility() == View.VISIBLE);
 
+        Thread.sleep(1000); // needed for Galaxy S10e
         Log.d(TAG, "about to click preview");
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         Log.d(TAG, "done click preview");
@@ -4801,7 +4872,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         // touch to auto-focus with focus area
         // autofocus shouldn't be immediately, but after a delay
-        Thread.sleep(1000);
+        // and Galaxy S10e needs a longer delay for some reason, for the subsequent touch of the preview view to register
+        Thread.sleep(2000);
         int saved_count = mPreview.count_cameraAutoFocus;
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
@@ -4853,7 +4925,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         // touch to auto-focus with focus area
         // autofocus shouldn't be immediately, but after a delay
-        Thread.sleep(1000);
+        // and Galaxy S10e needs a longer delay for some reason, for the subsequent touch of the preview view to register
+        Thread.sleep(2000);
         int saved_count = mPreview.count_cameraAutoFocus;
         TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
         Log.d(TAG, "1 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
@@ -4865,7 +4938,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mPreview.getCameraController().getMeteringAreas().size() == 1);
 
         // wait 3s for auto-focus to complete, and 5s to require additional auto-focus when taking a photo
-        Thread.sleep(8000);
+        // need a bit longer on Galaxy S10e
+        Thread.sleep(9000);
 
         View takePhotoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.take_photo);
         Log.d(TAG, "about to click take photo");
@@ -4881,7 +4955,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         // taking photo should have done an auto-focus iff in automatic mode, and still have focus areas
         Log.d(TAG, "2 count_cameraAutoFocus: " + mPreview.count_cameraAutoFocus);
-        assertTrue(mPreview.count_cameraAutoFocus == (locked ? saved_count+1 : saved_count+2));
+        assertEquals((locked ? saved_count + 1 : saved_count + 2), mPreview.count_cameraAutoFocus);
         assertTrue(mPreview.hasFocusArea());
         assertTrue(mPreview.getCameraController().getFocusAreas() != null);
         assertTrue(mPreview.getCameraController().getFocusAreas().size() == 1);
@@ -5054,10 +5128,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             while( switchCameraButton.getVisibility() != View.VISIBLE ) {
                 // wait until photo is taken and button is visible again
             }
-            clickView(switchCameraButton);
-            waitUntilCameraOpened();
-            new_cameraId = mPreview.getCameraId();
-            assertTrue(cameraId == new_cameraId);
+
+            // return to back camera
+            switchToCamera(cameraId);
         }
     }
 
@@ -5141,10 +5214,9 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             while( switchCameraButton.getVisibility() != View.VISIBLE ) {
                 // wait until photo is taken and button is visible again
             }
-            clickView(switchCameraButton);
-            waitUntilCameraOpened();
-            new_cameraId = mPreview.getCameraId();
-            assertTrue(cameraId == new_cameraId);
+
+            // return to back camera
+            switchToCamera(cameraId);
         }
     }
 
@@ -5849,7 +5921,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
     }
 
     /** Set available memory to make sure that we stop before running out of memory.
-     *  This test is fine-tuned to Nexus 6, OnePlus 3T and Nokia 8, as we measure hitting max filesize based on time.
+     *  This test is fine-tuned to Nexus 6, OnePlus 3T, Nokia 8, Galaxy S10e as we measure hitting max filesize based on time.
      */
     public void testTakeVideoAvailableMemory() throws InterruptedException {
         Log.d(TAG, "testTakeVideoAvailableMemory");
@@ -5863,7 +5935,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         mActivity.getApplicationInterface().test_set_available_memory = true;
         mActivity.getApplicationInterface().test_available_memory = 50000000;
         boolean is_nokia = Build.MANUFACTURER.toLowerCase(Locale.US).contains("hmd global");
-        if( is_nokia )
+        boolean is_samsung = Build.MANUFACTURER.toLowerCase(Locale.US).contains("samsung");
+        if( is_nokia || is_samsung )
         {
             // Nokia 8 has much smaller video sizes, at least when recording with phone face down, so we both set
             // 4K, and lower test_available_memory.
@@ -5933,7 +6006,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
      *  check video is still recording, then expect at least 2 resultant video files. If this fails on Android 8+, ensure
      *  that the video lengths aren't too short (if less than 3s, we sometimes seem to fall back to the pre-Android 8
      *  behaviour, presumably because setNextOutputFile() can't take effect in time).
-     *  This test is fine-tuned to Nexus 6, OnePlus 3T and Nokia 8, as we measure hitting max filesize based on time.
+     *  This test is fine-tuned to Nexus 6, OnePlus 3T, Nokia 8, Galaxy S10e, as we measure hitting max filesize based on time.
      */
     public void testTakeVideoMaxFileSize1() throws InterruptedException {
         Log.d(TAG, "testTakeVideoMaxFileSize1");
@@ -5946,7 +6019,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
         SharedPreferences.Editor editor = settings.edit();
         boolean is_nokia = Build.MANUFACTURER.toLowerCase(Locale.US).contains("hmd global");
-        if( is_nokia ) {
+        boolean is_samsung = Build.MANUFACTURER.toLowerCase(Locale.US).contains("samsung");
+        if( is_nokia || is_samsung ) {
             // Nokia 8 has much smaller video sizes, at least when recording with phone face down, so we also set 4K
             editor.putString(PreferenceKeys.getVideoQualityPreferenceKey(mPreview.getCameraId(), false), "" + CamcorderProfile.QUALITY_HIGH); // set to highest quality (4K on Nexus 6)
             //editor.putString(PreferenceKeys.getVideoMaxFileSizePreferenceKey(), "2000000"); // approx 3s on Nokia 8 at 4K
@@ -6252,7 +6326,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         subTestTakeVideo(false, false, true, false, null, 5000, false, false);
     }
 
-    /** Will likely be unreliable on OnePlus 3T with Camera2.
+    /** Will likely be unreliable on OnePlus 3T and Galaxy S10e with Camera2.
      */
     public void testTakeVideoFPS() throws InterruptedException {
         Log.d(TAG, "testTakeVideoFPS");
@@ -6272,7 +6346,16 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
                     Log.d(TAG, "fps is NOT supported: " + fps_value);
                     continue;
                 }
-                assertTrue( mPreview.fpsIsHighSpeed("" + fps_value) == (fps_value >= 60) );
+                boolean expect_high_speed;
+                boolean is_samsung = Build.MANUFACTURER.toLowerCase(Locale.US).contains("samsung");
+                if( is_samsung ) {
+                    // tested on Galaxy S10e at least
+                    expect_high_speed = (fps_value > 60);
+                }
+                else {
+                    expect_high_speed = (fps_value >= 60);
+                }
+                assertEquals(expect_high_speed, mPreview.fpsIsHighSpeed("" + fps_value));
             }
 
             SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
@@ -6288,7 +6371,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         }
     }
 
-    /** Will likely be unreliable on OnePlus 3T with Camera2.
+    /** Will likely be unreliable on OnePlus 3T and Galaxy S10e.
      *  Manual mode should be ignored by high speed video, but check this doesn't crash at least!
      */
     public void testTakeVideoFPSHighSpeedManual() throws InterruptedException {
@@ -6468,7 +6551,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(video_width == high_speed_video_width && video_height == high_speed_video_height);
     }
 
-    /** Will likely be unreliable on OnePlus 3T.
+    /** Will likely be unreliable on OnePlus 3T and Galaxy S10e.
      */
     public void testTakeVideoSlowMotion() throws InterruptedException {
         Log.d(TAG, "testTakeVideoSlowMotion");
@@ -6903,7 +6986,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
     }
 
-    /** Switch to macro focus, go to settings, check switched to continuous mode, leave settings, check back in macro mode, then test recording.
+    /** Switch to non-default focus, go to settings, check still in focus mode that we set, then test recording.
      */
     public void testTakeVideoMacro() throws InterruptedException {
         Log.d(TAG, "testTakeVideoMacro");
@@ -6924,7 +7007,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mPreview.isVideo());
         assertTrue(mPreview.isPreviewStarted());
 
-        switchToFocusValue("focus_mode_macro");
+        String non_default_focus_mode = getNonDefaultFocus();
+        switchToFocusValue(non_default_focus_mode);
 
         // now go to settings
         View settingsButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.settings);
@@ -6937,7 +7021,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         Thread.sleep(500);
 
-        assertTrue(mPreview.getCurrentFocusValue().equals("focus_mode_macro"));
+        assertTrue(mPreview.getCurrentFocusValue().equals(non_default_focus_mode));
 
         mActivity.runOnUiThread(new Runnable() {
             public void run() {
@@ -7279,8 +7363,16 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         switchToFlashValue("flash_off");
         switchToFlashValue("flash_on");
 
-        switchToFocusValue("focus_mode_macro");
-        switchToFocusValue("focus_mode_auto");
+        if( mPreview.getSupportedFocusValues().contains("focus_mode_macro") ) {
+            switchToFocusValue("focus_mode_macro");
+        }
+        else if( mPreview.getSupportedFocusValues().contains("focus_mode_infinity") ) {
+            switchToFocusValue("focus_mode_infinity");
+        }
+
+        if( mPreview.getSupportedFocusValues().contains("focus_mode_auto") ) {
+            switchToFocusValue("focus_mode_auto");
+        }
 
         // now open popup, pause and resume, then reopen popup
         // this tests against a crash, if we don't remove the popup from the popup container in MainUI.destroyPopup()
@@ -8058,11 +8150,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "front size is now " + front_new_size.width + " x " + front_new_size.height);
         assertTrue(front_size.equals(front_new_size));
 
-        // switch camera to back
-        clickView(switchCameraButton);
-        waitUntilCameraOpened();
-        new_cameraId = mPreview.getCameraId();
-        assertTrue(cameraId == new_cameraId);
+        // return to back camera
+        switchToCamera(cameraId);
 
         // now back camera size should still be what it was
         {
@@ -8273,15 +8362,15 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
         // switch to front camera
         if( mPreview.getCameraControllerManager().getNumberOfCameras() > 1 ) {
+            int cameraId = mPreview.getCameraId();
             View switchCameraButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.switch_camera);
             clickView(switchCameraButton);
             waitUntilCameraOpened();
             this.getInstrumentation().waitForIdleSync();
             assertTrue(mActivity.getLocationSupplier().getLocation() == null);
 
-            clickView(switchCameraButton);
-            waitUntilCameraOpened();
-            this.getInstrumentation().waitForIdleSync();
+            // return to back camera
+            switchToCamera(cameraId);
             assertTrue(mActivity.getLocationSupplier().getLocation() == null);
         }
 
@@ -8546,7 +8635,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
     /* Tests zoom.
      */
-    public void testZoom() {
+    public void testZoom() throws InterruptedException {
         Log.d(TAG, "testZoom");
         setToDefault();
 
@@ -8575,6 +8664,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             assertTrue(mPreview.getCameraController().getMeteringAreas() == null);
 
             // touch to auto-focus with focus area
+            Thread.sleep(2000); // needed for Galaxy S10e for the touch to register
             TouchUtils.clickView(MainActivityTest.this, mPreview.getView());
             assertTrue(mPreview.hasFocusArea());
             assertTrue(mPreview.getCameraController().getFocusAreas() != null);
@@ -10729,6 +10819,117 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertEquals(mActivity.getTextFormatter().getGPSString("preference_stamp_gpsformat_default", "preference_units_distance_m", false, null, true, Math.toRadians(74)), "74°");
         assertEquals(mActivity.getTextFormatter().getGPSString("preference_stamp_gpsformat_dms", "preference_units_distance_m", false, null, true, Math.toRadians(74)), "74°");
         assertEquals(mActivity.getTextFormatter().getGPSString("preference_stamp_gpsformat_default", "preference_units_distance_ft", true, location2, true, Math.toRadians(74)), "-29.3, 47.6173, 349.4ft, 74°");
+    }
+
+    /* Tests launching with ACTION_VIDEO_CAPTURE intent, along with EXTRA_SIZE_LIMIT and
+     * EXTRA_VIDEO_QUALITY.
+     */
+    public void testIntentVideo() throws ApplicationInterface.NoFreeStorageException {
+        Log.d(TAG, "testIntentVideo");
+
+        setToDefault();
+
+        List<String> video_quality = mActivity.getPreview().getVideoQualityHander().getSupportedVideoQuality();
+
+        assertFalse( mActivity.getApplicationInterface().isVideoPref() );
+        assertEquals( 0, mActivity.getApplicationInterface().getVideoMaxDurationPref() );
+        // n.b., will fail if not enough storage space on device!:
+        MyApplicationInterface.VideoMaxFileSize videomaxfilesize = mActivity.getApplicationInterface().getVideoMaxFileSizePref();
+        long max_filesize = videomaxfilesize.max_filesize;
+        assertTrue( max_filesize > 100000000);
+        assertTrue(videomaxfilesize.auto_restart);
+
+        Intent intent = createDefaultIntent();
+        intent.setAction(MediaStore.ACTION_VIDEO_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_SIZE_LIMIT, 50123456L);
+        intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 0);
+        setActivityIntent(intent);
+
+        restart();
+
+        assertTrue( mActivity.getApplicationInterface().isVideoPref() );
+        assertEquals( 0, mActivity.getApplicationInterface().getVideoMaxDurationPref() );
+        videomaxfilesize = mActivity.getApplicationInterface().getVideoMaxFileSizePref();
+        assertEquals( 50123456, videomaxfilesize.max_filesize );
+        assertFalse(videomaxfilesize.auto_restart);
+        assertEquals(video_quality.get(video_quality.size()-1), mActivity.getApplicationInterface().getVideoQualityPref());
+
+        intent = createDefaultIntent();
+        intent.setAction(MediaStore.ACTION_VIDEO_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+        setActivityIntent(intent);
+
+        restart();
+
+        assertTrue( mActivity.getApplicationInterface().isVideoPref() );
+        assertEquals( 0, mActivity.getApplicationInterface().getVideoMaxDurationPref() );
+        videomaxfilesize = mActivity.getApplicationInterface().getVideoMaxFileSizePref();
+        assertTrue( videomaxfilesize.max_filesize > 100000000);
+        assertTrue( Math.abs(max_filesize - videomaxfilesize.max_filesize) < 5000000 ); // remaining storage may vary whilst test is running!
+        assertTrue(videomaxfilesize.auto_restart);
+
+        assertEquals(video_quality.get(0), mActivity.getApplicationInterface().getVideoQualityPref());
+    }
+
+    /* Tests launching with ACTION_VIDEO_CAPTURE intent, along with EXTRA_DURATION_LIMIT. The test
+     * then tests we actually record video with the duration limit set.
+     */
+    public void testIntentVideoDurationLimit() throws InterruptedException, ApplicationInterface.NoFreeStorageException {
+        Log.d(TAG, "testIntentVideoDurationLimit");
+
+        setToDefault();
+
+        assertFalse( mActivity.getApplicationInterface().isVideoPref() );
+        assertEquals( 0, mActivity.getApplicationInterface().getVideoMaxDurationPref() );
+        // n.b., will fail if not enough storage space on device!:
+        MyApplicationInterface.VideoMaxFileSize videomaxfilesize = mActivity.getApplicationInterface().getVideoMaxFileSizePref();
+        long max_filesize = videomaxfilesize.max_filesize;
+        assertTrue( max_filesize > 100000000);
+        assertTrue(videomaxfilesize.auto_restart);
+
+        Intent intent = createDefaultIntent();
+        intent.setAction(MediaStore.ACTION_VIDEO_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, 5);
+        setActivityIntent(intent);
+
+        restart();
+
+        assertTrue( mActivity.getApplicationInterface().isVideoPref() );
+        assertEquals( 5000, mActivity.getApplicationInterface().getVideoMaxDurationPref() );
+        assertEquals( max_filesize, mActivity.getApplicationInterface().getVideoMaxFileSizePref().max_filesize );
+
+        // count initial files in folder
+        File folder = mActivity.getImageFolder();
+        int n_files = getNFiles(folder);
+        Log.d(TAG, "n_files at start: " + n_files);
+
+        View takePhotoButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.take_photo);
+        Log.d(TAG, "about to click take video");
+        clickView(takePhotoButton);
+        Log.d(TAG, "done clicking take video");
+        this.getInstrumentation().waitForIdleSync();
+        Log.d(TAG, "after idle sync");
+
+        assertTrue( mPreview.isVideoRecording() );
+
+        Thread.sleep(4000);
+        Log.d(TAG, "check still taking video");
+        assertTrue( mPreview.isVideoRecording() );
+
+        int n_new_files = getNFiles(folder) - n_files;
+        Log.d(TAG, "n_new_files: " + n_new_files);
+        assertEquals(1, n_new_files);
+
+        Thread.sleep(3000);
+
+        Log.d(TAG, "check stopped taking video");
+        assertTrue( !mPreview.isVideoRecording() );
+
+        assertTrue( folder.exists() );
+        n_new_files = getNFiles(folder) - n_files;
+        Log.d(TAG, "n_new_files: " + n_new_files);
+        assertEquals(1, n_new_files);
+
     }
 
     private static class HistogramDetails {
