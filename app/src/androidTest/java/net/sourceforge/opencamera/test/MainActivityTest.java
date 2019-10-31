@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import net.sourceforge.opencamera.MyPreferenceFragment;
 import net.sourceforge.opencamera.PanoramaProcessorException;
 import net.sourceforge.opencamera.cameracontroller.CameraController2;
 import net.sourceforge.opencamera.HDRProcessor;
@@ -100,7 +101,8 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         editor.clear();
         if( test_camera2 ) {
             MainActivity.test_force_supports_camera2 = true;
-            editor.putBoolean(PreferenceKeys.UseCamera2PreferenceKey, true);
+            //editor.putBoolean(PreferenceKeys.UseCamera2PreferenceKey, true);
+            editor.putString(PreferenceKeys.CameraAPIPreferenceKey, "preference_camera_api_camera2");
         }
         editor.apply();
         Log.d(TAG, "setUp: 2");
@@ -2451,8 +2453,7 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
             int [] test_isos = {0, 50, 100, 200, 400, 800, 1600, 3200, 6400, 10000};
             int min_iso = mPreview.getMinimumISO();
             int max_iso = mPreview.getMaximumISO();
-            for(int i=0;i<test_isos.length;i++) {
-                int test_iso = test_isos[i];
+            for(int test_iso : test_isos) {
                 subTestPopupButtonAvailability("TEST_ISO", "" + test_iso, test_iso >= min_iso && test_iso <= max_iso);
             }
             subTestPopupButtonAvailability("TEST_ISO", "" + (min_iso-1), false);
@@ -8987,6 +8988,30 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(mActivity.isCameraInBackground());
     }
 
+    /* Tests going to settings and opening the privacy policy window.
+     */
+    public void testSettingsPrivacyPolicy() throws InterruptedException {
+        Log.d(TAG, "testSettingsPrivacyPolicy");
+        setToDefault();
+
+        assertFalse(mActivity.isCameraInBackground());
+        View settingsButton = mActivity.findViewById(net.sourceforge.opencamera.R.id.settings);
+        clickView(settingsButton);
+        this.getInstrumentation().waitForIdleSync();
+        assertTrue(mActivity.isCameraInBackground());
+        Thread.sleep(500);
+
+        mActivity.runOnUiThread(new Runnable() {
+            public void run() {
+                MyPreferenceFragment fragment = mActivity.getPreferenceFragment();
+                assertNotNull(fragment);
+                fragment.clickedPrivacyPolicy();
+            }
+        });
+        getInstrumentation().waitForIdleSync();
+        Thread.sleep(1000);
+    }
+
     /* Tests save and load settings.
      */
     public void testSettingsSaveLoad() throws InterruptedException {
@@ -10932,6 +10957,50 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
 
     }
 
+    /** Tests that we handle the upgrade from the preference boolean key "preference_use_camera2"
+     *  to the string key PreferenceKeys.CameraAPIPreferenceKey that occured in v1.48.
+     */
+    public void testCamera2PrefUpgrade() {
+        Log.d(TAG, "testCamera2PrefUpgrade");
+
+        // n.b., don't bother calling setToDefault()
+        waitUntilCameraOpened();
+
+        if( !mActivity.supportsCamera2() ) {
+            Log.d(TAG, "test requires camera2 support");
+            return;
+        }
+
+        assertFalse(mPreview.usingCamera2API());
+
+        // test legacy key present, but set to old api
+        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        SharedPreferences.Editor editor = settings.edit();
+        editor.clear();
+        editor.putBoolean("preference_use_camera2", false);
+        editor.apply();
+        restart();
+        assertFalse(mPreview.usingCamera2API());
+
+        // now test legacy key present for camera2 api
+        settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+        editor = settings.edit();
+        editor.clear();
+        editor.putBoolean("preference_use_camera2", true);
+        editor.apply();
+
+        for(int i=0;i<2;i++) {
+            restart();
+            assertTrue(mPreview.usingCamera2API());
+
+            // also check we switched over to the new key
+            settings = PreferenceManager.getDefaultSharedPreferences(mActivity);
+            assertFalse(settings.contains("preference_use_camera2"));
+            assertTrue(settings.contains(PreferenceKeys.CameraAPIPreferenceKey));
+            assertEquals("preference_camera_api_camera2", settings.getString(PreferenceKeys.CameraAPIPreferenceKey, PreferenceKeys.CameraAPIPreferenceDefault));
+        }
+    }
+
     private static class HistogramDetails {
         final int min_value;
         final int median_value;
@@ -11082,10 +11151,11 @@ public class MainActivityTest extends ActivityInstrumentationTestCase2<MainActiv
         Log.d(TAG, "compare min value " + hdrHistogramDetails.min_value + " to expected " + exp_min_value);
         Log.d(TAG, "compare median value " + hdrHistogramDetails.median_value + " to expected " + exp_median_value);
         Log.d(TAG, "compare max value " + hdrHistogramDetails.max_value + " to expected " + exp_max_value);
-            // we allow some tolerance as different devices can produce different results (e.g., Nexus 6 vs OnePlus 3T; see testHDR18 on Nexus 6 which needs a tolerance of 2)
-        assertTrue(Math.abs(exp_min_value - hdrHistogramDetails.min_value) <= 2);
-        assertTrue(Math.abs(exp_median_value - hdrHistogramDetails.median_value) <= 2);
-        assertTrue(Math.abs(exp_max_value - hdrHistogramDetails.max_value) <= 2);
+        // we allow some tolerance as different devices can produce different results (e.g., Nexus 6 vs OnePlus 3T; see testHDR18 on Nexus 6 which needs a tolerance of 2)
+        // interestingly it's testHDR18 that also needs a higher tolerance for Nokia 8 vs Galaxy S10e
+        assertTrue(Math.abs(exp_min_value - hdrHistogramDetails.min_value) <= 3);
+        assertTrue(Math.abs(exp_median_value - hdrHistogramDetails.median_value) <= 3);
+        assertTrue(Math.abs(exp_max_value - hdrHistogramDetails.max_value) <= 3);
     }
 
     final private String hdr_images_path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/testOpenCamera/testdata/hdrsamples/";

@@ -221,7 +221,7 @@ public class DrawPreview {
         p.setStrokeCap(Paint.Cap.ROUND);
         scale = getContext().getResources().getDisplayMetrics().density;
         this.stroke_width = (1.0f * scale + 0.5f); // convert dps to pixels
-        // don't set stroke_width now - set it when we use STROKE style (as it'll be overridden by drawTextWithBackground())
+        p.setStrokeWidth(this.stroke_width);
 
         location_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_gps_fixed_white_48dp);
         location_off_bitmap = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.ic_gps_off_white_48dp);
@@ -656,7 +656,7 @@ public class DrawPreview {
             int exif_orientation_s = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
             boolean needs_tf = false;
             int exif_orientation = 0;
-            // from http://jpegclub.org/exif_orientation.html
+            // see http://jpegclub.org/exif_orientation.html
             // and http://stackoverflow.com/questions/20478765/how-to-get-the-correct-orientation-of-the-image-selected-from-the-default-image
             if( exif_orientation_s == ExifInterface.ORIENTATION_UNDEFINED || exif_orientation_s == ExifInterface.ORIENTATION_NORMAL ) {
                 // leave unchanged
@@ -712,6 +712,8 @@ public class DrawPreview {
         if( camera_controller == null ) {
             return;
         }
+
+        p.setStrokeWidth(stroke_width);
 
         switch( preference_grid_pref ) {
             case "preference_grid_3x3":

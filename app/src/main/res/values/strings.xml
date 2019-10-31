@@ -4,7 +4,6 @@
     <string name="app_name">Open Camera</string> <!-- shouldn't be translated -->
     <string name="action_settings">Settings</string>
     <string name="action_popup">Popup settings</string>
-    <string name="intro_text">Touch to focus, and press the blue camera button to take photos. For more help, click Online help from Settings. Open Camera is completely free. If you like this app, please consider buying my donate app :) (see link in Settings, or Online help).</string>
     <string name="intro_ok">OK (This message won\'t show again)</string>
 
     <string name="on">On</string> <!-- whether a setting is turned on, e.g., "Auto-level: On" -->
@@ -108,7 +107,7 @@
     <string name="preference_shutter_sound_summary">Play a sound when taking a photo</string>
     <string name="preference_volume_keys">Volume keys</string>
     <string name="preference_audio_control">Audio control options</string>
-    <string name="preference_audio_control_summary">Take photo or record video when a noise is detected, or on a voice command (\"cheese\"). When enabled, use the on-screen microphone button to start and stop listening.</string> <!-- note that cheese shouldn't be translated, as we listen for this no matter what language is being used -->
+    <!-- preference_audio_control_summary defined below -->
     <string name="preference_audio_noise_control_sensitivity">Audio control sensitivity</string>
     <string name="preference_audio_noise_control_sensitivity_summary">Noise level sensitivity for audio (loud noise) option</string>
     <string name="preference_save_location">Save location</string>
@@ -802,7 +801,7 @@
     <string name="preference_remote_type_kraken">Kraken Smart Housing</string>
 
     <string name="preference_stamp_geo_address">Use addresses</string>
-    <string name="preference_stamp_geo_address_summary">If possible, use an address when stamping GPS locations. This option requires an Internet connection.\n%s</string>
+    <!-- preference_stamp_geo_address_summary defined below -->
     <string name="preference_stamp_geo_address_both">Display address if possible, in addition to GPS coords</string>
     <string name="preference_stamp_geo_address_prefer">Prefer address to GPS coords</string>
     <string name="preference_stamp_geo_address_no">Don\'t display address</string>
@@ -882,29 +881,82 @@
 
     <string name="camera_id">ID</string> <!-- ID as in camera ID -->
 
+    <string name="exposure_compensation_seekbar">Seekbar to change exposure compensation</string>
+
+    <string name="preference_image_format_summary">Select the file format used for saving photos. This affects \"standard\" (not RAW) photos. Note that PNG format is not truly lossless, instead it is converted from a JPEG at 100%% quality.\n%s</string>
+
+    <string name="preference_camera_api">Camera API</string>
+    <string name="preference_camera_api_summary">Select Camera2 API to enables extra feature such as manual modes for exposure, focus, white balance, along with RAW (if supported by the device), but may not work properly on all devices. Changing the API will cause a restart.\n%s</string>
+    <string name="preference_camera_api_old">Original camera API</string>
+    <string name="preference_camera_api_camera2">Camera2 API</string>
+
+    <string name="preference_audio_control_summary">Take photo/video when a noise is detected, or on voice command.
+        When enabled, use the on-screen microphone button to start/stop listening.
+        Note the voice command option uses the Android speech recognition service: when using this option, audio data is likely to
+        be sent to remote servers to perform speech recognition.
+        \n%s</string>
+
+    <string name="preference_stamp_geo_address_summary">If possible, use an address when stamping GPS locations.
+        This option requires an Internet connection.
+        Note that if enabled, this requires that your device transmits location data across the Internet to a third party
+        in order to convert GPS coordinates to an address. See https://developer.android.com/reference/android/location/Geocoder .
+        \n%s</string>
+
+    <string name="intro_text">Touch to focus, and press the blue camera button to take photos.
+        \n\nTo disable maximum screen brightness, see Settings/On screen GUI/\"Force maximum brightness\".
+        To save to SD cards on Android 5+, see Settings/More camera controls/\"Use Storage Access Framework\".
+        For more help, click \"Online help\" from Settings.
+    </string>
+
+    <!-- The following strings should not be translated (in case they need updating) -->
+
     <string name="preference_privacy_policy">Privacy policy</string>
-    <string name="preference_privacy_policy_text"> <!-- shouldn't be translated (in case it needs updating) -->
+    <string name="preference_privacy_policy_summary">Tap to display privacy policy</string>
+    <string name="preference_privacy_policy_online">Online privacy policy</string>
+    <string name="preference_privacy_policy_text"> <!-- if changing this, remember to consider if the online privacy policy needs updating -->
         Open Camera accesses camera sensor and microphone data to fulfil its purpose as a camera.
         Microphone is also used for the optional \"Audio control\".
-        Access to files is needed to save resultant photos and videos to your device.
-        Location permission is required for the optional geotagging/stamp/subtitles and Bluetooth features.
-        Please tap here for online privacy policy.
+        \nAccess to files is needed to save resultant photos and videos to your device.
+        \nLocation permission is required for the optional geotagging/stamp/subtitles and Bluetooth features.
+        \nSince Open Camera also uses operating system APIs, you should review relevant privacy policies
+        such as for your device, manufacturer, operating system and/or Google accounts. For example:
+        \n*The optional voice control option uses the Android speech recognition service. When enabled,
+        audio data is likely to be sent to remote servers by Android to perform speech recognition.
+        \n*The \"addresses\" option for photo stamp or video subtitles uses the Android Geocoder API.
+        When enabled, this requires that your device transmits location data across the Internet to a
+        third party (which may depend on what "backend services" are installed on your device).
+        \n*Apps/services such as cloud services on your device may auto-upload photos and videos that are saved on your device.
     </string>
+
+    <string name="speech_recognizer_extra_info">
+        (Your audio may be sent to remote\n
+        servers by Android to perform speech\n
+        recognition.)</string>
+
+    <string name="preference_screen_licences">Open Source licences</string>
+    <string name="preference_licence_open_camera">Open Camera</string>
+    <string name="preference_licence_open_camera_text">Open Camera is © 2013–2019 Mark Harman, released under the GPL v3 or later. Tap here for full licence text.</string>
+    <string name="preference_licence_google_icons">Google\'s Material Design icons</string>
+    <string name="preference_licence_google_icons_text">Open Camera uses icons from Google\'s Material Design icons
+        (https://developer.android.com/design/downloads/index.html ,
+        https://design.google.com/icons/ ,
+        https://github.com/google/material-design-icons/ ,
+        https://google.github.io/material-design-icons/)
+        under the Apache license version 2.0. Some icons include modifications. Tap here for full licence text.</string>
+    <string name="preference_licence_online">Online licences</string>
+    <string name="preference_licence_online_text">Please tap here for full online licensing information (opens in your browser).</string>
 
     <!-- There's no point translating the What's New text - it'll be updated constantly, and change each version -->
     <string name="whats_new_text">
         <small>[This dialog is shown when Open Camera is updated. You can disable it under
             Settings/On screen GUI/Show What\'s New dialog.]</small>
-        \n\n<b>v1.47:</b>\n
+        \n\n<b>v1.47.3:</b>\n
         <ul>
-            <li>New panorama photo mode (requires Android 5+, note not all devices are supported).\n</li>
-            <li>New option Settings/Photo settings/Text style/\"Text with shaded background\" for photo stamp.\n</li>
-            <li>Notifications now displayed on Android 8+ when Open Camera is in background when images are
-                still being processed/saved.\n</li>
-            <li>Camera ID is now displayed when switching cameras, on devices with more than two cameras.\n</li>
-            <li>Improved performance on Android 7+ when saving photos when using Storage Access Framework.\n</li>
-            <li>Other improvements and bug fixes.\n</li>
-
+            <li>Camera2 API option is now a \"list\" selection rather than a toggle switch. This option
+            should be copied over, but just in case, if you had enabled Camera2 API and Camera2 features
+            are no longer available, please check Settings/\"Camera API\".\n</li>
+            <li>Grids were being drawing too faintly.\n</li>
+            <li>Updated appearance of some icons.\n</li>
         </ul>
     </string>
 </resources>

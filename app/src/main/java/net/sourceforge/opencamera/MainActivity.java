@@ -473,7 +473,7 @@ public class MainActivity extends Activity {
                     // E.g., we have a "What's New" for 1.44 (64), but then push out a quick fix for 1.44.1 (65). We don't want to
                     // show the dialog again to people who already received 1.44 (64), but we still want to show the dialog to people
                     // upgrading from earlier versions.
-                    int whats_new_version = 71; // 1.47
+                    int whats_new_version = 74; // 1.47.3
                     whats_new_version = Math.min(whats_new_version, version_code); // whats_new_version should always be <= version_code, but just in case!
                     if( MyDebug.LOG ) {
                         Log.d(TAG, "whats_new_version: " + whats_new_version);
@@ -489,15 +489,16 @@ public class MainActivity extends Activity {
                         alertDialog.setTitle(R.string.whats_new);
                         alertDialog.setMessage(R.string.whats_new_text);
                         alertDialog.setPositiveButton(android.R.string.ok, null);
-                        alertDialog.setNegativeButton(R.string.donate, new DialogInterface.OnClickListener() {
+                        /*alertDialog.setNegativeButton(R.string.donate, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 if( MyDebug.LOG )
                                     Log.d(TAG, "donate");
+                                // if we change this, remember that any page linked to must abide by Google Play developer policies!
                                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.DonateLink));
                                 startActivity(browserIntent);
                             }
-                        });
+                        });*/
                         alertDialog.show();
                     }
                 }
@@ -582,12 +583,13 @@ public class MainActivity extends Activity {
             //Log.d(TAG, "is_pixel_xl_phone? " + is_pixel_xl_phone);
         }
         if( is_samsung || is_oneplus ) {
-            // workaround needed for Samsung S7 at least (tested on Samsung RTL)
+            // workaround needed for Samsung Galaxy S7 at least (tested on Samsung RTL)
             // workaround needed for OnePlus 3 at least (see http://forum.xda-developers.com/oneplus-3/help/camera2-support-t3453103 )
             // update for v1.37: significant improvements have been made for standard flash and Camera2 API. But OnePlus 3T still has problem
             // that photos come out with a blue tinge if flash is on, and the scene is bright enough not to need it; Samsung devices also seem
             // to work okay, testing on S7 on RTL, but still keeping the fake flash mode in place for these devices, until we're sure of good
             // behaviour
+            // update for testing on Galaxy S10e: still needs fake flash
             if( MyDebug.LOG )
                 Log.d(TAG, "set fake flash for camera2");
             SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -745,6 +747,23 @@ public class MainActivity extends Activity {
 
         if( MyDebug.LOG )
             Log.d(TAG, "supports_camera2? " + supports_camera2);
+
+        // handle the switch from a boolean preference_use_camera2 to String preference_camera_api
+        // that occurred in v1.48
+        if( supports_camera2 ) {
+            SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+            if( !sharedPreferences.contains(PreferenceKeys.CameraAPIPreferenceKey) // doesn't have the new key set yet
+                    && sharedPreferences.contains("preference_use_camera2") // has the old key set
+                    && sharedPreferences.getBoolean("preference_use_camera2", false) // and camera2 was enabled
+            ) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "transfer legacy camera2 boolean preference to new api option");
+                SharedPreferences.Editor editor = sharedPreferences.edit();
+                editor.putString(PreferenceKeys.CameraAPIPreferenceKey, "preference_camera_api_camera2");
+                editor.remove("preference_use_camera2"); // remove the old key, just in case
+                editor.apply();
+            }
+        }
     }
 
     private void preloadIcons(int icons_id) {
@@ -840,15 +859,17 @@ public class MainActivity extends Activity {
         editor.apply();
     }
 
-    static String getOnlineHelpUrl(String append) {
+    private static String getOnlineHelpUrl(String append) {
         if( MyDebug.LOG )
             Log.d(TAG, "getOnlineHelpUrl: " + append);
+        // if we change this, remember that any page linked to must abide by Google Play developer policies!
         return "https://opencamera.sourceforge.io/"+ append;
     }
 
     void launchOnlineHelp() {
         if( MyDebug.LOG )
             Log.d(TAG, "launchOnlineHelp");
+        // if we change this, remember that any page linked to must abide by Google Play developer policies!
         Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(getOnlineHelpUrl("")));
         startActivity(browserIntent);
     }
@@ -856,7 +877,17 @@ public class MainActivity extends Activity {
     void launchOnlinePrivacyPolicy() {
         if( MyDebug.LOG )
             Log.d(TAG, "launchOnlinePrivacyPolicy");
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/index.html#privacy"));
+        // if we change this, remember that any page linked to must abide by Google Play developer policies!
+        //Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/index.html#privacy"));
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://opencamera.sourceforge.io/privacy_oc.html"));
+        startActivity(browserIntent);
+    }
+
+    void launchOnlineLicences() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "launchOnlineLicences");
+        // if we change this, remember that any page linked to must abide by Google Play developer policies!
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(getOnlineHelpUrl("#licence")));
         startActivity(browserIntent);
     }
 
@@ -988,8 +1019,8 @@ public class MainActivity extends Activity {
         initLocation();
         initGyroSensors();
         soundPoolManager.initSound();
-        soundPoolManager.loadSound(R.raw.beep);
-        soundPoolManager.loadSound(R.raw.beep_hi);
+        soundPoolManager.loadSound(R.raw.mybeep);
+        soundPoolManager.loadSound(R.raw.mybeep_hi);
 
         mainUI.layoutUI();
 
@@ -1338,7 +1369,9 @@ public class MainActivity extends Activity {
                     }
                 }
                 if( has_audio_permission ) {
-                    preview.showToast(audio_control_toast, R.string.speech_recognizer_started);
+                    String toast_string = this.getResources().getString(R.string.speech_recognizer_started) + "\n" +
+                            this.getResources().getString(R.string.speech_recognizer_extra_info);
+                    preview.showToast(audio_control_toast, toast_string);
                     speechControl.startSpeechRecognizerIntent();
                     speechControl.speechRecognizerStarted();
                 }
@@ -2043,7 +2076,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private MyPreferenceFragment getPreferenceFragment() {
+    public MyPreferenceFragment getPreferenceFragment() {
         return (MyPreferenceFragment)getFragmentManager().findFragmentByTag("PREFERENCE_FRAGMENT");
     }
 
@@ -2284,12 +2317,12 @@ public class MainActivity extends Activity {
         if( sharedPreferences.getBoolean(PreferenceKeys.getKeepDisplayOnPreferenceKey(), true) ) {
             if( MyDebug.LOG )
                 Log.d(TAG, "do keep screen on");
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            this.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         else {
             if( MyDebug.LOG )
                 Log.d(TAG, "don't keep screen on");
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            this.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         if( sharedPreferences.getBoolean(PreferenceKeys.getShowWhenLockedPreferenceKey(), true) ) {
             if( MyDebug.LOG )
@@ -2641,7 +2674,7 @@ public class MainActivity extends Activity {
         if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
             int n_images_to_save = applicationInterface.getImageSaver().getNRealImagesToSave();
             Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.take_photo)
+                    .setSmallIcon(R.drawable.ic_stat_notify_take_photo)
                     .setContentTitle(getString(R.string.app_name))
                     .setContentText(getString(R.string.image_saving_notification) + " " + n_images_to_save + " " + getString(R.string.remaining))
                     //.setStyle(new Notification.BigTextStyle()
@@ -2743,7 +2776,7 @@ public class MainActivity extends Activity {
                 if( MyDebug.LOG )
                     Log.d(TAG, "try ACTION_VIEW");
                 Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                // from http://stackoverflow.com/questions/11073832/no-activity-found-to-handle-intent - needed to fix crash if no gallery app installed
+                // see http://stackoverflow.com/questions/11073832/no-activity-found-to-handle-intent - needed to fix crash if no gallery app installed
                 //Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("blah")); // test
                 if( intent.resolveActivity(getPackageManager()) != null ) {
                     try {
@@ -2846,14 +2879,11 @@ public class MainActivity extends Activity {
                     Uri treeUri = resultData.getData();
                     if( MyDebug.LOG )
                         Log.d(TAG, "returned treeUri: " + treeUri);
-                    // from https://developer.android.com/guide/topics/providers/document-provider.html#permissions :
-                    final int takeFlags = resultData.getFlags()
-                            & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    // see https://developer.android.com/guide/topics/providers/document-provider.html#permissions :
+                    final int takeFlags = resultData.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                     try {
 					/*if( true )
 						throw new SecurityException(); // test*/
-                        // Check for the freshest data.
                         getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
 
                         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
@@ -3834,11 +3864,8 @@ public class MainActivity extends Activity {
         this.supports_force_video_4k = false;
     }
 
-    public static final String DonateLink = "https://play.google.com/store/apps/details?id=harman.mark.donation";
-
-    /*public static String getDonateMarketLink() {
-    	return "market://details?id=harman.mark.donation";
-    }*/
+    // if we change this, remember that any page linked to must abide by Google Play developer policies!
+    //public static final String DonateLink = "https://play.google.com/store/apps/details?id=harman.mark.donation";
 
     public Preview getPreview() {
         return this.preview;
@@ -4279,9 +4306,9 @@ public class MainActivity extends Activity {
             Log.d(TAG, "restartOpenCamera");
         this.waitUntilImageQueueEmpty();
         // see http://stackoverflow.com/questions/2470870/force-application-to-restart-on-first-activity
-        Intent i = this.getBaseContext().getPackageManager().getLaunchIntentForPackage( this.getBaseContext().getPackageName() );
-        i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(i);
+        Intent intent = this.getBaseContext().getPackageManager().getLaunchIntentForPackage( this.getBaseContext().getPackageName() );
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        this.startActivity(intent);
     }
 
     public void takePhotoButtonLongClickCancelled() {

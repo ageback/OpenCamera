@@ -16,7 +16,7 @@
         "message":"This website uses cookies, including for Google Analytics and to display ads",
         "dismiss":"Got it!",
         "learnMore":"More info",
-        "link":"http://opencamera.org.uk/#privacy",
+        "link":"http://opencamera.org.uk/privacy_oc.html",
         "theme":"dark-bottom"};
 </script>
 
@@ -40,14 +40,14 @@
 
 <body>
 
-<img align="left" src="ic_launcher.png" alt="Open Camera icon" title="Open Camera icon" width="72" height="72">
+<a href="index.html"><img align="left" src="ic_launcher.png" alt="Open Camera icon" title="Open Camera icon" width="72" height="72"></a>
 <hr>
 <center><h2>Open Camera Device Compatibility</h2></center>
 <hr>
 
 <p>&lt; <small><a href="index.html">Main Page.</a></small></p>
 
-<p>This page provides some guidance on compatibility of various Android devices with Open Camera. Please note the following:</p>
+<p>This page provides some guidance on possible issues of Open Camera on various Android&trade; devices. Please note the following:</p>
 <ul>
         <li>Sometimes behaviour can be affected by things like operating system version or can differ between variants of the same
                 model. Behaviour may also change over time depending on different versions of Open Camera, and different
@@ -59,7 +59,7 @@
 
 <h2>General notes</h2>
 
-<p>If you're just interested in taking photos with non-advanced features (without enabling "Camera2 API"), then most things
+<p>If you're just interested in taking photos with non-advanced features (without using "Camera2 API"), then most things
         should work on most devices, as far as I can tell. I do occasionally get bug reports of things which seem to be device
         specific, but not enough to draw conclusions about things not working on particular devices. The most commonly reported
         issues seems to be:</p>
@@ -69,8 +69,8 @@
                 all.</li>
         <li>If you're wanting to save to external SD cards, you'll need to follow the advice at
                 <a href="http://opencamera.org.uk/help.html#faq">the FAQ</a> . Note that in some cases, it seems that SD cards
-                can't be selected even when using the Storage Access Framework option - this is an operating system issue, and
-                something out of my control (due to the way Google have locked down on SD cards). If you're wanting to have lots
+                can't be selected even when using the Storage Access Framework option - this is a device issue, and
+                something out of my control. If you're wanting to have lots
                 of storage for taking photos or videos, it's probably better to make sure you get a device with plenty of
                 internal storage (internal storage is faster anyway, so means faster taking of photos, and more reliable high
                 resolution video recording).</li>
@@ -92,8 +92,7 @@
 
 <p>In general, Google Nexuses have worked well for Open Camera. Firstly because Google provide good support for their own
         Android camera API, both old and Camera2 (as you'd hope!) - and they use it for their own Google camera. Secondly because
-        I've owned several Nexuses (Galaxy Nexus, Nexus 7, Nexus 6), and so have been able to test Open Camera against them.
-        That's not to say they're bug free (exposure lock has sometimes been flaky for example).</p>
+        I've owned several Nexuses (Galaxy Nexus, Nexus 7, Nexus 6), and so have been able to test Open Camera against them.</p>
 
 <p>Camera2 on the Nexus 6 works well (there are some minor issues, e.g., manual exposure doesn't work well when recording
         video). It's hard to be sure about other Nexuses though.</p>
@@ -113,9 +112,11 @@ seem to work including Camera2 features. Open Camera also supports Google's HDR+
 
 <h3>Lenovo Vibe S1</h3>
 
-<p>A special prize goes to this device - several people have told me they can't even install Open Camera (error 504 from
-        Google Play) on at least some versions of this device. This seems to be due to a pre-installed app "Stereo Verify"
-        that uses Open Camera's package name (net.sourceforge.opencamera), which prevents installation of Open Camera.</p>
+<p>A special prize goes to this device - several people have told me they can't even install Open Camera (Google Play
+        gives error 504) on at least some versions of this device. This appears to be due to a pre-installed app "Stereo Verify"
+        that clashes with Open Camera's package name (net.sourceforge.opencamera), which prevents installation of Open Camera.
+        Also see
+        <a href="http://forum.xda-developers.com/vibe-p1/help/stereo-verify-t3454811">here</a> for further discussion.</p>
 
 <h3>Nokia</h3>
 
@@ -205,7 +206,7 @@ manual controls, RAW and 120fps video.</p>
 
 <h3>Sony Xperia</h3>
 
-<p>To enable the 23MP photo resolution, you need to enable Settings/"Use Camera2 API". Someone has reported to me this works on the
+<p>To enable the 23MP photo resolution, you need to set Settings/"Camera API" to "Camera2 API". Someone has reported to me this works on the
         Sony XA1 (G3123) (Android 8), I'm not sure about older devices.</p>
 <!--<p>23MP photo resolution isn't available, the maximum seems to be 8MP. This seems to be due to
         <a href="http://talk.sonymobile.com/t5/Xperia-Z5-Z5-Compact-Z5-Premium/Full-camera-res-in-third-party-apps/td-p/1045437/highlight/true/page/4">Sony
@@ -217,7 +218,8 @@ manual controls, RAW and 120fps video.</p>
 <p>I've had a report that manual white balance temperature doesn't work (Sony Xperia X Compact).</p>
 
 <hr>
-<p><a href="http://opencamera.org.uk/#privacy">Open Camera Privacy Policy.</a></p>
+<p><a href="privacy_oc.html">Open Camera Privacy Policy.</a></p>
+<p>This website uses icons from third party sources, see <a href="index.html#licence">licences.</a></p>
 <p><a href="http://sourceforge.net/p/opencamera/">Open Camera on Sourceforge.</a></p>
 <p><a href="http://mark-h.users.sourceforge.net/">More of my Free software.</a></p>
 <hr>

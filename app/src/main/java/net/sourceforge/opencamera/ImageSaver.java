@@ -2094,6 +2094,7 @@ public class ImageSaver extends Thread {
                         Address address = null;
                         if( request.store_location && !request.preference_stamp_geo_address.equals("preference_stamp_geo_address_no") ) {
                             // try to find an address
+                            // n.b., if we update the class being used, consider whether the info on Geocoder in preference_stamp_geo_address_summary needs updating
                             if( Geocoder.isPresent() ) {
                                 if( MyDebug.LOG )
                                     Log.d(TAG, "geocoder is present");
@@ -3207,7 +3208,7 @@ public class ImageSaver extends Thread {
                 Log.d(TAG, "    exif orientation string: " + exif_orientation_s);
             boolean needs_tf = false;
             int exif_orientation = 0;
-            // from http://jpegclub.org/exif_orientation.html
+            // see http://jpegclub.org/exif_orientation.html
             // and http://stackoverflow.com/questions/20478765/how-to-get-the-correct-orientation-of-the-image-selected-from-the-default-image
             switch (exif_orientation_s) {
                 case ExifInterface.ORIENTATION_UNDEFINED:

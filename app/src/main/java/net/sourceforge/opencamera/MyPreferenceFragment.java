@@ -13,7 +13,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
-import android.content.Intent;
+//import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.PackageInfo;
@@ -21,7 +21,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.Point;
-import android.net.Uri;
+//import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.EditTextPreference;
@@ -34,9 +34,8 @@ import android.preference.PreferenceGroup;
 import android.preference.PreferenceManager;
 import android.preference.TwoStatePreference;
 import android.text.SpannableString;
-import android.text.Spanned;
+//import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
-import android.text.style.URLSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
@@ -47,12 +46,14 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Scanner;
 
 /** Fragment to handle the Settings UI. Note that originally this was a
  *  PreferenceActivity rather than a PreferenceFragment which required all
@@ -696,7 +697,54 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
             }
         }
 
-        final boolean supports_camera2 = bundle.getBoolean("supports_camera2");
+        {
+            List<String> camera_api_values = new ArrayList<>();
+            List<String> camera_api_entries = new ArrayList<>();
+
+            // all devices support old api
+            camera_api_values.add("preference_camera_api_old");
+            camera_api_entries.add(getActivity().getResources().getString(R.string.preference_camera_api_old));
+
+            final boolean supports_camera2 = bundle.getBoolean("supports_camera2");
+            if( MyDebug.LOG )
+                Log.d(TAG, "supports_camera2: " + supports_camera2);
+            if( supports_camera2 ) {
+                camera_api_values.add("preference_camera_api_camera2");
+                camera_api_entries.add(getActivity().getResources().getString(R.string.preference_camera_api_camera2));
+            }
+
+            if( camera_api_values.size() == 1 ) {
+                // if only supports 1 API, no point showing the preference
+                camera_api_values.clear();
+                camera_api_entries.clear();
+            }
+
+            readFromBundle(camera_api_values.toArray(new String[0]), camera_api_entries.toArray(new String[0]), "preference_camera_api", PreferenceKeys.CameraAPIPreferenceDefault, "preference_category_online");
+
+            if( camera_api_values.size() >= 2 ) {
+                final Preference pref = findPreference("preference_camera_api");
+                pref.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+                    @Override
+                    public boolean onPreferenceChange(Preference arg0, Object newValue) {
+                        if( pref.getKey().equals("preference_camera_api") ) {
+                            ListPreference list_pref = (ListPreference)pref;
+                            if( list_pref.getValue().equals(newValue) ) {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "user selected same camera API");
+                            }
+                            else {
+                                if( MyDebug.LOG )
+                                    Log.d(TAG, "user changed camera API - need to restart");
+                                MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
+                                main_activity.restartOpenCamera();
+                            }
+                        }
+                        return true;
+                    }
+                });
+            }
+        }
+        /*final boolean supports_camera2 = bundle.getBoolean("supports_camera2");
         if( MyDebug.LOG )
             Log.d(TAG, "supports_camera2: " + supports_camera2);
         if( supports_camera2 ) {
@@ -719,7 +767,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
             Preference pref = findPreference("preference_use_camera2");
             PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_category_online");
             pg.removePreference(pref);
-        }
+        }*/
 
         {
             final Preference pref = findPreference("preference_online_help");
@@ -746,14 +794,68 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                     if( pref.getKey().equals("preference_privacy_policy") ) {
                         if( MyDebug.LOG )
                             Log.d(TAG, "user clicked privacy policy");
-                        MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
-                        main_activity.launchOnlinePrivacyPolicy();
+
+                        clickedPrivacyPolicy();
+                    }
+                    return false;
+                }
+            });
+        }
+
+        // licences
+
+        {
+            final Preference pref = findPreference("preference_licence_open_camera");
+            pref.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference arg0) {
+                    if( pref.getKey().equals("preference_licence_open_camera") ) {
+                        if( MyDebug.LOG )
+                            Log.d(TAG, "user clicked open camera licence");
+                        // display the GPL v3 text
+                        displayTextDialog(R.string.preference_licence_open_camera, "gpl-3.0.txt");
                         return false;
                     }
                     return false;
                 }
             });
         }
+
+        {
+            final Preference pref = findPreference("preference_licence_google_icons");
+            pref.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference arg0) {
+                    if( pref.getKey().equals("preference_licence_google_icons") ) {
+                        if( MyDebug.LOG )
+                            Log.d(TAG, "user clicked google material design icons licence");
+                        // display the Apache licence 2.0 text
+                        displayTextDialog(R.string.preference_licence_google_icons, "google_material_design_icons_LICENSE-2.0.txt");
+                        return false;
+                    }
+                    return false;
+                }
+            });
+        }
+
+        {
+            final Preference pref = findPreference("preference_licence_online");
+            pref.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference arg0) {
+                    if( pref.getKey().equals("preference_licence_online") ) {
+                        if( MyDebug.LOG )
+                            Log.d(TAG, "user clicked online licences");
+                        MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
+                        main_activity.launchOnlineLicences();
+                        return false;
+                    }
+                    return false;
+                }
+            });
+        }
+
+        // end licences
 
         {
             ListPreference pref = (ListPreference)findPreference("preference_ghost_image");
@@ -910,7 +1012,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
             });
         }
 
-        {
+        /*{
             final Preference pref = findPreference("preference_donate");
             pref.setOnPreferenceClickListener(new OnPreferenceClickListener() {
                 @Override
@@ -918,17 +1020,6 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                     if( pref.getKey().equals("preference_donate") ) {
                         if( MyDebug.LOG )
                             Log.d(TAG, "user clicked to donate");
-            	        /*Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.getDonateMarketLink()));
-            	        try {
-            	        	startActivity(browserIntent);
-            	        }
-            			catch(ActivityNotFoundException e) {
-            				// needed in case market:// not supported
-            				if( MyDebug.LOG )
-            					Log.d(TAG, "can't launch market:// intent");
-                	        browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.getDonateLink()));
-            	        	startActivity(browserIntent);
-            			}*/
                         Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(MainActivity.DonateLink));
                         startActivity(browserIntent);
                         return false;
@@ -936,7 +1027,7 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                     return false;
                 }
             });
-        }
+        }*/
 
         {
             final Preference pref = findPreference("preference_about");
@@ -949,8 +1040,6 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                         AlertDialog.Builder alertDialog = new AlertDialog.Builder(MyPreferenceFragment.this.getActivity());
                         alertDialog.setTitle(R.string.preference_about);
                         final StringBuilder about_string = new StringBuilder();
-                        final String gpl_link = "GPL v3 or later";
-                        final String online_help_link = "online help";
                         String version = "UNKNOWN_VERSION";
                         int version_code = -1;
                         try {
@@ -967,10 +1056,6 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                         about_string.append(version);
                         about_string.append("\nCode: ");
                         about_string.append(version_code);
-                        about_string.append("\n(c) 2013-2019 Mark Harman");
-                        about_string.append("\nReleased under the ");
-                        about_string.append(gpl_link);
-                        about_string.append(" (Open Camera also uses additional third party files, see " + online_help_link + " for full licences and attributions.)");
                         about_string.append("\nPackage: ");
                         about_string.append(MyPreferenceFragment.this.getActivity().getPackageName());
                         about_string.append("\nAndroid API version: ");
@@ -1252,9 +1337,6 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                         }
 
                         SpannableString span = new SpannableString(about_string);
-                        // Google Play prelaunch accessibility warnings suggest using URLSpan instead of ClickableSpan
-                        span.setSpan(new URLSpan("http://www.gnu.org/copyleft/gpl.html"), about_string.indexOf(gpl_link), about_string.indexOf(gpl_link) + gpl_link.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
-                        span.setSpan(new URLSpan(MainActivity.getOnlineHelpUrl("#licence")), about_string.indexOf(online_help_link), about_string.indexOf(online_help_link) + online_help_link.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
 
                         // clickable text is only supported if we call setMovementMethod on the TextView - which means we need to create
                         // our own for the AlertDialog!
@@ -1438,6 +1520,69 @@ public class MyPreferenceFragment extends PreferenceFragment implements OnShared
                     return false;
                 }
             });
+        }
+    }
+
+    /* The user clicked the privacy policy preference.
+     */
+    public void clickedPrivacyPolicy() {
+        if( MyDebug.LOG )
+            Log.d(TAG, "clickedPrivacyPolicy()");
+        /*MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
+        main_activity.launchOnlinePrivacyPolicy();*/
+
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(MyPreferenceFragment.this.getActivity());
+        alertDialog.setTitle(R.string.preference_privacy_policy);
+        alertDialog.setMessage(R.string.preference_privacy_policy_text);
+        alertDialog.setPositiveButton(android.R.string.ok, null);
+        alertDialog.setNegativeButton(R.string.preference_privacy_policy_online, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "online privacy policy");
+                MainActivity main_activity = (MainActivity)MyPreferenceFragment.this.getActivity();
+                main_activity.launchOnlinePrivacyPolicy();
+            }
+        });
+        final AlertDialog alert = alertDialog.create();
+        // AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+        alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface arg0) {
+                if( MyDebug.LOG )
+                    Log.d(TAG, "reset dialog dismissed");
+                dialogs.remove(alert);
+            }
+        });
+        alert.show();
+        dialogs.add(alert);
+    }
+
+    /* Displays a dialog with text loaded from a file in assets.
+     */
+    private void displayTextDialog(int title_id, String file) {
+        try {
+            InputStream inputStream = getActivity().getAssets().open(file);
+            Scanner scanner = new Scanner(inputStream).useDelimiter("\\A");
+            AlertDialog.Builder alertDialog = new AlertDialog.Builder(MyPreferenceFragment.this.getActivity());
+            alertDialog.setTitle(getActivity().getResources().getString(title_id));
+            alertDialog.setMessage(scanner.next());
+            alertDialog.setPositiveButton(android.R.string.ok, null);
+            final AlertDialog alert = alertDialog.create();
+            // AlertDialog.Builder.setOnDismissListener() requires API level 17, so do it this way instead
+            alert.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                @Override
+                public void onDismiss(DialogInterface arg0) {
+                    if( MyDebug.LOG )
+                        Log.d(TAG, "text dialog dismissed");
+                    dialogs.remove(alert);
+                }
+            });
+            alert.show();
+            dialogs.add(alert);
+        }
+        catch(IOException e) {
+            e.printStackTrace();
         }
     }
 

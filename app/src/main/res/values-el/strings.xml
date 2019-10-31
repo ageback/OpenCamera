@@ -4,7 +4,6 @@
     <string name="app_name">Open Camera</string> <!-- shouldn't be translated -->
     <string name="action_settings">Ρυθμίσεις</string>
     <string name="action_popup">Ρυθμίσεις Παραθύρου</string>
-    <string name="intro_text">Πατήστε για να εστιάσετε και πατήστε το μπλε πλήκτρο της κάμερας για να τραβήξετε φωτογραφίες. Για περισσότερη βοήθεια, κάντε κλικ στην βοήθεια στις Ρυθμίσεις. Το Open Camera είναι εντελώς δωρεάν. Αν σας αρέσει αυτή η εφαρμογή, παρακαλείστε να εξετάσετε την πιθανότητα μιας δωρεάς :) (βλέπε σύνδεσμο σε Ρυθμίσεις, η στην Διαδικτυακή Βοήθεια).\n\nΠολιτική Προσωπικών Δεδομένων: Η άδεια για τη λειτουργία απαιτεί την προσθήκη μιας γεωγραφικής ετικέτας, αλλά αυτό είναι απενεργοποιημένο από προεπιλογή. Αν ενεργοποιηθεί, η τοποθεσία σας είναι κωδικοποιημένη στα αποθηκευμένα αρχεία (χρησιμοποιούνται μόνο για το σκοπό αυτό).</string>
     <string name="intro_ok">OK (Καμμία εμφάνιση αυτού του μυνήματος ξανά)</string>
 
     <string name="on">On</string> <!-- whether a setting is turned on, e.g., "Auto-level: On" -->
@@ -107,7 +106,6 @@
     <string name="preference_shutter_sound_summary">Αναπαραγωγή ήχου κατά την λήψη φωτογραφίας</string>
     <string name="preference_volume_keys">Πλήκτρα ρύθμισης ήχου</string>
     <string name="preference_audio_control">Ρυθμίσεις ελέγχου του ήχου</string>
-    <string name="preference_audio_control_summary">Κατά την λήψη φωτογραφίας η εγγραφή βίντεο, όταν ένας θόρυβος εντοπίζετε, ακούγεται μια φωνητική εντολή (\"cheese\"). Όταν είναι ενεργοποιημένη, χρησιμοποιήστε στην οθόνη, το πλήκτρο μικροφώνου για να ξεκινήσει και να σταματήσει.</string> <!-- note that cheese shouldn't be translated, as we listen for this no matter what language is being used -->
     <string name="preference_audio_noise_control_sensitivity">Ευαισθησία ελέγχου του ήχου</string>
     <string name="preference_audio_noise_control_sensitivity_summary">Επίπεδο θορύβου ευαισθησίας για τον ήχο</string>
     <string name="preference_save_location">Χώρος αποθήκευσης</string>

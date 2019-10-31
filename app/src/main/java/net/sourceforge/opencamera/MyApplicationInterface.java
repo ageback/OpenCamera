@@ -34,7 +34,6 @@ import android.graphics.Rect;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
-import android.media.CamcorderProfile;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
@@ -233,7 +232,10 @@ public class MyApplicationInterface extends BasicApplicationInterface {
     @Override
     public boolean useCamera2() {
         if( main_activity.supportsCamera2() ) {
-            return sharedPreferences.getBoolean(PreferenceKeys.UseCamera2PreferenceKey, false);
+            String camera_api = sharedPreferences.getString(PreferenceKeys.CameraAPIPreferenceKey, PreferenceKeys.CameraAPIPreferenceDefault);
+            if( "preference_camera_api_camera2".equals(camera_api) ) {
+                return true;
+            }
         }
         return false;
     }
@@ -1933,8 +1935,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                                 else {
                                     if( MyDebug.LOG )
                                         Log.d(TAG, "last_video_file_saf: " + last_video_file_saf);
-                                    File file = storageUtils.getFileFromDocumentUriSAF(last_video_file_saf, false);
-                                    String subtitle_filename = file.getName();
+                                    String subtitle_filename = storageUtils.getFileName(last_video_file_saf);
                                     subtitle_filename = getSubtitleFilename(subtitle_filename);
                                     Uri subtitle_uri = storageUtils.createOutputFileSAF(subtitle_filename, ""); // don't set a mimetype, as we don't want it to append a new extension
                                     ParcelFileDescriptor pfd_saf = getContext().getContentResolver().openFileDescriptor(subtitle_uri, "w");
@@ -2358,7 +2359,7 @@ public class MyApplicationInterface extends BasicApplicationInterface {
             if( MyDebug.LOG )
                 Log.d(TAG, "play beep!");
             boolean is_last = remaining_time <= 1000;
-            main_activity.getSoundPoolManager().playSound(is_last ? R.raw.beep_hi : R.raw.beep);
+            main_activity.getSoundPoolManager().playSound(is_last ? R.raw.mybeep_hi : R.raw.mybeep);
         }
         if( sharedPreferences.getBoolean(PreferenceKeys.getTimerSpeakPreferenceKey(), false) ) {
             if( MyDebug.LOG )
@@ -2690,9 +2691,11 @@ public class MyApplicationInterface extends BasicApplicationInterface {
         if( shadow == Shadow.SHADOW_OUTLINE ) {
             paint.setColor(background);
             paint.setStyle(Paint.Style.STROKE);
+            float current_stroke_width = paint.getStrokeWidth();
             paint.setStrokeWidth(1);
             canvas.drawText(text, location_x, location_y, paint);
             paint.setStyle(Paint.Style.FILL); // set back to default
+            paint.setStrokeWidth(current_stroke_width); // reset
         }
         return text_bounds.bottom - text_bounds.top;
     }

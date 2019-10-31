@@ -4,7 +4,6 @@
     <string name="app_name">Open Camera</string> <!-- shouldn't be translated -->
     <string name="action_settings">Einstellungen</string>
     <string name="action_popup">Popup-Einstellungen</string>
-    <string name="intro_text">Zum Fokussieren das Display berühren und den blauen Button drücken um Fotos zu machen. Mehr Hilfe erhalten Sie über Einstellungen-&gt;Online-Hilfe. Open Camera ist vollkommen frei. Wenn Sie diese App mögen, wäre es schön, wenn Sie meine Spenden-App kaufen :) (Link hierzu in den Einstellungen oder der Online-Hilfe)\n\nDatenschutz: Der Standortzugriff wird für das Geotagging gebraucht, was jedoch standardmäßig deaktiviert ist. Wenn aktiviert, wird Ihr Standort lediglich in den Aufnahmen gespeichert.</string>
     <string name="intro_ok">OK (Diese Nachricht wird nicht wieder angezeigt.)</string>
 
     <string name="on">Ein</string> <!-- whether a setting is turned on, e.g., "Auto-stabilise: On" -->
@@ -108,13 +107,12 @@
     <string name="preference_shutter_sound_summary">Abspielen eines Tones bei der Aufnahme (benötigt Android 4.2 oder höher zum Deaktivieren)</string>
     <string name="preference_volume_keys">Lautstärketasten</string>
     <string name="preference_audio_control">Audio Steuerungsoptionen</string>
-    <string name="preference_audio_control_summary">Nimm ein Foto nach einem lauten Geräusch oder Sprachkommando (\"cheese\") auf. When akktiviert, benutze den OnScreen Mikrofone Knopf um die Funktion zu (de)aktivieren.</string>
     <string name="preference_audio_noise_control_sensitivity">Audio Steuerung Empfindlichkeit</string>
     <string name="preference_audio_noise_control_sensitivity_summary">Mikroempfindlichkeit für lautes Geräusch</string>
     <string name="preference_save_location">Speicherort</string>
     <string name="preference_save_location_summary">Ordner, wo die Fotos/Videos gespeichert werden</string>
     <string name="preference_using_saf">Benutze Storage Access Framework</string>
-    <string name="preference_using_saf_summary">Für das Speichern der Fotos/Videos Androids Storage Access Framework verwenden</string>
+    <string name="preference_using_saf_summary">Für das Speichern der Fotos/Videos Storage Access Framework verwenden</string>
     <string name="preference_save_photo_prefix">Foto-Präfix</string>
     <string name="preference_save_photo_prefix_summary">Den Präfix für die Dateinamen der Fotos einstellen</string>
     <string name="preference_save_video_prefix">Video-Präfix</string>
@@ -757,7 +755,6 @@
     <string name="preference_remote_type_kraken">Kraken Smart Housing</string>
 
     <string name="preference_stamp_geo_address">Verwende Adressen</string>
-    <string name="preference_stamp_geo_address_summary">Wenn möglich, verwende Adressdaten wenn die GPS-Position ins Bild gestempelt wird. Diese Option benötigt eine Internat-Verbindung.\n%s</string>
     <string name="preference_stamp_geo_address_both">Zeige zusätzlich zur GPS-Position die zugehörige Adresse an</string>
     <string name="preference_stamp_geo_address_prefer">Bevorzuge Adressdaten vor GPS-Koordinaten</string>
     <string name="preference_stamp_geo_address_no">Zeige keine Adressdaten an</string>

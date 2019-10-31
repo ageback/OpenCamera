@@ -4,7 +4,6 @@
     <string name="app_name">Open Camera</string> <!-- shouldn't be translated -->
     <string name="action_settings">Cài đặt</string>
     <string name="action_popup">Cài đặt cửa sổ bật lên</string>
-    <string name="intro_text">Chạm để lấy nét và nhấn nút camera trên màn hình để chụp ảnh. Để nhận thêm trợ giúp, nhấn Trợ giúp trực tuyến trong Cài đặt. Open Camera hoàn toàn miễn phí và không có quảng cáo. Nếu bạn thích ứng dụng này, vui lòng cân nhắc việc quyên góp cho tôi :) (xem liên kết trong Cài đặt hoặc Trợ giúp trực tuyến).\n\nChính sách bảo mật: Quyền vị trí cần được cấp phép để gắn thẻ địa lý, nhưng mặc định đã bị vô hiệu hóa. Nếu kích hoạt, vị trí của bạn sẽ được mã hóa trong các tệp đã lưu (chỉ sử dụng cho mục đích trên).</string>
     <string name="intro_ok">OK (Thông báo này không hiển thị nữa)</string>
 
     <string name="on">Bật</string> <!-- whether a setting is turned on, e.g., "Auto-level: On" -->
@@ -108,7 +107,6 @@
     <string name="preference_shutter_sound_summary">Phát âm thanh khi chụp ảnh</string>
     <string name="preference_volume_keys">Phím âm lượng</string>
     <string name="preference_audio_control">Chụp bằng tiếng</string>
-    <string name="preference_audio_control_summary">Chụp ảnh hoặc quay video khi phát hiện tiếng động lớn hoặc tiếng cheese. Khi kích hoạt, hãy sử dụng nút micrô trên màn hình để bắt đầu và tạm dừng nghe.</string> <!-- note that cheese shouldn't be translated, as we listen for this no matter what language is being used -->
     <string name="preference_audio_noise_control_sensitivity">Độ nhạy chụp bằng tiếng</string>
     <string name="preference_audio_noise_control_sensitivity_summary">Độ nhạy cho tùy chọn chụp bằng tiếng động lớn</string>
     <string name="preference_save_location">Vị trí lưu</string>
@@ -228,7 +226,7 @@
     <string name="preference_online_help">Trợ giúp trực tuyến</string>
     <string name="preference_online_help_summary">Truy cập trang chủ Open Camera bằng trình duyệt của bạn</string>
     <string name="preference_donate">Hỗ trợ phát triển</string>
-    <string name="preference_donate_summary">Nếu bạn thích ứng dụng này, vui lòng cân nhắc việc quyên góp để hỗ trợ phát triển. Bạn có thể quyên góp bằng cách mua ứng dụng quyên góp của tôi - nhấn vào đây để mở trang ứng dụng trên Google Play. Xin cảm ơn!</string>
+    <string name="preference_donate_summary">Nếu bạn thích ứng dụng này, vui lòng cân nhắc việc quyên góp để hỗ trợ phát triển. Bạn có thể quyên góp bằng cách mua ứng dụng quyên góp của tôi - nhấn vào đây để mở trang ứng dụng. Xin cảm ơn!</string>
     <string name="preference_use_camera2">Sử dụng Camera2 API</string>
     <string name="preference_use_camera2_summary">Kích hoạt các tính năng bổ sung như chế độ thủ công với các tùy chọn phơi sáng, lấy nét, cân bằng trắng và lưu ảnh RAW (nếu được hỗ trợ), có thể không hoạt động trên một số thiết bị (ứng dụng sẽ khởi động lại)</string>
     <string name="preference_about">Giới thiệu</string>

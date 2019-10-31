@@ -539,7 +539,7 @@ public class MainUI {
                 view.setTranslationX(2*height_pixels);
             }
             else if( ui_rotation == 0 ) {
-                view.setTranslationY(1*height_pixels);
+                view.setTranslationY(height_pixels);
             }
             else {
                 view.setTranslationY(-1*height_pixels);
@@ -1161,10 +1161,10 @@ public class MainUI {
                     break;
                 case "flash_torch":
                 case "flash_frontscreen_torch":
-                    view.setImageResource(R.drawable.flash_torch);
+                    view.setImageResource(R.drawable.baseline_highlight_white_48);
                     break;
                 case "flash_red_eye":
-                    view.setImageResource(R.drawable.flash_red_eye);
+                    view.setImageResource(R.drawable.baseline_remove_red_eye_white_48);
                     break;
             }
         }
