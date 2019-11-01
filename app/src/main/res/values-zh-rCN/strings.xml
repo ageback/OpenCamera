@@ -805,4 +805,20 @@
     <string name="preference_stamp_style_background">带有阴影背景的文本</string>
     <string name="preference_stamp_style_plain">纯文本</string>
     <string name="preference_stamp_style_shadowed">阴影文本</string>
+    <string name="exposure_compensation_seekbar">搜索栏更改曝光补偿</string>
+    <string name="preference_camera_api_old">原始 camera API</string>
+    <string name="preference_camera_api_summary">选择Camera2 API可启用其他功能，例如曝光，对焦，白平衡和RAW（如果设备支持）的手动模式，但可能无法在所有设备上正常工作。 更改API将导致重新启动。 %s</string>
+    <string name="preference_image_format_summary">选择用于保存照片的文件格式。 这会影响标准（非RAW）照片。 请注意，PNG格式并不是真正的无损格式，而是从JPEG转换为100%%的质量。 %s</string>
+    <string name="preference_licence_google_icons">Google的Material Design图标</string>
+    <string name="preference_licence_google_icons_text">Open Camera使用Google的Material Design图标（https://developer.android.com/design/downloads/index.html，https://design.google.com/icons/，https://github.com/google / material-design-icons /，https://google.github.io/material-design-icons/）下的Apache许可版本2.0。 一些图标包括修改。 点击此处查看完整的许可证文本。</string>
+    <string name="preference_licence_online">在线许可证</string>
+    <string name="preference_licence_online_text">请点击此处以获取完整的在线许可信息（在浏览器中打开）。</string>
+    <string name="preference_licence_open_camera">Open Camera</string>
+    <string name="preference_licence_open_camera_text">Open Camera是©2013–2019 Mark Harman，在GPL v3或更高版本下发布。 点击此处查看完整的许可证文本。</string>
+    <string name="preference_privacy_policy">隐私政策</string>
+    <string name="preference_privacy_policy_online">在线隐私政策</string>
+    <string name="preference_privacy_policy_summary">点击以显示隐私政策</string>
+    <string name="preference_privacy_policy_text">打开相机访问相机传感器和麦克风数据，以实现其作为相机的目的。麦克风也用于可选的音频控制。需要访问文件才能将生成的照片和视频保存到设备中。可选的地理标记/戳记/字幕和蓝牙功能需要位置许可。由于Open Camera还使用操作系统API，因此您应查看相关的隐私权政策，例如针对设备，制造商，操作系统和/或Google帐户的隐私权政策。例如：*可选的语音控制选项使用Android语音识别服务。启用后，Android可能会将音频数据发送到远程服务器以执行语音识别。 *照片图章或视频字幕的地址选项使用Android Geocoder API。启用后，这要求您的设备通过Internet将位置数据传输给第三方（这可能取决于设备上安装的后端服务）。 *您设备上的应用程序/服务（例如云服务）可能会自动上传保存在设备上的照片和视频。</string>
+    <string name="preference_screen_licences">开源许可证</string>
+    <string name="speech_recognizer_extra_info">（您的音频可以由Android发送到远程服务器以执行语音识别。）</string>
 </resources>
